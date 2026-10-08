@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -79,6 +79,7 @@ ExceptionFromNot0:
 %rep 6
         movsd      ;move exception frame to the client stack
 %endrep
+        cld
         mov dword [es:edi], Trap3Selector   ;store to the client stack
         sub edi, 4                    ;return address
         mov dword [es:edi], OffRetFromExcTrap3
@@ -881,6 +882,10 @@ S equ MaxSystemSwitchCode * 3
         mov [esi + DC_ES], ecx
         mov ecx, [ebp + RMS_FS]
         mov [esi + DC_FS], ecx
+        mov cx, [ebp + RMS_DS]
+        mov [esi + DC_DS], cx
+        mov cx, [ebp + RMS_GS]
+        mov [esi + DC_GS], cx
         mov cx, [ebp + RMS_Flags]
         mov [esi + DC_Flags], cx
         mov ecx, [ss:OffRMStack]

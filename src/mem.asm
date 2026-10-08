@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -15,7 +15,10 @@ malloc:
         pop es
         shl ebx, 16
         mov bx, cx
+        or ebx, ebx
+        jz near MemErrVal
         add _newsize, 1000h - 1
+        jc near MemErrNoMem
         and _newsize, ~(0FFFh)
         call FindLinWindow
         call MakeNewMCB
@@ -25,7 +28,7 @@ malloc:
         call AllocPages
         _ifnot jnc
           call FreeMCB
-          jmp MemError
+          jmp MemErrNoMem
         _endif
 ReturnMalloc:
         mov word [esp + PA_ECX], _offsetw
@@ -66,8 +69,7 @@ free:
         popad
         ret
 Err@16:
-        mov al, 0
-        jmp MemError
+        jmp MemErrHandle
 
 MemError3:
         pop ebp
@@ -76,9 +78,18 @@ MemError2:
 MemError1:
         pop ebp
 MemError:
-        ;mov  byte ptr [esp].PA_EAX, al
+        mov byte [esp + PA_EAX], al
         popad
         jmp DPMIError1
+MemErrVal:
+        mov al, 21h
+        jmp MemError
+MemErrNoMem:
+        mov al, 12h
+        jmp MemError
+MemErrHandle:
+        mov al, 23h
+        jmp MemError
 
 realloc:
         DPMIFn 5, 3
@@ -87,7 +98,7 @@ realloc:
 %define _optsize ebp
 %define _curmcb esi
 %define _optmcb ecx
-_err equ MemError
+_err equ MemErrHandle
         pushad
         push ds
         pop es
@@ -96,7 +107,10 @@ _err equ MemError
         shl esi, 16
         mov bx, cx
         mov si, di
+        or ebx, ebx
+        jz near MemErrVal
         add _newsize, 1000h - 1
+        jc near MemErrNoMem
         and _newsize, ~(0FFFh)
         cmp esi, OffMCBVector
         jb _err
@@ -174,7 +188,7 @@ FreeAndErr@18:
             cmp esp, edx
             _enddo jne
             pop esi
-            jmp MemError
+            jmp MemErrNoMem
           _else ; jmp
             neg _t
             mov _t1, dword [esi + MCB_EndOffset]
@@ -283,7 +297,7 @@ ReturnMalloc@18:
             push dword [esi + MCB_EndOffset]
             push 1
             call AllocPages
-            jc _err
+            jc near MemErrNoMem
             add dword [esi + MCB_EndOffset], _msize
           _else jmp
             sub dword [esi + MCB_EndOffset], _msize
@@ -361,6 +375,7 @@ L1@20:
         jnz Continue@20
         cmp _optsize, -(1)
         jne Exit@20
+        mov al, 12h
         jmp MemError3
 
 
@@ -429,6 +444,7 @@ AllocMCB@22:
         add dword [OffMCBVectorEnd], MCBStruct_size
         jmp Exit@22
 Error@22:
+        mov al, 12h
         jmp MemError1
 
 

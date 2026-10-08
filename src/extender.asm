@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -7,7 +7,7 @@
 ;DataPtr EQU ss:[ebp]
 ;WARN Res
 
-NHookedInterrupts equ 3
+NHookedInterrupts equ 4
 %assign p_ds 200h
 %assign p_es 0
 p_ax equ DC_EAX
@@ -94,6 +94,11 @@ EID21: dd Int21
         dw 0
         db 0
         db 21h
+EID2F: dd Int2F
+        dd 0
+        dw 0
+        db 0
+        db 2Fh
         ESEG EData
         LLabel FirstExtHandler
 $FirstExtHandler equ $
@@ -104,6 +109,10 @@ ExtHandlerStep equ $ - $FirstExtHandler
 
         pushfd
         push EID10
+        jmp short IntEntry
+
+        pushfd
+        push EID2F
         jmp short IntEntry
 
 int21entry:
@@ -150,11 +159,19 @@ Int10:
         db 0B8h
         dw p_esbp, r_ptr
         jmp CallMethod1
+Int2F:
+        cmp ah, 17h
+        jne near ToOldInt0
+        mov edi, int2F17Table
+        jmp CallMethod
 Int21:
         cmp eax, 0FF00h
         je GetExtVer?
         mov edi, int2144Table
         cmp ah, 44h
+        je CallMethod
+        mov edi, int2171Table
+        cmp ah, 71h
         je CallMethod
         mov edi, int21Table
 CallMethod3:
@@ -569,6 +586,339 @@ r_psp:
         mov eax, [OffSavedPSP]
         mov [ebp + DC_EBX], eax
         ret
+        SEGM EData
+%macro LfnOpd 4
+        db %1, %2, %3
+        dw %4
+%endmacro
+        LLabel LfnSpNone
+        db 0
+        LLabel LfnSpName
+        LfnOpd 1, DC_EDX, 2, 0
+        db 0
+        LLabel LfnSpCurDir
+        LfnOpd 3, DC_ESI, 2, 264
+        db 0
+        LLabel LfnSpFind1
+        LfnOpd 1, DC_EDX, 2, 0
+        LfnOpd 2, DC_EDI, 0, 318
+        db 0
+        LLabel LfnSpFind2
+        LfnOpd 2, DC_EDI, 0, 318
+        db 0
+        LLabel LfnSpRename
+        LfnOpd 1, DC_EDX, 2, 0
+        LfnOpd 1, DC_EDI, 0, 0
+        db 0
+        LLabel LfnSpTrue
+        LfnOpd 1, DC_ESI, 2, 0
+        LfnOpd 3, DC_EDI, 0, 264
+        db 0
+        LLabel LfnSpOpen
+        LfnOpd 1, DC_ESI, 2, 0
+        db 0
+        LLabel LfnSpVol
+        LfnOpd 1, DC_EDX, 2, 0
+        LfnOpd 5, DC_EDI, 0, 0
+        db 0
+        LLabel LfnSpInfo
+        LfnOpd 2, DC_EDX, 2, 52
+        db 0
+        LLabel LfnSpTimeIn
+        LfnOpd 4, DC_ESI, 2, 8
+        db 0
+        LLabel LfnSpTimeOut
+        LfnOpd 2, DC_EDI, 0, 8
+        db 0
+        LLabel LfnSpShort
+        LfnOpd 1, DC_ESI, 2, 0
+        LfnOpd 3, DC_EDI, 0, 16
+        db 0
+        LLabel LfnSpFcb
+        LfnOpd 1, DC_ESI, 2, 0
+        LfnOpd 2, DC_EDI, 0, 11
+        db 0
+        LLabel LfnSpSubst
+        LfnOpd 3, DC_EDX, 2, 264
+        db 0
+        ESEG EData
+LfnOp:
+        movzx eax, byte [esi]
+        or eax, eax
+        jz DosCall
+        sub esp, 28
+        mov [esp + 20], esi
+        movzx ebx, word [esi + 1]
+        mov [esp + 16], ebx
+        movzx ecx, word [esi + 3]
+        mov [esp + 12], eax
+        cmp eax, 1
+        _ifnot jne
+          call GetasciizLen
+        _else jmp
+          cmp eax, 5
+          _ifnot jne
+            movzx ecx, word [ebp + DC_ECX]
+            cmp ecx, 64
+            _ifnot jbe
+              mov ecx, 64
+              mov [ebp + DC_ECX], cx
+            _endif
+          _endif
+        _endif
+        mov [esp + 8], ecx
+        movzx eax, bh
+        mov edi, [OffTransferSegment]
+        mov [ebp + eax + DC_FirstSR], di
+        and ebx, 7Fh
+        mov esi, [OffTransferStack]
+        mov edi, esi
+        sub edi, ecx
+        jb near TransferStackOverflow
+        and edi, ~(3)
+        mov [esp + 0], esi
+        mov [esp + 24], edi
+        mov [OffTransferStack], edi
+        mov edx, [ebp + ebx]
+        mov [esp + 4], edx
+        mov [ebp + ebx], edi
+        mov eax, [esp + 12]
+        cmp eax, 1
+        je lfn_copyin
+        cmp eax, 4
+        jne lfn_nocopyin
+lfn_copyin:
+        movzx eax, byte [esp + 17]
+        mov fs, [ebp + eax + DC_FirstSR0]
+        mov esi, [esp + 4]
+        les edi, [OffTransferStack]
+        mov ecx, [esp + 8]
+        call MoveStr
+lfn_nocopyin:
+        mov esi, [esp + 20]
+        add esi, 5
+        call LfnOp
+        test byte [ebp + DC_Flags], 1
+        jnz lfn_restore
+        mov eax, [esp + 12]
+        cmp eax, 2
+        je lfn_copyback
+        cmp eax, 3
+        je lfn_copyz
+        cmp eax, 5
+        jne lfn_restore
+lfn_copyz:
+        mov fs, [OffTransferStack + 4]
+        mov esi, [esp + 24]
+        mov ecx, [esp + 8]
+        xor edx, edx
+        _do
+          cmp byte [fs:esi + edx], 0
+          _break je
+          inc edx
+          cmp edx, ecx
+        _enddo jb
+        lea ecx, [edx + 1]
+        cmp ecx, [esp + 8]
+        _ifnot jbe
+          mov ecx, [esp + 8]
+        _endif
+        jmp lfn_copy
+lfn_copyback:
+        mov ecx, [esp + 8]
+lfn_copy:
+        movzx eax, byte [esp + 17]
+        mov es, [ebp + eax + DC_FirstSR0]
+        mov edi, [esp + 4]
+        mov fs, [OffTransferStack + 4]
+        mov esi, [esp + 24]
+        call MoveStr
+lfn_restore:
+        movzx ebx, byte [esp + 16]
+        and ebx, 7Fh
+        mov eax, [esp + 4]
+        mov [ebp + ebx], eax
+        mov eax, [esp + 0]
+        mov [OffTransferStack], eax
+        add esp, 28
+        ret
+lfn_name:
+        mov esi, OffLfnSpName
+        jmp LfnOp
+lfn_curdir:
+        mov esi, OffLfnSpCurDir
+        jmp LfnOp
+lfn_find1:
+        mov esi, OffLfnSpFind1
+        jmp LfnOp
+lfn_find2:
+        mov esi, OffLfnSpFind2
+        jmp LfnOp
+lfn_rename:
+        mov esi, OffLfnSpRename
+        jmp LfnOp
+lfn_true:
+        mov esi, OffLfnSpTrue
+        jmp LfnOp
+lfn_open:
+        mov esi, OffLfnSpOpen
+        jmp LfnOp
+lfn_vol:
+        mov esi, OffLfnSpVol
+        jmp LfnOp
+lfn_info:
+        mov esi, OffLfnSpInfo
+        jmp LfnOp
+lfn_time:
+        mov esi, OffLfnSpNone
+        cmp byte [ebp + DC_EBX], 0
+        _ifnot jne
+          mov esi, OffLfnSpTimeIn
+        _endif
+        cmp byte [ebp + DC_EBX], 1
+        _ifnot jne
+          mov esi, OffLfnSpTimeOut
+        _endif
+        jmp LfnOp
+lfn_short:
+        mov esi, OffLfnSpShort
+        cmp byte [ebp + DC_EDX + 1], 0
+        _ifnot jne
+          mov esi, OffLfnSpFcb
+        _endif
+        jmp LfnOp
+lfn_subst:
+        mov esi, OffLfnSpNone
+        cmp byte [ebp + DC_EBX + 1], 0
+        _ifnot jne
+          mov esi, OffLfnSpName
+        _endif
+        cmp byte [ebp + DC_EBX + 1], 2
+        _ifnot jne
+          mov esi, OffLfnSpSubst
+        _endif
+        jmp LfnOp
+clip_plain:
+        jmp DosCall
+ClipSize:
+        movzx ecx, word [ebp + DC_ESI]
+        shl ecx, 16
+        mov cx, [ebp + DC_ECX]
+        ret
+ClipAlloc:
+        cmp ecx, 0A0000h
+        ja ca_err
+        push ecx
+        add ecx, 15
+        shr ecx, 4
+        mov ebx, ecx
+        mov ax, 100h
+        int 31h
+        pop ecx
+        ret
+ca_err:
+        stc
+        ret
+clip_set:
+        call ClipSize
+        jecxz clip_plain
+        call ClipAlloc
+        _ifnot jnc
+          mov word [ebp + DC_EAX], 0
+          ret
+        _endif
+        push edx
+        push dword [ebp + DC_EBX]
+        push ecx
+        movzx eax, ax
+        push eax
+        mov es, edx
+        mov fs, [ebp + DC_ES0]
+        mov esi, [ebp + DC_EBX]
+        xor edi, edi
+        call MoveStr
+        pop eax
+        pop ecx
+        movzx ebx, word [ebp + DC_EDX]
+        cmp ebx, 2
+        je clip_set_bm
+        cmp ebx, 82h
+        jne clip_set_call
+clip_set_bm:
+        cmp ecx, 12h
+        jb clip_set_call
+        mov word [es:0Ah], 12h
+        mov [es:0Ch], ax
+clip_set_call:
+        mov [ebp + DC_ES], ax
+        mov word [ebp + DC_EBX], 0
+        call DosCall
+        pop dword [ebp + DC_EBX]
+        pop edx
+        mov ax, 101h
+        int 31h
+        ret
+clip_get:
+        push dword [ebp + DC_EAX]
+        push dword [ebp + DC_EDX]
+        push dword [ebp + DC_EBX]
+        mov word [ebp + DC_EAX], 1704h
+        call DosCall
+        movzx ecx, word [ebp + DC_EDX]
+        shl ecx, 16
+        mov cx, [ebp + DC_EAX]
+        test ecx, ecx
+        jz near clip_get_none
+        call ClipAlloc
+        jc clip_get_none
+        push edx
+        push ecx
+        movzx eax, ax
+        push eax
+        mov ebx, [esp + 16]
+        mov [ebp + DC_EDX], ebx
+        mov [ebp + DC_ES], ax
+        mov word [ebp + DC_EBX], 0
+        mov word [ebp + DC_EAX], 1705h
+        call DosCall
+        pop eax
+        pop ecx
+        pop edx
+        cmp word [ebp + DC_EAX], 0
+        je clip_get_free
+        mov fs, edx
+        mov es, [ebp + DC_ES0]
+        mov edi, [esp]
+        xor esi, esi
+        push edx
+        push ecx
+        call MoveStr
+        pop ecx
+        pop edx
+        movzx eax, word [esp + 4]
+        cmp eax, 2
+        je clip_get_bm
+        cmp eax, 82h
+        jne clip_get_free
+clip_get_bm:
+        cmp ecx, 12h
+        jb clip_get_free
+        mov ebx, [esp]
+        lea eax, [ebx + 12h]
+        mov [es:ebx + 0Ah], ax
+        mov ax, [ebp + DC_ES0]
+        mov [es:ebx + 0Ch], ax
+clip_get_free:
+        mov ax, 101h
+        int 31h
+clip_get_end:
+        pop dword [ebp + DC_EBX]
+        pop dword [ebp + DC_EDX]
+        add esp, 4
+        ret
+clip_get_none:
+        mov word [ebp + DC_EAX], 0
+        jmp clip_get_end
 ;----------------------------- memory procedures ----------------------------
 reallocmem:
 DPMIMemCall:
@@ -983,14 +1333,16 @@ MouseCallbackHandler:
 %assign ttpend 0
 %assign ttpos 0
 %assign ttmax 0
+%define ttdef 0
 %macro TransEntry 3
-        times (%1) - ttpos db 0
+        times (%1) - ttpos db ttdef
         db zcat3(%2,%3,Idx)
         %assign ttpos (%1) + 1
 %endmacro
 %macro TransTableEnd 0
-        times ttmax + 1 - ttpos db 0
+        times ttmax + 1 - ttpos db ttdef
         %assign ttpend 0
+        %define ttdef 0
 %endmacro
 %macro DefTransTable 2
 %if ttpend
@@ -1060,6 +1412,21 @@ MethodTable0:
         RegFnIndex r_cx_za, p_dsdx
         RegFnIndex w_cx_za, p_dsdx
         RegFnIndex dc_za, 0
+        RegFnIndex clip_plain, 0
+        RegFnIndex clip_set, p_esbx
+        RegFnIndex clip_get, p_esbx
+        RegFnIndex lfn_name, 0
+        RegFnIndex lfn_curdir, 0
+        RegFnIndex lfn_find1, 0
+        RegFnIndex lfn_find2, 0
+        RegFnIndex lfn_rename, 0
+        RegFnIndex lfn_true, 0
+        RegFnIndex lfn_open, 0
+        RegFnIndex lfn_vol, 0
+        RegFnIndex lfn_info, 0
+        RegFnIndex lfn_time, 0
+        RegFnIndex lfn_short, 0
+        RegFnIndex lfn_subst, 0
 
 ;----------------------------translation tables------------------------------
 ;DefTransTable int21Table, 21h, 09h, 0FFh
@@ -1131,6 +1498,43 @@ MethodTable0:
         TransTableEnd
 
 
+
+        DefTransTable int2171Table, 0FFh
+        %define ttdef clip_plain0Idx
+        TransEntry 0Dh, clip_plain, 0
+        TransEntry 39h, lfn_name, 0
+        TransEntry 3Ah, lfn_name, 0
+        TransEntry 3Bh, lfn_name, 0
+        TransEntry 41h, lfn_name, 0
+        TransEntry 43h, lfn_name, 0
+        TransEntry 47h, lfn_curdir, 0
+        TransEntry 4Eh, lfn_find1, 0
+        TransEntry 4Fh, lfn_find2, 0
+        TransEntry 56h, lfn_rename, 0
+        TransEntry 60h, lfn_true, 0
+        TransEntry 6Ch, lfn_open, 0
+        TransEntry 0A0h, lfn_vol, 0
+        TransEntry 0A1h, clip_plain, 0
+        TransEntry 0A2h, lfn_find2, 0
+        TransEntry 0A6h, lfn_info, 0
+        TransEntry 0A7h, lfn_time, 0
+        TransEntry 0A8h, lfn_short, 0
+        TransEntry 0A9h, lfn_open, 0
+        TransEntry 0AAh, lfn_subst, 0
+        TransTableEnd
+
+        DefTransTable int2F17Table, 0FFh
+        %define ttdef clip_plain0Idx
+        TransEntry 0, clip_plain, 0
+        TransEntry 1, clip_plain, 0
+        TransEntry 2, clip_plain, 0
+        TransEntry 3, clip_set, p_esbx
+        TransEntry 4, clip_plain, 0
+        TransEntry 5, clip_get, p_esbx
+        TransEntry 8, clip_plain, 0
+        TransEntry 9, clip_plain, 0
+        TransEntry 0Ah, clip_plain, 0
+        TransTableEnd
 
         DefTransTable int33Table, 17h
         TransEntry 09h, wr_64, p_esdx           ;set graphics cursor

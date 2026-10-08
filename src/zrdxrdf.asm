@@ -3,6 +3,7 @@
 ;                     (C) 2026, Viacheslav Komenda
 ;NASM version
 cpu 386
+%assign RDFLDR 1
 %include "autolbl.inc"
 %include "prot.inc"
 %include "gmacros.asm"
@@ -20,7 +21,7 @@ cpu 386
 %include "smm.asm"
 %endif
 %include "prothand.asm"
-%include "leldr.asm"
+%include "rdfldr.asm"
 %ifdef EDebug
         SEGM DBText
 %include "debugger.asm"

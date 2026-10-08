@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -364,6 +364,14 @@ LoaderDbgEntry:
           _do
             movzx eax, byte [edx + 2]
             mov ah, [edx + 1]
+            mov ebx, 1000h
+            cmp eax, [ebp + LXModuleNPages]
+            _ifnot jne
+              movzx ebx, word [ebp + LXPageOffShift]
+              dec ebx
+              and ebx, 0FFFh
+              inc ebx
+            _endif
             dec eax
             js ErrEXE@129 ;XXX
             shl eax, 12
@@ -371,7 +379,7 @@ LoaderDbgEntry:
             push _pageloadaddress
             add _pageloadaddress, 1000h
             push eax
-            push 1000h
+            push ebx
             call PreRead
             add _pagetblreg, 4
           _enddo loop

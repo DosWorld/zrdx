@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 

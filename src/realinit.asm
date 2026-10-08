@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -11,7 +11,7 @@
         db 'swap I/O error', 0
 %endif
         LByte IntroMsg
-        db 'Zurenava DOS extender, version 0.50OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
+        db 'Zurenava DOS extender, version 0.51OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
         LByte FirstError
         db 'ZRDX init error:$'
         LByte VersionEM
@@ -532,11 +532,24 @@ RInitError:
         cmp [di - 1], ah
         _enddo jne
         mov si, ROffFileAccessEM
-        mov ax, 3D20h           ;read only, deny write
+        push dx
+        push si
+        mov si, dx
+        mov bx, 20h
+        xor cx, cx
+        mov dx, 1
+        mov ax, 716Ch
+        stc
+        int 21h
+        pop si
+        pop dx
+        _ifnot jnc
+          mov ax, 3D20h           ;read only, deny write
                                  ;the file may be opened by other instance
                                  ;with same open mode only
-        int 21h
-        jc RInitError
+          int 21h
+          jc RInitError
+        _endif
         push es
         pop ds
         add [ROffEnvSize + PSP], di

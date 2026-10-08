@@ -41,7 +41,7 @@ static void pack(const struct config *c)
 
 static void usage(void)
 {
-    puts("Zurenava DOS extender setup utility v.0.50OSE (C) 2026, Viacheslav Komenda");
+    puts("Zurenava DOS extender setup utility v.0.51OSE (C) 2026, Viacheslav Komenda");
     puts("Usage:");
     puts("zrxsetup [options] <filename>");
     puts("Where options are:");
@@ -63,7 +63,7 @@ static void show(const struct config *c, const char *title)
     printf("  Display copyright message is %s\n", (c->flags & 1) ? "no" : "yes");
 }
 
-static int number(const char *s, int opt, unsigned long max, unsigned long *v)
+static int number(const char *s, int opt, unsigned long min, unsigned long max, unsigned long *v)
 {
     char *end;
 
@@ -76,8 +76,8 @@ static int number(const char *s, int opt, unsigned long max, unsigned long *v)
         printf("bad parameter syntax:\"%s\"\n", s);
         return 1;
     }
-    if (*v > max) {
-        printf("\"%c\" parameter value is out of range(0-%lX).\n", opt, max);
+    if (*v < min || *v > max) {
+        printf("\"%c\" parameter value is out of range(%lX-%lX).\n", opt, min, max);
         return 1;
     }
     return 0;
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    f = fopen(name, "r+b");
+    f = fopen(name, "rb");
     if (f == NULL) {
         printf("Can't open file \"%s\"\n", name);
         return 1;
@@ -139,23 +139,23 @@ int main(int argc, char *argv[])
         opt = (char)toupper((unsigned char)argv[i][1]);
         switch (opt) {
         case 'X':
-            if (number(argv[i] + 2, opt, 0xFFFFFFFFUL, &v)) goto fail;
+            if (number(argv[i] + 2, opt, 0UL, 0xFFFFFFFFUL, &v)) goto fail;
             cfg.xms = v;
             break;
         case 'T':
-            if (number(argv[i] + 2, opt, 0x1000UL, &v)) goto fail;
+            if (number(argv[i] + 2, opt, 0x100UL, 0x1000UL, &v)) goto fail;
             cfg.tbuf = (unsigned)v;
             break;
         case 'L':
-            if (number(argv[i] + 2, opt, 0xFFFFUL, &v)) goto fail;
+            if (number(argv[i] + 2, opt, 0UL, 0xFFFFUL, &v)) goto fail;
             cfg.lowmem = (unsigned)v;
             break;
         case 'M':
-            if (number(argv[i] + 2, opt, 1UL, &v)) goto fail;
+            if (number(argv[i] + 2, opt, 0UL, 1UL, &v)) goto fail;
             cfg.flags = (cfg.flags & ~2u) | (v ? 2u : 0u);
             break;
         case 'B':
-            if (number(argv[i] + 2, opt, 1UL, &v)) goto fail;
+            if (number(argv[i] + 2, opt, 0UL, 1UL, &v)) goto fail;
             cfg.flags = (cfg.flags & ~1u) | (v ? 0u : 1u);
             break;
         default:
@@ -174,6 +174,12 @@ int main(int argc, char *argv[])
     }
     show(&old, "Old configuration:");
     pack(&cfg);
+    fclose(f);
+    f = fopen(name, "r+b");
+    if (f == NULL) {
+        printf("Can't write file \"%s\"\n", name);
+        return 1;
+    }
     if (fseek(f, -TRAILER_SIZE, SEEK_END) != 0 ||
         fwrite(trailer, 1, sizeof(trailer), f) != sizeof(trailer)) {
         printf("Can't write file \"%s\"\n", name);

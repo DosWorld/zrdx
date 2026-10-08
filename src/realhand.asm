@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -6,9 +6,7 @@
 ;assume cs:dgroup16, ds:nothing, es:nothing, ss:nothing
 ;assume cs:Text16, ds:nothing, es:nothing, ss:nothing
         LLabel MouseRHandler
-        dw 20
-        db 'ZRDX0.50'
-InitFlags: dw 2
+InitFlags: dw 0
         LWord TransferBufferPSize
         dw 0400h ;400h
         LDWord MaxXMSAllocate
@@ -85,6 +83,10 @@ SwitchTableCS: dw Code0Selector
 int15handler:
         cmp ah, 88h
         _ifnot je
+        cmp ax, 0E801h
+        je Int15Unsupp
+        cmp ax, 0E820h
+        je Int15Unsupp
         db JmpFarCode
         LLabel OldInt15
         dd 0
@@ -96,6 +98,13 @@ int15handler:
         and byte [bp + 6], ~(1)  ;clear carry
         pop bp
         LLabel int67Handler
+        iret
+Int15Unsupp:
+        push bp
+        mov bp, sp
+        or byte [bp + 6], 1
+        pop bp
+        mov ah, 86h
         iret
 
         DPROC AllocXMSBlock
@@ -204,6 +213,7 @@ ExitXMS:
         _ifnot jz
           call far [ROffXMC]               ;unlock and free XMS if handle is not null
           mov ah, 0Ah            ;free
+          mov dx, [ROffXMHandle]
           call far [ROffXMC]
         _endif
 PatchPoint1:

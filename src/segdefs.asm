@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 ;NASM version
@@ -110,7 +110,7 @@ group DGROUP Text Data
 
 segment Text16
 DPMIHOSTMaxLowData equ XCurSegBaseR
-        SetupRTSeg 760, 800, Text16, EText16
+        SetupRTSeg 800, 800, Text16, EText16
          ;RM data for IDPMI host
 segment Data16
         SetupSeg 000, 0, Data16, Text16
@@ -126,9 +126,9 @@ segment EText
 ExtenderStart equ XCurSegBaseR
 %assign TXCurSegBase XCurSegBase
 %assign XCurSegBase 0
-        SetupSeg 2720, 2800, EText, IData16
+        SetupSeg 3776, 3900, EText, IData16
 segment EData
-        SetupSeg 793, 862, EData, EText
+        SetupSeg 1520, 1600, EData, EText
         VSegment EBSS, 200, 200
 %assign ExtenderSize XCurSegBase
 ExtenderFullSize equ ExtenderSize+200
@@ -141,9 +141,21 @@ segment IEText
 LoaderStart equ XCurSegBaseR
 %assign TXCurSegBase TXCurSegBase + XCurSegBase
 %assign XCurSegBase 0
-        SetupSeg 1660, 2000, IEText, EData
+%ifdef PELDR
+        SetupSeg 1408, 2600, IEText, EData
+%elifdef RDFLDR
+        SetupSeg 2048, 2600, IEText, EData
+%else
+        SetupSeg 1712, 2000, IEText, EData
+%endif
 segment IEData
-        SetupSeg 313, 500, IEData, IEText
+%ifdef PELDR
+        SetupSeg 256, 600, IEData, IEText
+%elifdef RDFLDR
+        SetupSeg 256, 600, IEData, IEText
+%else
+        SetupSeg 336, 500, IEData, IEText
+%endif
 %assign ROffLoaderEnd XCurSegBaseR
 %assign WinSize (ROffLoaderEnd+0FFFh+200h) & ~0FFFh
 %assign LoaderSize XCurSegBase
@@ -153,7 +165,7 @@ LoaderFullSize equ LoaderSize+3000
 segment Text
 %assign OffProtectedStart XCurSegBaseR
 %assign XCurSegBase KernelBase
-        SetupRTSeg 7350, 9000, Text, IEData
+        SetupRTSeg 7680, 9000, Text, IEData
 segment IText
         SetupSeg 0000, 000, IText, Text
 segment Data

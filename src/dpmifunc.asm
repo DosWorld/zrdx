@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.50OSE project
+;             This file is part of the ZRDX 0.51OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -536,7 +536,10 @@ NextScan@10:
           push _t
           push 0
           call AllocPages
-          jc Err@10
+          _ifnot jnc
+            add esp, 4
+            jmp Err@10
+          _endif
           pop _t
           add word [OffLDTLimit], _tw
           mov _tw, LDTSelector
@@ -741,13 +744,13 @@ SetInt7@10:
           ;add  eax, 10000
           ;add  edx, 10000
 %endif
-        mov [edi - 30h + 18h], eax
-        mov [edi - 30h + 0Ch], eax
-        mov [edi - 30h + 4], edx ;maximum unlocked page allocation
-        mov [edi - 30h + 8], edx ;maximum locked page allocation(same)
-        mov [edi - 30h + 10h], edx
-        mov [edi - 30h + 14h], edx
-        mov [edi - 30h + 1Ch], edx
+        mov [es:edi - 30h + 18h], eax
+        mov [es:edi - 30h + 0Ch], eax
+        mov [es:edi - 30h + 4], edx ;maximum unlocked page allocation
+        mov [es:edi - 30h + 8], edx ;maximum locked page allocation(same)
+        mov [es:edi - 30h + 10h], edx
+        mov [es:edi - 30h + 14h], edx
+        mov [es:edi - 30h + 1Ch], edx
         mov eax, edx
         shr eax, 10
         inc eax
@@ -757,7 +760,7 @@ SetInt7@10:
           xor edx, edx
         _endif
         shl edx, 12         ;convert pages to bytes
-        mov [edi - 30h], edx  ;maximum free block
+        mov [es:edi - 30h], edx  ;maximum free block
         popad
         FnRet
 

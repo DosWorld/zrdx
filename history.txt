@@ -1,16 +1,49 @@
-Version 0.50OSE
+Version 0.51OSE
 - The project is moved to free tools: the assembler sources are rewritten for
   NASM 0.98.39, the stub is linked with Watcom wlink, aligner, bin2asm and
   zrxsetup are built with Watcom C. Borland C, TASM, TLINK and MS link are not
   needed any more. The build is done with wmake (see readme.txt).
-- The stub is packed with UPX (upx -9 --8086), zrxbind binds the packed stub.
-  The prebuilt stub is available as bin\stub-le.exe. The old pack.exe is not
+- The stubs are packed with UPX (upx -9 --8086) and stored as separate files
+  (bin\stub-le.exe, bin\stub-pe.exe, bin\stub-rdf.exe). The old pack.exe is not
   used by the build any more.
+- zrxbind is a small .COM program now (zrxbind.com). The stubs are no longer
+  linked into it: it reads them from the directory where zrxbind.com lies.
+- Fixes: zrxbind -r keeps the settings trailer instead of appending a second
+  one, checks the write of the trailer and the stub files (MZ, size multiple
+  of 512), and verifies the RDOFF2 signature. The RDF and PE loaders check
+  sizes and relocation offsets against the image, the PE loader refuses DLL,
+  TLS and delay-import images and leaves a return stub on the stack, the RDF
+  loader keeps the exit code of the program, refuses a second code/data segment
+  and frees the header block. zrxsetup limits /T to 100h-1000h and opens the
+  file read-only unless a setting is changed. aligner validates its arguments.
+- DPMI host fixes: the exception handler of the client is entered with DF
+  clear; 0501h/0503h refuse zero and overflowing sizes and return the right
+  error codes (8012h, 8021h, 8023h); 0500h writes to ES:EDI; the failure of
+  the LDT growth no longer unbalances the stack; the callbacks get DS and GS
+  in the call structure. The LE loader reads the last page only up to the
+  bytes used (the settings trailer is no longer loaded into the BSS). INT 15h
+  E801h/E820h are reported as unsupported while the stub owns extended memory.
+- INT 2Fh, AX=17xxh (Windows clipboard API) is passed to real mode; the data
+  buffers of the set/get calls (ES:BX, SI:CX) are copied through a DOS memory
+  block of any size, the pointer in the bitmap header is converted.
+- INT 21h, AX=71xxh (long file names): all functions (mkdir,
+  rmdir, chdir, delete, attributes, current directory, find first/next, rename,
+  truename, create/open, volume info, file info, time conversion, short name,
+  subst; the ones without pointers and every unlisted number go to real
+  mode as plain calls; the clipboard range 17xxh works the same way). zrxbind and the stub open their files with the LFN
+  API when it is present and fall back to the old calls otherwise.
+- The stub sizes are raised (13312 bytes aligned); the makefile has the
+  NASMOPT macro (-Ox for NASM 3.x, -O1 for NASM 0.98.39).
+- New loaders: PE files (flat 32-bit, no imports, base relocations are applied)
+  and RDOFF2 files made by NASM and RLINK (single module). zrxbind chooses the
+  stub by the format of the input file.
 - The settings (zrxsetup) are stored in the last 14 bytes of the bound program
   (signature "ZRXC"), not in the stub header, so the stub can be packed. zrxbind
   writes the default settings block, the stub reads it at start. zrxsetup is
   rewritten; it does not work with programs bound by the older
   zrxbind.
+- The default order of detection is changed: DPMI is probed first, then VCPI
+  (zrxsetup /M1 restores the old order).
 - Support of xle (xeload.asm, zrdxe.asm) is removed.
 - Fixed bugs in DPMI function 503h that made it fail when the block has to be
   moved.
