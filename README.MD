@@ -1,5 +1,4 @@
 <div align="center">
-
 ```
  ______ ____  ______  __
 |___  /|  _ \|  _ \ \/ /
@@ -7,6 +6,7 @@
   / /__|  _ <| |_| /  \
  /_____|_| \_\____/_/\_\
 ```
+</div>
 
 # 🔥 ZRDX — Zurenava DOS Extender 🔥
 
@@ -15,15 +15,11 @@
 [![License: CC0](https://img.shields.io/badge/license-CC0%201.0-brightgreen?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-MS--DOS-blue?style=for-the-badge&logo=windowsterminal&logoColor=white)](#-quick-start)
 [![Version](https://img.shields.io/badge/version-0.50OSE-orange?style=for-the-badge)](history.txt)
-[![Assembler](https://img.shields.io/badge/NASM-0.98.39-red?style=for-the-badge)](#-building-from-source)
-[![Compiler](https://img.shields.io/badge/Open%20Watcom-wmake%20%7C%20wlink%20%7C%20wcl-yellow?style=for-the-badge)](#-building-from-source)
-[![Packed with](https://img.shields.io/badge/packed%20with-UPX-purple?style=for-the-badge)](#-building-from-source)
 
 **⚡ stub 12 KB ⚡ DPMI 0.9 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡**
 
 *Original author: Sergey Belyakov (1998-1999) · Open source edition: Viacheslav Komenda (2026)*
 
-</div>
 
 ---
 
@@ -36,13 +32,13 @@ does, but small, fast and free.
 
 | | |
 |---|---|
-| 🎯 **Targets** | programs built for **DOS4G/W**, **PMODE/W**, **DOS32A**, **WDOSX** with Watcom C/C++, TMT Pascal, LadSoft C, … |
-| 🧠 **Memory** | access to all physical memory (up to **4 GB**) |
-| 🔌 **DPMI** | DPMI 0.9 compatible (int 31h), except functions 0A00h-0B03h |
-| 🔄 **DOS calls** | translates all functions translated by PMODE/W (except identification) and almost all of DOS4G/W's |
-| 🏗️ **Hosts** | runs under **DPMI**, **VCPI**, **XMS** and **RAW** (it picks what is available) |
-| 📦 **Size** | the packed stub is only **12 800 bytes** |
-| 🛠️ **Tools** | built with **NASM + Open Watcom + UPX** — no proprietary compilers |
+| **Targets** | programs built for **DOS4G/W**, **PMODE/W**, **DOS32A**, **WDOSX** with Watcom C/C++, TMT Pascal, LadSoft C, … |
+| **Memory** | access to all physical memory (up to **4 GB**) |
+| **DPMI** | DPMI 0.9 compatible (int 31h), except functions 0A00h-0B03h |
+| **DOS calls** | translates all functions translated by PMODE/W (except identification) and almost all of DOS4G/W's |
+| **Hosts** | runs under **DPMI**, **VCPI**, **XMS** and **RAW** (it picks what is available) |
+| **Size** | the packed stub is only **12 800 bytes** |
+| **Tools** | built with **NASM + Open Watcom + UPX** — no proprietary compilers |
 
 > 💡 If you call DOS directly, the list of all translated functions is in
 > [`src/extender.asm`](src/extender.asm).
@@ -101,9 +97,6 @@ Want ZRDX bound at **link time**? Extract the stub and give it to `wlink`:
 zrxbind -w zrdx.exe
 wlink ... option stub=zrdx.exe
 ```
-
-> 📦 **Pack your programs with [UPX](https://upx.github.io/).** It is far more
-> effective than PMWLITE or other packers and supports a wide range of platforms.
 
 ---
 
@@ -179,14 +172,14 @@ no such block — bind them again.
 You may notice there are far fewer settings than in PMODE/W or DOS32A. The ZRDX
 kernel configures itself dynamically:
 
-- 📄 **Page tables** (and low memory) are allocated in VCPI mode on demand, always
+- **Page tables** (and low memory) are allocated in VCPI mode on demand, always
   from the top of memory — the addressable space stays up to 4 GB.
-- 🗺️ **Physical-to-linear mappings** are allocated on demand, also up to 4 GB.
-- 🗂️ **LDT** starts with one page (511 selectors) and grows up to 8191.
-- 📚 **Stacks** are managed by an exclusive system and need no tuning. The only
+- **Physical-to-linear mappings** are allocated on demand, also up to 4 GB.
+- **LDT** starts with one page (511 selectors) and grows up to 8191.
+- **Stacks** are managed by an exclusive system and need no tuning. The only
   thing you may want to touch is the common DOS stack (you need just one); the
   default 512 bytes is plenty.
-- 📞 **Real-mode callbacks**: more than 20 will not work under DPMI, because most
+- **Real-mode callbacks**: more than 20 will not work under DPMI, because most
   DPMI servers limit them to 20.
 
 ---
@@ -197,7 +190,7 @@ Only **free tools**. No Borland C, no TASM, no TLINK, no MS link.
 
 | Tool | Version | Used for |
 |---|---|---|
-| [**NASM**](https://nasm.us/) | **0.98.39** (other versions are not supported) | the whole stub and the binder |
+| [**NASM**](https://nasm.us/) | **0.98.39** (or newest) | the whole stub and the binder |
 | [**Open Watcom**](https://github.com/open-watcom/open-watcom-v2) | `wmake`, `wlink`, `wcl` | linking and the C tools |
 | [**UPX**](https://upx.github.io/) | 5.x (tested with 5.1.0) | packing the stub and `zrxsetup` |
 
@@ -210,30 +203,6 @@ wmake zrdxu.exe       :: only the UPX-packed stub
 wmake install         :: copy zrxbind.exe, zrxsetup.exe, stub-le.exe to ..\bin
 wmake clean
 ```
-
-### 🔧 The build pipeline
-
-```
-zrdx.asm --NASM--> zrdx.obj --wlink--> zrdx0.exe --UPX -9 --8086--> zrdxu.exe
-zrdxu.exe --aligner (12800)--> --bin2asm--> stub0_le.asb
-bnd.asm + stub0_le.asb --NASM--> bnd.obj --wlink--> zrxbind.exe
-zrxsetup.c --wcl--> --UPX--> zrxsetup.exe
-```
-
-`aligner` pads the packed stub to 12800 bytes (a multiple of 512). In tests a
-packed stub padded to an unaligned size (12416) bound fine but the program did
-not start, so keep this size when you change the stub.
-
-### ⚠️ NASM and memory
-
-`NASM.EXE` 0.98.39 is a 16-bit real-mode DOS program. It needs **almost all
-conventional memory** to assemble `zrdx.asm`, and fails with
-`nasm: fatal: out of memory` if there is not enough. If the build fails silently
-(no `zrdx.obj`), free some memory first:
-
-- unload TSRs and drivers before building,
-- run from a plain DOS (or a DOS box with ~600 KB free),
-- 32-bit `wmake` leaves more memory than 16-bit `wmaker`.
 
 ### 🔬 Experimental: VMM
 
@@ -286,7 +255,7 @@ or not using this product.
 ## 🙏 Credits
 
 - **Sergey Belyakov** — author of ZRDX (1998-1999), homepage `http://www.zrdx.da.ru`
-- **Viacheslav Komenda** — open source edition (2026)
+- **DosWorld** — open source edition (2026)
 
 <div align="center">
 
