@@ -18,7 +18,8 @@
 
 **⚡ stub 12 KB ⚡ DPMI 0.9 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡**
 
-*Original author: Sergey Belyakov (1998-1999) · Open source edition: Viacheslav Komenda (2026)*
+*Original author: Sergey Belyakov (1998-1999)
+Open source edition: DosWorld (2026)*
 
 </div>
 
