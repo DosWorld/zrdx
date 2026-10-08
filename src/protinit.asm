@@ -1,275 +1,304 @@
-;             This file is part of the ZRDX 0.50 project
+;             This file is part of the ZRDX 0.50OSE project
 ;                     (C) 1998, Sergey Belyakov
+;                     (C) 2026, Viacheslav Komenda
 
 ;protected init code
-Segm Text
+        SEGM Text
 ;assume cs:dgroup, ds:dgroup, es:nothing, ss:dgroup
-assume cs:Text, ds:nothing, es:nothing, ss:nothing
-LLabel PMInit
+;assume cs:Text, ds:nothing, es:nothing, ss:nothing
+        LLabel PMInit
         push Data0Selector
-        pop  eax
-        mov  ss, eax
-        mov  esp, OffKernelStack
+        pop eax
+        mov ss, eax
+        mov esp, OffKernelStack
         pushfd
-        or   byte ptr [esp][1], 30h      ;set protected mode IOPL to 3
+        or byte [esp + 1], 30h      ;set protected mode IOPL to 3
         popfd
-        mov  al, Data1Selector
-        mov  ds, eax
-        mov  fs, eax
-        mov  gs, eax
-        mov  es, eax
-        mov  SwitchTableEIP, OffRMS_PMHandler
-        RRT  4
+        mov al, Data1Selector
+        mov ds, eax
+        mov fs, eax
+        mov gs, eax
+        mov es, eax
+        mov dword [OffSwitchTableEIP], OffRMS_PMHandler
+        RRT 4
         push eax ;Data1Selector
         push OffKernelStack1End  ;OffUserStackEnd;-size DC_Struct; OffLockedStack-800h
         push Code1Selector
         push OffPL3Entry
-        mov  eax, cr0
-        mov  RMCR0, eax          ;save original CR0 for Real(or VM) Mode
+        mov eax, cr0
+        mov [OffRMCR0], eax          ;save original CR0 for Real(or VM) Mode
         RRT
-        and  eax, not  05002Ch   ;clear AM & WP & TS & EM & NE
-        mov  PMCR0, eax
+        and eax, ~(05002Ch)   ;clear AM & WP & TS & EM & NE
+        mov [OffPMCR0], eax
         RRT
-        mov  cr0, eax
+        mov cr0, eax
         retf
 
-DPROC PL3Entry
+        DPROC PL3Entry
         push Data3Selector
         push OffUserStackEnd
         ;push eax
-        mov  al, NExitPages+NLoaderPages
-        sub  al, NExtraRPages
-        $ifnot ja
+        mov al, NExitPages + NLoaderPages
+        sub al, [OffNExtraRPages]
+        _ifnot ja
           mov al, 0
-        $endif
-        cmp  al, NExitPages
-        $ifnot jb
+        _endif
+        cmp al, NExitPages
+        _ifnot jb
           mov al, NExitPages
-        $endif
-        mov  esi, ((OffLastInit+0FFFh) and not 0FFFh)-4
-        mov  ebx, OffPage2+NExitPages*4
-        mov  nEntriesInTable[4], 2   ;prevent page table 2 from free
-        $do
-        dec  al
-        mov  ecx, 1024
-        $break js
-        sub  ebx, 4
+        _endif
+        mov esi, ((OffLastInit + 0FFFh) & ~(0FFFh)) - 4
+        mov ebx, OffPage2 + NExitPages * 4
+        mov dword [OffnEntriesInTable + 4], 2   ;prevent page table 2 from free
+        _do
+        dec al
+        mov ecx, 1024
+        _break js
+        sub ebx, 4
         push eax
         call Alloc1Page
-        jnc  @@MemErr1
+        jnc near MemErr1@7
 
-@@MovePage:
-        mov  edi, OffFreePageWin+1000h-4
+MovePage@7:
+        mov edi, OffFreePageWin + 1000h - 4
         std
-        mov  FreePageEntry, edx
-        DB   CallFarCode              ;PageMoveTrap
-        DD   0
-        DW   PageMoveGateSelector
-@@Lo:
-        NExitPages = (OffLastInit-KernelBase+4095)/4096
-        NLoaderPages = WinSize shr 12
-        pop  eax
-        $enddo jmp
-IFNDEF VMM
-        and  byte ptr PageDir[4], not 2;disable client write access to server area
-ENDIF
+        mov [OffPage2 + ((OffFreePageWin - KernelBase) >> 10)], edx
+        db CallFarCode ;PageMoveTrap
+        dd 0
+        dw PageMoveGateSelector
+Lo@7:
+NExitPages equ (OffLastInit - KernelBase + 4095) / 4096
+NLoaderPages equ WinSize >> 12
+        pop eax
+        _enddo jmp
+%ifndef VMM
+        and byte [OffPageDir + 4], ~(2) ;disable client write access to server area
+%endif
         cld
 
-        @@NExtraRPages equ ecx
-        @@Counter      equ ebx
-        @@CounterB     equ bl
-        movzx @@NExtraRPages, NExtraRPages
-        $ifnot jecxz
-          mov  esi, OffPage0+4
-LLabel PatchPoint5
-          mov  edi, Offfplist
-          xor  @@Counter, @@Counter
-          $do
-            cmp  @@Counter, @@NExtraRPages
-            $break jae
+%define _nextrarpages ecx
+%define _counter ebx
+%define _counterb bl
+        movzx _nextrarpages, byte [OffNExtraRPages]
+        _ifnot jecxz_n, near
+          mov esi, OffPage0 + 4
+        LLabel PatchPoint5
+          mov edi, Offfplist
+          xor _counter, _counter
+          _do
+            cmp _counter, _nextrarpages
+            _break jae
             lodsd          ;load phisical page address
-            cmp  @@Counter, NLoaderPages-1
-            $ifnot jb
-              cmp  @@Counter, NLoaderPages+NExitPages-1
-              jbe  @@L5
-            $endif
-            and  ah, 0F0h
-            mov  al, 67h
-            inc  nFreePages
-            or   @@Counter, @@Counter
-            $ifnot jnz
-              mov  FpListEntry, eax
+            cmp _counter, NLoaderPages - 1
+            _ifnot jb
+              cmp _counter, NLoaderPages + NExitPages - 1
+              jbe L5@7
+            _endif
+            and ah, 0F0h
+            mov al, 67h
+            inc dword [OffnFreePages]
+            or _counter, _counter
+            _ifnot jnz
+              mov [OffPage2 + ((Offfplist - KernelBase) >> 10)], eax
               InvalidateTLB
-              xor  eax, eax
-              mov  nEntriesInFplist, eax
-              jmp  @@L4
-            $endif
-            inc  nEntriesInFplist ;FreePagesOnDir
-@@L4:
+              xor eax, eax
+              mov [OffnEntriesInFplist], eax
+              jmp L4@7
+            _endif
+            inc dword [OffnEntriesInFplist] ;FreePagesOnDir
+L4@7:
             stosd
-@@L5:       inc  @@Counter
-            $loop jmp
-          $enddo
-          sub  @@Counter, NLoaderPages+NExitPages + 15   ;!!!!!!!!!!!!!!
-          $ifnot jae
-            cmp @@Counter, -15
-            $ifnot ja
-              mov  @@CounterB, -15
-            $endif
-            $do
+L5@7:
+        inc _counter
+            _loop jmp
+          _enddo
+          sub _counter, NLoaderPages + NExitPages + 15   ;!!!!!!!!!!!!!!
+          _ifnot jae
+            cmp _counter, -(15)
+            _ifnot ja
+              mov _counterb, -(15)
+            _endif
+            _do
               call Alloc1Page
               cld
-              jnc  @@MemErr
+              jnc MemErr@7
               xchg eax, edx
               stosd
-              inc  nFreePages
-              inc  nEntriesInFplist ;FreePagesOnDir
+              inc dword [OffnFreePages]
+              inc dword [OffnEntriesInFplist] ;FreePagesOnDir
               ;inc  nFreePagesOnDir
-              inc  @@Counter
-            $enddo jne
-          $endif
-        $endif
+              inc _counter
+            _enddo jne
+          _endif
+        _endif
         sti
         ;push OffGDT+40h 20 10
         ;+(InvalidateTLBGateSelector and not 7) 8 10
         ;call MemDump
-        IFDEF VMM
-        mov  eax, PageDirAliasPte
-        mov  PageDir[8], eax
-        mov  eax, PageExtinfoTablePte
-        mov  PageDir[12], eax
-        mov  eax, PageDir[4]
-        mov  PageDirAlias[4], eax
+%ifdef VMM
+        mov eax, [OffPage2 + ((OffPageDirAlias - KernelBase) >> 10)]
+        mov [OffPageDir + 8], eax
+        mov eax, [OffPage2 + ((OffPageExtinfoTable - KernelBase) >> 10)]
+        mov [OffPageDir + 12], eax
+        mov eax, [OffPageDir + 4]
+        mov [OffPageDirAlias + 4], eax
         InvalidateTLB
         ;push 10000
         ;push OffGDT
         ;call d_write_page
-        mov  edi, Offswap_file_bitmap
+        mov edi, Offswap_file_bitmap
         push 800h
         push edi
         push 0
         call alloc_pages
-        or   eax, -1
+        or eax, -(1)
         cld
-        mov  ecx, 800h shr 5
-        rep  stosd
-        ENDIF
+        mov ecx, 800h >> 5
+        rep stosd
+%endif
         ;hlt
-        mov  ebx, ROffILoaderEntry+LS
-@@L09:
-        xor  eax, eax
-        mov  al, (17+1)*8+7  ;data selector
-        mov  ds, eax
+        mov ebx, ROffILoaderEntry + LS
+L09@7:
+        xor eax, eax
+        mov al, (17 + 1) * 8 + 7  ;data selector
+        mov ds, eax
         push eax
-        push WinSize-80h
-        mov  al, ((17+3)*8+7) and 0FFh  ;PSP selector
-        mov  es, eax
-        mov  al, (17*8+7) and 0FFh  ;CS selector
+        push WinSize - 80h
+        mov al, ((17 + 3) * 8 + 7) & 0FFh  ;PSP selector
+        mov es, eax
+        mov al, (17 * 8 + 7) & 0FFh  ;CS selector
         push eax
         push ebx
         xchg eax, edi
         retf
-@@MemErr1:
-@@MemErr:
-        mov  ebx, ROffPInitErrorE+LS
-        mov  si, ROffErrNoDPMIMemoryEM+LS
-        jmp  @@L09
+MemErr1@7:
+MemErr@7:
+        mov ebx, ROffPInitErrorE + LS
+        mov si, ROffErrNoDPMIMemoryEM + LS
+        jmp L09@7
 
-DPROC   PageMoveHandler
-        mov  ebp, cr3
-        mov  cr3, ebp
-        rep  movsd
-        cmp  ebx, offset Page2Entry
-        $ifnot jne
-          mov  PageDir[4], edx
-          mov  FreePageWin[Page2Index*4], edx
-        $else  jmp
-          mov  [ebx], edx
-        $endif
-        cmp  ebx, offset PageDirEntry
-        $ifnot jne
-          and dx, not 0FFFh
-          mov SwitchTableCR3, edx
+        DPROC PageMoveHandler
+        mov ebp, cr3
+        mov cr3, ebp
+        rep movsd
+        cmp ebx, (OffPage2 + ((OffPage2 - KernelBase) >> 10))
+        _ifnot jne
+          mov [OffPageDir + 4], edx
+          mov [OffFreePageWin + (Page2Index * 4)], edx
+        _else jmp
+          mov [ebx], edx
+        _endif
+        cmp ebx, (OffPage2 + ((OffPageDir - KernelBase) >> 10))
+        _ifnot jne
+          and dx, ~(0FFFh)
+          mov [OffSwitchTableCR3], edx
           RRT
           mov ebp, edx
-        $endif
+        _endif
         mov cr3, ebp
         retf
-        ENDP
 
-IFNDEF Release
+
+%ifndef Release
 ;parameters: linear address, word count, display line
-MemDump  PROC NEAR
+MemDump:
         pushad
-        imul  edi, dword ptr ss:[esp+9*4], 160
-        add  edi, 0B8000h
-        mov  esi, [esp+11*4]
-        mov  ecx, [esp+10*4]
-        push ds es
-        mov  ax, Data3Selector
-        mov  ds, ax
-        mov  es, ax
-        xor  dl, dl
-        xchg dl, PrintToMem
-        $do
-        push dword ptr ss:[esi]
-        add  esi, 4
+        imul edi, [esp + (9 * 4)], 160
+        add edi, 0B8000h
+        mov esi, [esp + (11 * 4)]
+        mov ecx, [esp + (10 * 4)]
+        push ds
+        push es
+        mov ax, Data3Selector
+        mov ds, ax
+        mov es, ax
+        xor dl, dl
+        xchg dl, [OffPrintToMem]
+        _do
+        push dword [ss:esi]
+        add esi, 4
         push 8
         call PrintNX
-        $enddo loop
-        mov  PrintToMem, dl
-        pop es ds
+        _enddo loop
+        mov [OffPrintToMem], dl
+        pop es
+        pop ds
         popad
-        retn 12
-        ENDP
-DispLog PROC NEAR
+        ret 12
+
+DispLog:
         pushfd
-        push ebp edi esi edx ecx ebx eax
-        push ds es
+        push ebp
+        push edi
+        push esi
+        push edx
+        push ecx
+        push ebx
+        push eax
+        push ds
+        push es
         cld
         mov ax, Data3Selector
         mov ds, ax
         mov es, ax
-        imul edi, LogLine, 160
-        mov word ptr [0B8000h+edi], 0E00h+' ';mark prev line off
-        inc  LogLine
-        cmp  LogLine, 25
-        $ifnot jb
-          and LogLine, 0
-        $endif
-        imul edi, LogLine, 160
+        imul edi, [OffLogLine], 160
+        mov word [edi + 0B8000h], 0E00h + ' ' ;mark prev line off
+        inc dword [OffLogLine]
+        cmp dword [OffLogLine], 25
+        _ifnot jb
+          and dword [OffLogLine], 0
+        _endif
+        imul edi, [OffLogLine], 160
         add edi, 0B8000h
         mov ax, 0E00h + '*'
         stosw
-        push dword ptr ss:[esp+10*4]
+        push dword [esp + (10 * 4)]
         push 4
         call PrintNX                     ;print lo part of EIP
         mov ecx, 8
-        lea esi, [esp+8]
-        $do
-          push dword ptr ss:[esi]
-          add  esi, 4
+        lea esi, [esp + 8]
+        _do
+          push dword [ss:esi]
+          add esi, 4
           push 8
           call PrintNX
-        $enddo loop
-        pop es ds
-        pop eax ebx ecx edx esi edi ebp
+        _enddo loop
+        pop es
+        pop ds
+        pop eax
+        pop ebx
+        pop ecx
+        pop edx
+        pop esi
+        pop edi
+        pop ebp
         popfd
         ret
-        ENDP
 
-RegDump PROC NEAR
+
+RegDump:
         pushfd
-        push ebp edi esi edx ecx ebx eax
+        push ebp
+        push edi
+        push esi
+        push edx
+        push ecx
+        push ebx
+        push eax
         push esp
         push 8
-        push dword ptr ss:[esp+11*4]
+        push dword [esp + (11 * 4)]
         call MemDump
-        pop eax ebx ecx edx esi edi ebp
+        pop eax
+        pop ebx
+        pop ecx
+        pop edx
+        pop esi
+        pop edi
+        pop ebp
         popfd
-        retn 4
-        ENDP
-ENDIF
+        ret 4
 
-ESeg Text
+%endif
 
+        ESEG Text

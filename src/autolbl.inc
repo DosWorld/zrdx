@@ -1,99 +1,138 @@
 ;A macro file for structured programming in ASM
 ;use and redistribution are permitted without any limitations.
 ;(C) Sergey Belyakov, 1998
+;(C) Viacheslav Komenda, 2026
+;NASM version
 
-?iflevel  = 0
-?dolevel  = 0
-?LabelNum = 0
+%assign zn 0
+%assign zi_else 0
+%assign zi_endif 0
+%assign zd_do 0
+%assign zd_while 0
+%assign zd_enddo 0
 
-$__SetLabel MACRO LabelNum
-?Label&LabelNum:
-            ENDM
+%macro zlab 1
+..@z %+ %1:
+%endmacro
 
-$_SetLabel MACRO LabelClass, levelnum
-           $__SetLabel %(?&LabelClass&levelnum)
-           ENDM
+%macro zgen 2-3
+%if %0 > 2
+%1 near ..@z %+ %2
+%else
+%1 ..@z %+ %2
+%endif
+%endmacro
 
-$_AssignLabelNum MACRO LabelClass, LevelNum
-                 ?&LabelClass&LevelNum = ?LabelNum
-                 ?LabelNum = ?LabelNum + 1
-                 ENDM
+%macro jecxz_n 1
+        jecxz %%t
+        jmp short %%s
+%%t:
+        jmp %1
+%%s:
+%endmacro
 
-$ifnot  MACRO C
-        $_inclevel if
-        $_AssignLabelNum endif, %?iflevel
-        $_AssignLabelNum else, %?iflevel
-        $_AssignLabelNum beginif, %?iflevel
-        $_GenNBCode C, else, %?iflevel
-        ENDM
-$beginif MACRO
-         $SetLabel beginif, %?iflevel
-         ENDM
-$tobeginif MACRO C
-           $_GenCode Code, tobeginif, %?iflevel
-           ENDM
-$else   MACRO C
-        $_GenNBCode C, endif, %?iflevel
-        $_SetLabel else, %?iflevel
-        $_AssignLabelNum else, %?iflevel
-        $_AssignLabelNum beginif, %?iflevel
-        ENDM
-$endif  MACRO
-        $_SetLabel else,  %?iflevel
-        $_SetLabel endif, %?iflevel
-        $_declevel if
-        ENDM
-$__GenCode MACRO Code, LabelNum
-           ifnb <Code>
-             Code ?Label&LabelNum
-           else
-             jmp ?Label&LabelNum
-           endif
-           ENDM
-$_GenCode MACRO Code, LabelClass, Level
-          $__GenCode Code, %(?&LabelClass&Level)
-          ENDM
-$_GenNBCode MACRO Code, LabelClass, Level
-          IFNB <Code>
-            $__GenCode Code, %(?&LabelClass&Level)
-          ENDIF
-          ENDM
-$toelse MACRO Code
-        $_GenCode Code, else, %?iflevel
-        ENDM
-$toendif MACRO Code
-        $_GenCode Code, endif, %?iflevel
-        ENDM
+%macro _ifnot 1-2
+%push zif
+%assign %$ie zi_else
+%assign %$in zi_endif
+%assign zi_endif zn
+%assign zn zn+1
+%assign zi_else zn
+%assign zn zn+1
+%if %0 > 1
+zgen %1, zi_else, near
+%else
+zgen %1, zi_else
+%endif
+%endmacro
 
-$do      MACRO C
-         $_IncLevel do
-         $_AssignLabelNum do, %?dolevel
-         $_AssignLabelNum while %?dolevel
-         $_AssignLabelNum enddo %?dolevel
-         $_GenNBCode C, while, %?dolevel
-         $_SetLabel do, %?dolevel
-         ENDM
-$towhile MACRO C
-         $_GenCode C, while, %?dolevel
-         ENDM
-$while   MACRO
-         $_SetLabel while, %?dolevel
-         ENDM
-$loop     MACRO C
-          $_GenCode C, do, %?dolevel
-          ENDM
-$break    MACRO C
-          $_GenCode C, enddo, %?dolevel
-          ENDM
-$enddo    MACRO C
-          $_GenNBCode C, do, %?dolevel
-          $_SetLabel enddo, %?dolevel
-          $_DecLevel do
-          ENDM
+%macro _else 0-1
+%if %0 > 0
+zgen %1, zi_endif
+%endif
+zlab zi_else
+%assign zi_else zn
+%assign zn zn+1
+%endmacro
 
-$_IncLevel MACRO L
-           ?&L&level = ?&L&level + 1
-           ENDM
-$_DecLevel MACRO L
-           ?&L&level = ?&L&level - 1
-           ENDM
+%macro _endif 0
+zlab zi_else
+zlab zi_endif
+%assign zi_else %$ie
+%assign zi_endif %$in
+%pop
+%endmacro
+
+%macro _toelse 0-1
+%if %0 > 0
+zgen %1, zi_else
+%else
+zgen jmp, zi_else
+%endif
+%endmacro
+
+%macro _toendif 0-1
+%if %0 > 0
+zgen %1, zi_endif
+%else
+zgen jmp, zi_endif
+%endif
+%endmacro
+
+%macro _do 0-1
+%push zdo
+%assign %$od zd_do
+%assign %$ow zd_while
+%assign %$oe zd_enddo
+%assign zd_do zn
+%assign zn zn+1
+%assign zd_while zn
+%assign zn zn+1
+%assign zd_enddo zn
+%assign zn zn+1
+%if %0 > 0
+zgen %1, zd_while
+%endif
+zlab zd_do
+%endmacro
+
+%macro _while 0
+zlab zd_while
+%endmacro
+
+%macro _towhile 0-1
+%if %0 > 0
+zgen %1, zd_while
+%else
+zgen jmp, zd_while
+%endif
+%endmacro
+
+%macro _loop 0-1
+%if %0 > 0
+zgen %1, zd_do
+%else
+zgen jmp, zd_do
+%endif
+%endmacro
+
+%macro _break 0-2
+%if %0 > 1
+zgen %1, zd_enddo, near
+%elif %0 > 0
+zgen %1, zd_enddo
+%else
+zgen jmp, zd_enddo
+%endif
+%endmacro
+
+%macro _enddo 0-1
+%if %0 > 0
+zgen %1, zd_do
+%endif
+zlab zd_enddo
+%assign zd_do %$od
+%assign zd_while %$ow
+%assign zd_enddo %$oe
+%pop
+%endmacro

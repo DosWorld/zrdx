@@ -1,6 +1,7 @@
                       Zurenava DOS extender(ZRDX).
-             DOS4GW-compatible DOS extender, version 0.50 beta.
+             DOS4GW-compatible DOS extender, version 0.50OSE beta.
        Copyright(C) 1998-1999 by Sergey Belyakov(S.Belyakov@chat.ru).
+       Copyright(C) 2026 by Viacheslav Komenda.
                     Homepage: http://www.zrdx.da.ru
 
        Translated to English by berk//xq
@@ -8,7 +9,7 @@
 
 => LEGAL <=
 ~~~~~~~~~~~
-        ZRDX 0.50 is distributed as freeware and can be freely copied and used in
+        ZRDX 0.50OSE is distributed as freeware and can be freely copied and used in
 any purposes, either commercial or non-commercial. There are no restrictions
 applied to development and use of software which can be created via modifying
 or extending original ZRDX source files or binary code.
@@ -58,12 +59,15 @@ command -w. For example, running "zrxbind -w zrdx.exe" will write stub to
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ZRXSETUP is proposed for additionally configuring DOS extender. You can
 find out complete switches list by running it with /? command (zrxsetup /?).
-        <filename> parameter specifies name of program with ZRDX stub bind into it,
-or the name of ZRDX stub file.
+        <filename> parameter specifies name of program with ZRDX stub bound into it by
+ZRXBIND. The settings are kept in the last 14 bytes of the
+file (signature "ZRXC", written by ZRXBIND), so they do not depend on the
+stub code and the stub may be packed with UPX. Programs bound by ZRXBIND of
+older versions have no such block and must be bound again.
         If there were no more switches given, setup program will display current
-stub configuration. If you do specify switches, setup will additionally
+configuration. If you do specify switches, setup will additionally
 display, what configuration parameters were changed and writes new values to
-stub executable.
+the program.
 
 Switches are:
 /X<hex number> - maximal amount of allocated memory in raw/xms mode.
@@ -128,10 +132,26 @@ much more able to dynamically configure itself. Here is the list:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         If you want, you may build experimental version with VMM support (seems
 to go away in next versions ?). The necessary steps to carry out:
-Comment line 'Release = 1' and uncomment 'VMM = 1' in segdefs.asm.
+Comment line '%assign Release 1' and uncomment '%assign VMM 1' in segdefs.asm.
 This system is very incomplete. Page freeing is not supported under VCPI,
 so you better run it under RAW/XMS only. Besides, unimplemented page unlocking
 function. Work with swap file is also not very correct (you have to reopen it
 after each resize and delete upon program exit). VMM speed is not worse than
 in DOS4G/W.
 
+
+=> BUILDING FROM SOURCE <=
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        The sources are built with free tools only:
+ - NASM 0.98.39 (other versions are not supported),
+ - Open Watcom C/C++ (wmake, wlink, wcl; the WATCOM environment variable must
+   be set and the tools must be in PATH),
+ - UPX (to pack the stub and zrxsetup).
+        Go to the SRC directory and run 'wmake'. It assembles zrdx.asm, links
+the DOS stub (zrdx0.exe), packs it with UPX and aligns it with aligner
+(zrdxu.exe), converts it to an assembler include with bin2asm and builds the
+binder (binder\zrxbind.exe) and zrxsetup.exe. 'wmake STUB=zrdx.exe' uses the
+unpacked stub. 'wmake install' copies zrxbind.exe, zrxsetup.exe and the stub
+(stub-le.exe) to the BIN directory. Prebuilt files are in BIN.
+        NASM is a 16 bit DOS program and needs most of the conventional memory
+to assemble zrdx.asm: remove TSR programs and drivers before building.

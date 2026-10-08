@@ -1,84 +1,85 @@
-;             This file is part of the ZRDX 0.50 project
+;             This file is part of the ZRDX 0.50OSE project
 ;                     (C) 1998, Sergey Belyakov
+;                     (C) 2026, Viacheslav Komenda
 
-Segm  Text
+        SEGM Text
 ;assume cs:Text, ds:Data, ss:Data
-DPROC AllocPages
-PageSize = 1000h
-@@Pos   equ edx
-@@Size  equ eax
-@@PageSubdirIndex equ ebx
-@@XDir  equ edi
-@@XSize equ ecx
-@@T     equ esi
-@@XDir1 equ esi
-@@nFreePagesOnDir equ ebp
+        DPROC AllocPages
+PageSize equ 1000h
+%define _pos edx
+%define _size eax
+%define _pagesubdirindex ebx
+%define _xdir edi
+%define _xsize ecx
+%define _t esi
+%define _xdir1 esi
+%define _nfreepagesondir ebp
         pushad
 ;uses eax, ebx, ecx, edx, esi, edi, ebp
-        mov  @@Pos,  [esp+8 + 8*4]
-        mov  @@Size, [esp+12 + 8*4]
-        add  @@Pos,  PageSize-1
-        add  @@Size, @@Pos
-        shr  @@Pos,  12  ;Calculating number of first page
-        shr  @@Size, 12
+        mov _pos, [esp + 8 + (8 * 4)]
+        mov _size, [esp + 12 + (8 * 4)]
+        add _pos, PageSize - 1
+        add _size, _pos
+        shr _pos, 12  ;Calculating number of first page
+        shr _size, 12
         cld
-        push @@Pos
-        sub  @@Size, @@Pos ;calculating number of pages
-        $ifnot jbe
-        $do
-          cmp byte ptr [esp+4+8*4+4], 0
-          $ifnot je
-            IFDEF Release
+        push _pos
+        sub _size, _pos ;calculating number of pages
+        _ifnot jbe, near
+        _do
+          cmp byte [esp + 4 + (8 * 4) + 4], 0
+          _ifnot je
+%ifdef Release
             sti
-            ENDIF
-            jmp short $+2
+%endif
+            jmp $ + 2
             cli
-          $endif
-          mov  @@PageSubdirIndex, @@Pos
-          shr  @@PageSubdirIndex, 10
-          cmp  nEntriesInTable[@@PageSubdirIndex*4], 0
-          $ifnot jne
+          _endif
+          mov _pagesubdirindex, _pos
+          shr _pagesubdirindex, 10
+          cmp dword [OffnEntriesInTable + (_pagesubdirindex * 4)], 0
+          _ifnot jne
             ;allocate page for table
-            lea  @@XDir, PageDir[@@PageSubdirIndex*4]
-            mov  @@XSize, 1
+            lea _xdir, [OffPageDir + (_pagesubdirindex * 4)]
+            mov _xsize, 1
             call XAllocPages
-            jz @@Fail
-          $endif
-          mov  @@T, PageDir[@@PageSubdirIndex*4]
-          mov  PageTableEntry, @@T
-          mov  @@XDir, @@Pos
-          and  @@XDir, 3FFh
-          mov  @@XSize, 400h
-          sub  @@XSize, @@XDir
-          cmp  @@XSize, @@Size
-          $ifnot jb
-            mov  @@XSize, @@Size
-          $endif
-          lea  @@XDir, PageTableWin[@@XDir*4]
+            jz Fail@32
+          _endif
+          mov _t, dword [OffPageDir + (_pagesubdirindex * 4)]
+          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
+          mov _xdir, _pos
+          and _xdir, 3FFh
+          mov _xsize, 400h
+          sub _xsize, _xdir
+          cmp _xsize, _size
+          _ifnot jb
+            mov _xsize, _size
+          _endif
+          lea _xdir, [OffPageTableWin + (_xdir * 4)]
           call XAllocPages
-          $ifnot jnz
-            cmp nEntriesInTable[@@PageSubdirIndex*4], 0
-            $ifnot jne
+          _ifnot jnz
+            cmp dword [OffnEntriesInTable + (_pagesubdirindex * 4)], 0
+            _ifnot jne
               ;free previsionaly allocated subdirectory, if main allocation failed
-              lea  @@XDir1, PageDir[@@PageSubdirIndex*4]
-              mov  @@XSize, 1
+              lea _xdir1, [OffPageDir + (_pagesubdirindex * 4)]
+              mov _xsize, 1
               call XFreePages
-            $endif
-@@Fail:
-            pop  eax
-            push dword ptr [esp+4+8*4]
+            _endif
+Fail@32:
+            pop eax
+            push dword [esp + 4 + (8 * 4)]
             call FreePagesN
             stc
-            jmp  @@ret
-          $endif
-          add  nEntriesInTable[@@PageSubdirIndex*4], @@XSize
-          add  @@Pos,  @@XSize
-          sub  @@Size, @@XSize
-        $enddo ja
-        $endif
-        pop  eax                   ;add esp, 4
+            jmp ret@32
+          _endif
+          add dword [OffnEntriesInTable + (_pagesubdirindex * 4)], _xsize
+          add _pos, _xsize
+          sub _size, _xsize
+        _enddo ja
+        _endif
+        pop eax                   ;add esp, 4
         clc
-@@ret:
+ret@32:
         popad
         ret 12
 
@@ -86,195 +87,199 @@ PageSize = 1000h
 ;destroy ebp, esi
 XAllocPages:
         InvalidateTLB
-        cmp nFreePages, 0
-        $ifnot je
-          mov @@nFreePagesOnDir, nEntriesInFplist ; nFreePagesOnDir
-          or  @@nFreePagesOnDir, @@nFreePagesOnDir
-          $ifnot jz
-            cmp @@XSize, @@nFreePagesOnDir
-            $ifnot jbe
-              mov @@XSize, @@nFreePagesOnDir
-            $endif
-            sub  @@nFreePagesOnDir, @@XSize
-            lea  esi, fplist[@@nFreePagesOnDir*4+4]
+        cmp dword [OffnFreePages], 0
+        _ifnot je
+          mov _nfreepagesondir, dword [OffnEntriesInFplist] ; nFreePagesOnDir
+          or _nfreepagesondir, _nfreepagesondir
+          _ifnot jz
+            cmp _xsize, _nfreepagesondir
+            _ifnot jbe
+              mov _xsize, _nfreepagesondir
+            _endif
+            sub _nfreepagesondir, _xsize
+            lea esi, [Offfplist + (_nfreepagesondir * 4) + 4]
             push ecx
-            rep  movsd
-            pop  ecx
+            rep movsd
+            pop ecx
             ;jmp  @@L0
-          $else jmp
-            mov  @@T, fplist[0]
-            lea  @@XSize, [@@nFreePagesOnDir+1]
-            xchg FpListEntry, @@T
-            mov  [@@XDir], @@T
-            mov  @@nFreePagesOnDir, 1023
+          _else jmp
+            mov _t, dword [Offfplist + 0]
+            lea _xsize, [ebp + 1]
+            xchg dword [OffPage2 + ((Offfplist - KernelBase) >> 10)], _t
+            mov [edi], _t
+            mov _nfreepagesondir, 1023
             ;@@L0:
-          $endif
-          mov  nEntriesInFplist, @@nFreePagesOnDir
-          sub  nFreePages, @@XSize
+          _endif
+          mov dword [OffnEntriesInFplist], _nfreepagesondir
+          sub dword [OffnFreePages], _xsize
           ;jmp @@Ret2
-        $else jmp
+        _else jmp
 ;VCPIAlloc:
-          push eax edx
-          xor  @@XSize, @@XSize
+          push eax
+          push edx
+          xor _xsize, _xsize
           call Alloc1Page
-          $ifnot jnc
-            mov  [@@XDir], edx
-            inc  @@XSize
-          $endif
-          pop  edx eax
-        $endif
+          _ifnot jnc
+            mov [edi], edx
+            inc _xsize
+          _endif
+          pop edx
+          pop eax
+        _endif
 ;@@Ret2:
         InvalidateTLB
-        or   @@XSize, @@XSize
-        retn
-        ENDP
+        or _xsize, _xsize
+        ret
+
 
 ;@@Pos, @@Size
-DPROC FreePages
-@@Pos   equ eax
-@@Size  equ edx
+        DPROC FreePages
+%define _pos eax
+%define _size edx
 ;uses eax, edx
-        push eax edx
-        mov @@Pos, [esp+8+2*4]
-        mov @@Size, [esp+12+2*4]
-        add @@Pos, PageSize-1
-        add @@Size, @@Pos
-        shr @@Pos, 12
-        shr @@Size, 12
-        push dword ptr [esp+4+2*4]
+        push eax
+        push edx
+        mov _pos, [esp + 8 + (2 * 4)]
+        mov _size, [esp + 12 + (2 * 4)]
+        add _pos, PageSize - 1
+        add _size, _pos
+        shr _pos, 12
+        shr _size, 12
+        push dword [esp + 4 + (2 * 4)]
         call FreePagesN
-        pop edx eax
+        pop edx
+        pop eax
         ret 12
-        ENDP
-DPROC FreePagesN
-@@FirstPage   equ eax
-@@LastPage    equ edx
-@@XDir        equ esi
-@@XSize       equ ecx
-@@nd          equ @@LastPage
-@@SubdirIndex equ ebx
-@@T           equ edi
+
+        DPROC FreePagesN
+%define _firstpage eax
+%define _lastpage edx
+%define _xdir esi
+%define _xsize ecx
+%define _nd edx
+%define _subdirindex ebx
+%define _t edi
         ;Log
         pushad
         cld
-        sub @@LastPage, @@FirstPage  ;@@nd
-        $ifnot jbe
-        $do
-          cmp byte ptr [esp+4+8*4], 0
-          $ifnot je
-            IFDEF Release
+        sub _lastpage, _firstpage  ;@@nd
+        _ifnot jbe
+        _do
+          cmp byte [esp + 4 + (8 * 4)], 0
+          _ifnot je
+%ifdef Release
             sti
-            ENDIF
-            jmp short $+2
+%endif
+            jmp $ + 2
             cli
-          $endif
-          mov  @@SubdirIndex, @@FirstPage
-          shr  @@SubdirIndex, 10
-          mov  @@XSize, PageDir[@@SubdirIndex*4]
-          mov  PageTableEntry, @@XSize
+          _endif
+          mov _subdirindex, _firstpage
+          shr _subdirindex, 10
+          mov _xsize, dword [OffPageDir + (_subdirindex * 4)]
+          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _xsize
           ;InvalidateTLB
-          mov  @@XSize, 400h
-          mov  @@XDir, @@FirstPage
-          and  @@XDir, 3FFh
-          sub  @@XSize, @@XDir
-          cmp  @@XSize, @@nd
-          $ifnot jb
-            mov @@XSize, @@nd
-          $endif
+          mov _xsize, 400h
+          mov _xdir, _firstpage
+          and _xdir, 3FFh
+          sub _xsize, _xdir
+          cmp _xsize, _nd
+          _ifnot jb
+            mov _xsize, _nd
+          _endif
           ;Log
-          lea  @@XDir, PageTableWin[@@XDir*4]
+          lea _xdir, [OffPageTableWin + (_xdir * 4)]
           call XFreePages
-          add  @@FirstPage, @@XSize
-          sub  @@nd, @@XSize
-          sub  nEntriesInTable[@@SubdirIndex*4], @@XSize
-          $ifnot jnz
-            lea  @@XDir, PageDir[@@SubdirIndex*4]
-            mov  @@XSize, 1
+          add _firstpage, _xsize
+          sub _nd, _xsize
+          sub dword [OffnEntriesInTable + (_subdirindex * 4)], _xsize
+          _ifnot jnz
+            lea _xdir, [OffPageDir + (_subdirindex * 4)]
+            mov _xsize, 1
             call XFreePages
-          $endif
-          or @@nd, @@nd
-        $enddo jnz
-        $endif
+          _endif
+          or _nd, _nd
+        _enddo jnz
+        _endif
         popad
         ret 4
 ;@@XDir, @@XSize
 ;destroy @@XDir, edi, eax
 XFreePages:
-@@T equ edi
+%define _t edi
         InvalidateTLB
-        mov  @@T, 1023
-        sub  @@T, nEntriesInFplist
-        $ifnot jz
-          cmp @@XSize, @@T
-          $ifnot jb
-            mov @@XSize, @@T
-          $endif
-          mov  @@T, nEntriesInFplist; nFreePagesOnDir
-          add  nEntriesInFplist, @@XSize
-          lea  edi, fplist[@@T*4+4]
+        mov _t, 1023
+        sub _t, dword [OffnEntriesInFplist]
+        _ifnot jz
+          cmp _xsize, _t
+          _ifnot jb
+            mov _xsize, _t
+          _endif
+          mov _t, dword [OffnEntriesInFplist] ; nFreePagesOnDir
+          add dword [OffnEntriesInFplist], _xsize
+          lea edi, [Offfplist + (_t * 4) + 4]
           push ecx
           push ecx
           push esi
-          rep  movsd
-          pop  edi
-          pop  ecx
+          rep movsd
+          pop edi
+          pop ecx
           push eax
-          xor  eax, eax
-          rep  stosd
-          pop  eax
-          pop  ecx
+          xor eax, eax
+          rep stosd
+          pop eax
+          pop ecx
           InvalidateTLB
-        $else jmp
-          mov  nEntriesInFplist, @@T    ; @@T already zero
-          lea  @@XSize, [@@T+1]
-          xchg @@T, [@@XDir]
-          xchg FpListEntry, @@T
+        _else jmp
+          mov dword [OffnEntriesInFplist], _t    ; @@T already zero
+          lea _xsize, [edi + 1]
+          xchg _t, [esi]
+          xchg dword [OffPage2 + ((Offfplist - KernelBase) >> 10)], _t
           InvalidateTLB
-          mov  fplist[0], @@T
-        $endif
-        add  nFreePages, @@XSize
-        retn
-        ENDP
-DPROC ReturnFreePool
+          mov dword [Offfplist + 0], _t
+        _endif
+        add dword [OffnFreePages], _xsize
+        ret
+
+        DPROC ReturnFreePool
         pushad
-        mov  ecx, FpListEntry         ;FreePagesRef
-        cmp  nFreePages, 0
-        $ifnot jz
-        mov  ecx, nEntriesInFplist  ;nFreePagesOnDir
-        jcxz @@L
-        $do
-        $do
+        mov ecx, [OffPage2 + ((Offfplist - KernelBase) >> 10)]         ;FreePagesRef
+        cmp dword [OffnFreePages], 0
+        _ifnot jz
+        mov ecx, [OffnEntriesInFplist]  ;nFreePagesOnDir
+        jcxz L@38
+        _do
+        _do
 
         sti
-        jmp  short $+2
+        jmp $ + 2
         cli
-        mov  edx, fplist[ecx*4]
-        call @@VCPIFree
-        dec  nFreePages
-        $enddo loop
-        @@L:
-        mov  edx, fplist[0]
-        xchg FpListEntry, edx
-        call @@VCPIFree
+        mov edx, [ecx*4 + Offfplist]
+        call VCPIFree@38
+        dec dword [OffnFreePages]
+        _enddo loop
+L@38:
+        mov edx, [Offfplist + 0]
+        xchg [OffPage2 + ((Offfplist - KernelBase) >> 10)], edx
+        call VCPIFree@38
         InvalidateTLB
-        mov  ch, 1024 shr 8
-        dec  nFreePages
-        $enddo loopnz
-        $endif
-        @@L0:
-@@E:
-@@E1:
+        mov ch, 1024 >> 8
+        dec dword [OffnFreePages]
+        _enddo loopnz
+        _endif
+L0@38:
+E@38:
+E1@38:
         ;mov nFreePagesOnDir, 1023
         popad
         ret
 
-@@VCPIFree:
+VCPIFree@38:
         test dh, VCPIPageBit
-        $ifnot jz
-        and  dx, 0F000h
-        mov  ax, 0DE05h
+        _ifnot jz
+        and dx, 0F000h
+        mov ax, 0DE05h
         VCPITrap
-        $endif
-        retn
-        ENDP
-Eseg Text
+        _endif
+        ret
+
+        ESEG Text

@@ -1,203 +1,217 @@
-;             This file is part of the ZRDX 0.50 project
+;             This file is part of the ZRDX 0.50OSE project
 ;                     (C) 1998, Sergey Belyakov
+;                     (C) 2026, Viacheslav Komenda
+;NASM version
 
 ;                      Macros definitions
+
+%define zcat2(a,b) a %+ b
+
+%macro zsetv 2
+%assign %1 %2
+%endmacro
+
+%macro zequ 2
+%1 equ %2
+%endmacro
+
+%assign LC 0
+%assign LC16 0
+%assign CurSegBase 0
+%assign CurSegBaseR 0
+%xdefine CurSegName none
+%assign _RRTEntryes 0
+%assign vsn 0
+
 ;Define label for virtual segments only
-DEFLabel MACRO MM, Label, Disp, Disp16, Shift
-        IFNB <Label>
-          Label      EQU MM ds:[LARGE Disp]
-          Label&A16  EQU MM ds:[SMALL Disp]
-          Off&Label = Disp
-          Label&R    EQU MM ds:[SMALL Disp16]
-          ROff&Label = Disp16
-        ENDIF
-        LC   = LC + Shift
-        LC16 = LC16 + Shift
-        ENDM
-DFB MACRO Label, lCount
-    IFNB <lCount>
-      DefLabel <byte ptr>, Label, %LC, %LC16, lCount
-    ELSE
-      DefLabel <byte ptr>, Label, %LC, %LC16, 1
-    ENDIF
-    ENDM
-DFW MACRO Label, lCount
-    IFNB <lCount>
-      DefLabel <word ptr>, Label, %LC, %LC16, (lCount)*2
-    ELSE
-      DefLabel <word ptr>, Label, %LC, %LC16, 2
-    ENDIF
-    ENDM
+%macro DefLabel 4
+        zsetv zcat2(Off,%1), %2
+        zsetv zcat2(ROff,%1), %3
+        %assign LC LC+(%4)
+        %assign LC16 LC16+(%4)
+%endmacro
+%macro DFB 1-2 1
+        DefLabel %1, LC, LC16, %2
+%endmacro
+%macro DFW 1-2 1
+        DefLabel %1, LC, LC16, (%2)*2
+%endmacro
+%macro DFD 1-2 1
+        DefLabel %1, LC, LC16, (%2)*4
+%endmacro
+%macro DFL 1
+        DFB %1, 0
+%endmacro
 
-DFD MACRO Label, lCount
-    IFNB <lCount>
-      DefLabel <dword ptr>, Label, %LC, %LC16, (lCount)*4
-    ELSE
-      DefLabel <dword ptr>, Label, %LC, %LC16, 4
-    ENDIF
-    ENDM
+%macro LBack 2
+Off %+ %1 equ ($ - $$) - (%2) - CurSegBase
+ROff %+ %1 equ ($ - $$) - (%2) - CurSegBaseR
+%endmacro
+%macro DefLLabel 1
+Off %+ %1 equ ($ - $$) - CurSegBase
+ROff %+ %1 equ ($ - $$) - CurSegBaseR
+%endmacro
+%macro LByte 1-2
+        DefLLabel %1
+%endmacro
+%macro LWord 1
+        DefLLabel %1
+%endmacro
+%macro LDWord 1
+        DefLLabel %1
+%endmacro
+%macro LLabel 1
+        DefLLabel %1
+%endmacro
+%macro DPROC 1
+        DefLLabel %1
+%1:
+%endmacro
 
-_DEFLLabel MACRO MM, Label, Disp, DispA16
-          Label&R    EQU MM ds:[Disp]
-          Label&A16  EQU MM ds:[SMALL DispA16]
-          ROff&Label = Disp
-          ENDM
+%macro RRT 0-1 0
+        %assign _RRTEntryes _RRTEntryes+1
+%%w     equ ($ - $$) - CurSegBaseR
+        %xdefine _rrtseg CurSegName
+        segment RelocR0
+        dw %%w - 4 - (%1) + PSP
+        segment _rrtseg
+%endmacro
 
-DEFLLabel MACRO MM, Label
-        IFNB <Label>
-          Label      EQU MM ds:[LARGE $-CurSegBase]
-          Off&Label = $-CurSegBase
-          _DEFLLabel <MM>, <Label>, %($-CurSegBaseR), %($-CurSegBase)
-          ;Label&R    EQU MM ds:[$-CurSegBaseR]
-          ;ROff&Label = $-CurSegBaseR
-        ENDIF
-        ENDM
+%macro SetBits 1
+%if %1 = 32
+        bits 32
+%else
+        bits 16
+%endif
+%endmacro
 
-LByte MACRO Label
-    DefLLabel <byte ptr>, Label
-    ENDM
-LWord MACRO Label
-      DefLLabel <word ptr>, Label
-      ENDM
+%macro SEGM 1
+%push seg
+        %xdefine %$prev CurSegName
+        %assign %$sb CurSegBase
+        %assign %$sbr CurSegBaseR
+        %xdefine CurSegName %1
+        segment %1
+        SetBits zcat2(SegBits_,%1)
+        %assign CurSegBase zcat2(SegBase,%1)
+        %assign CurSegBaseR zcat2(SegBaseR,%1)
+%endmacro
 
-LDWord MACRO Label
-       DefLLabel <dword ptr>, Label
-       ENDM
+%macro ESEG 1
+        %assign CurSegBase %$sb
+        %assign CurSegBaseR %$sbr
+        %xdefine CurSegName %$prev
+%ifnidn %$prev, none
+        segment %$prev
+        SetBits zcat2(SegBits_,%$prev)
+%endif
+%pop
+%endmacro
 
-LLabel  MACRO Label
-        DefLLabel , Label,
-        ENDM
-DFL     MACRO Label
-        DFB Label, 0
-        ENDM
-DFP     MACRO Label
-        Off&Label  = $ - CurSegBase
-        ROff&Label = $ - CurSegBaseR
-        ;Label      EQU ds:[SegStartText][$ - CurSegBase]
-        Label&R    EQU ds:[$ - CurSegBaseR][SegStartText16]
-        ENDM
-LinkLC  MACRO
-        LC   = $ - CurSegBase
-        LC16 = $ - CurSegBaseR
-        ENDM
+%macro VSegm 1
+        %assign SavedLC LC
+        %assign SavedLC16 LC16
+%ifidn %1, BSS16
+        %assign LC BSS16LC
+        %assign LC16 BSS16LC16
+%elifidn %1, EBSS
+        %assign LC EBSSLC
+        %assign LC16 EBSSLC16
+%elifidn %1, IEBSS
+        %assign LC IEBSSLC
+        %assign LC16 IEBSSLC16
+%elifidn %1, BSS
+        %assign LC BSSLC
+        %assign LC16 BSSLC16
+%else
+%error unknown virtual segment %1
+%endif
+%endmacro
 
-PutRTData MACRO XDisp, SName, N
-        SName&N segment
-          IF XDisp GE 80h
-            DW ((XDisp and 0FFh) shl 8) + ((XDisp and 7F00h) shr 7)
-          ELSE
-            DB XDisp*2+1
-          ENDIF
-        SName&N ends
-        ENDM
+%macro EVSeg 1
+%ifidn %1, BSS16
+        %assign BSS16LC LC
+        %assign BSS16LC16 LC16
+%elifidn %1, EBSS
+        %assign EBSSLC LC
+        %assign EBSSLC16 LC16
+%elifidn %1, IEBSS
+        %assign IEBSSLC LC
+        %assign IEBSSLC16 LC16
+%elifidn %1, BSS
+        %assign BSSLC LC
+        %assign BSSLC16 LC16
+%else
+%error unknown virtual segment %1
+%endif
+        %assign LC SavedLC
+        %assign LC16 SavedLC16
+%endmacro
 
-RRT     MACRO Disp
-        _RRTEntryes = _RRTEntryes+1
-        ___W = $ - CurSegBaseR
-        RelocR0 segment
-        IFB <Disp>
-          DW ___W-4+PSP
-        ELSE
-          DW ___W-4-Disp+PSP
-        ENDIF
-        ends
-        ENDM
+%macro VSAlign 1
+%if (LC - (LC // (%1)) * (%1)) != 0
+        %assign vsn vsn+1
+        DFB zcat2(_vsa,vsn), (%1) - (LC - (LC // (%1)) * (%1))
+%endif
+%endmacro
 
-        comment #
-        LOCAL XDisp
-        if CurRTNum EQ - 1
-          .err illegal rrt use
-        endif
-        XDisp = $ - LastRelocR - 4
-        IFNB <Disp>
-          XDisp = XDisp - Disp
-          LastRelocR = $ - Disp
-        ELSE
-          LastRelocR = $
-        ENDIF
-        PutRTData XDisp, RelocR, %CurRTNum
-        ENDM     #
+%macro Descr 3
+        dw (%2) & 0FFFFh
+        dw (%1) & 0FFFFh
+        db ((%1) >> 16) & 0FFh
+        dw ((%3) & 0C0FFh) + (((%2) >> 8) & 0F00h)
+        db ((%1) >> 24) & 0FFh
+%endmacro
+%macro GDescr 3
+        dw (%1) & 0FFFFh
+        dw %2
+        dw (%3) << 8
+        dw ((%1) >> 16) & 0FFFFh
+%endmacro
 
-RT      MACRO Disp
-        LOCAL XDisp
-        XDisp = $ - LastReloc - 4
-        IFNB <Disp>
-          XDisp = XDisp - Disp
-          LastReloc = $ - Disp
-        ELSE
-          LastReloc = $
-        ENDIF
-        PutRTData XDisp, Reloc, %CurRTNum
-        _RTEntryes = _RTEntryes+1
-        ENDM
+%macro VCPICallTrap 0
+        db CallFarCode
+        dd 0
+        dw VCPICallGateSelector
+%endmacro
+%macro VCPITrap 0
+        db CallFarCode
+        dd 0
+        dw VCPITrapGateSelector
+%endmacro
+%macro InvalidateTLB 0
+        db CallFarCode
+        dd 0
+        dw InvalidateTLBGateSelector
+%endmacro
+%macro Log 0
+        call DispLog
+%endmacro
+%macro rdtsc 0
+        db 0Fh, 31h
+%endmacro
 
-SEGM    MACRO Name
-        Name segment
-        ;SavedRRT&Name = LastRelocR
-        ;SavedRT&Name  = LastReloc
-        ;LastRelocR    = SegRRT&Name
-        ;LastReloc     = SegRT&Name
 
-        SavedSB&Name  = CurSegBase
-        SavedSBR&Name = CurSegBaseR
-        CurSegBase    = SegBase&Name
-        CurSegBaseR   = SegBaseR&Name
-        ;SavedRTNum    = CurRTNum
-        ;CurRTNum      = SegRTNum&Name
-        LC   = $ - CurSegBase
-        LC16 = $ - CurSegBaseR
-        ENDM
+%assign CurSegBase 0 ;define any values for correct SEGM work
+%assign CurSegBaseR 0
 
-ESEG    MACRO Name
-        ;SegRRT&Name = LastRelocR
-        ;SegRT&Name  = LastReloc
-        ;LastRelocR  = SavedRRT&Name
-        ;LastReloc   = SavedRT&Name
-
-        CurSegBase  = SavedSB&Name
-        CurSegBaseR = SavedSBR&Name
-        ;CurRTNum    = SavedRTNum
-        Name ends
-        ENDM
-VSegm   MACRO Name
-        SavedLC   = LC
-        SavedLC16 = LC16
-        LC   = Name&LC
-        LC16 = Name&LC16
-        ENDM
-EVSeg   MACRO Name
-        Name&LC   = LC
-        Name&LC16 = LC16
-        LC   = SavedLC
-        LC16 = SavedLC16
-        ENDM
-VSAlign MACRO A
-        Local L
-        if (LC mod A) ne 0
-          DFB L, %(A - (LC mod A))
-        endif
-        ENDM
-
-CurSegBase  = 0      ;define any values for correct SEGM work
-CurSegBaseR = 0
-
-int6code    = 06CDh        ;int 6 code in word format
-JmpFarCode  = 0EAh         ;jmp far code in byte format
-JmpNearCode = 0E9h
-CallFarCode = 09Ah
-PushWCode   = 68h
-PushBCode   = 6Ah
-JmpShortCode= 0EBh
-NearCallCode= 0E8h
-RetfCode    = 0CBh
-S32Bit      = 18
-XXX         = 45h
-SSPrefix    = 36h
-PSP         = 100h
-VCPIPageBit = 8  ;this bit in the page table or directory indicates,
+int6code equ 06CDh ;int 6 code in word format
+JmpFarCode equ 0EAh ;jmp far code in byte format
+JmpNearCode equ 0E9h
+CallFarCode equ 09Ah
+PushWCode equ 68h
+PushBCode equ 6Ah
+JmpShortCode equ 0EBh
+NearCallCode equ 0E8h
+RetfCode equ 0CBh
+S32Bit equ 18
+%assign XXX 45h
+SSPrefix equ 36h
+PSP equ 100h
+VCPIPageBit equ 8 ;this bit in the page table or directory indicates,
                  ;that page is from VCPI, and must be returned to it
 ;Init flags:
-PriorVCPIUse = 1
+PriorVCPIUse equ 1
 
 ;PMTR = XXX
 ;PMCS = XXX
@@ -209,224 +223,178 @@ PriorVCPIUse = 1
 ;VCPISelector = GatesSelector+8+NTraps3*8
 
 ;ClientHandlerCS = XXX
-IFBitMask    = 2
+IFBitMask equ 2
 
-DefRealFlags = XXX
+DefRealFlags equ XXX
 
 ;stack frame for interrupt
-IFrame struc
-IFrEIP    DD ?
-IFrCS     DD ?
-IFrFlags  DD ?
-IFrESP    DD ?
-IFrSS     DD ?
-IFrame ends
-CFrame struc    ;for call
-CFrEIP    DD ?
-CFrCS     DD ?
-CFrESP    DD ?
-CFrSS     DD ?
-CFrame ends
+;IFrame struc
+IFrEIP equ 0
+IFrCS equ 4
+IFrFlags equ 8
+IFrESP equ 12
+IFrSS equ 16
+IFrame_size equ 20
+;CFrame struc    ;for call
+CFrEIP equ 0
+CFrCS equ 4
+CFrESP equ 8
+CFrSS equ 12
+CFrame_size equ 16
 
 ;frame of this structure are created on the real mode stack before
 ;returning to VM86
 ;fields StartEIP0, StartCS0 initalized by SwitcherToVM
-VMIShortStruct struc
-        ;VMI_EIP0       DD ?
-        ;VMI_CS0        DD ?
-        VMI_Reserv     DD ?
-        VMI_ESP        DD ?;ss:esp must points to VMI_EAX
-        VMI_SS         DD ?
-        VMI_ES         DD ?
-        VMI_DS         DD ?
-        VMI_FS         DD ?
-        VMI_GS         DD ?
-        VMI_EAX        DD ?
-        VMI_IP         DW ?
-        VMI_CS         DW ?
-        VMI_Flags      DW ?
-VMIShortStruct ends
-VMIStruct struc
-        VMIShortStruct <>
-        VMI_EndIP      DW ?
-        VMI_EndCS      DW ?
-        VMI_EndFlags   DW ?
-VMIStruct ends
+;VMIShortStruct struc
+;        ;VMI_EIP0       DD ?
+;        ;VMI_CS0        DD ?
+VMI_Reserv equ 0
+VMI_ESP equ 4 ;ss:esp must points to VMI_EAX
+VMI_SS equ 8
+VMI_ES equ 12
+VMI_DS equ 16
+VMI_FS equ 20
+VMI_GS equ 24
+VMI_EAX equ 28
+VMI_IP equ 32
+VMI_CS equ 34
+VMI_Flags equ 36
+VMIShortStruct_size equ 38
+;VMIStruct struc
+;        VMIShortStruct <>
+VMI_EndIP equ 38
+VMI_EndCS equ 40
+VMI_EndFlags equ 42
+VMIStruct_size equ 44
 
-RMIEStruct STRUC
-        ;saved client registers
-        RMIE_EBX       DD ?
-        RMIE_ECX       DD ?
-        RMIE_EDX       DD ?
-        RMIE_ESI       DD ?
-        RMIE_EBP       DD ?
-        RMIE_EAX       DD ?
-        RMIE_DS        DW ?
-        RMIE_EDI       DD ?
-        RMIE_ES        DW ?
-        RMIE_FS        DW ?
-        RMIE_GS        DW ?
-        RMIE_RealStack DD ?
-        ;client iret frame
-        RMIE_EIP       DD ?
-        RMIE_CS        DD ?
-        RMIE_EFlags    DD ?
-RMIEStruct ENDS
+;RMIEStruct STRUC
+;        ;saved client registers
+RMIE_EBX equ 0
+RMIE_ECX equ 4
+RMIE_EDX equ 8
+RMIE_ESI equ 12
+RMIE_EBP equ 16
+RMIE_EAX equ 20
+RMIE_DS equ 24
+RMIE_EDI equ 26
+RMIE_ES equ 30
+RMIE_FS equ 32
+RMIE_GS equ 34
+RMIE_RealStack equ 36
+;        ;client iret frame
+RMIE_EIP equ 40
+RMIE_CS equ 44
+RMIE_EFlags equ 48
+RMIEStruct_size equ 52
 
 ;stack frame for simple interrupt from client PM - save all selectors,
 ;replaced with RM segments
-PMIStruct STRUC
-        ;saved registers
-        PMI_ES         DW ?
-        PMI_DS         DW ?
-        PMI_FS         DW ?
-        PMI_GS         DW ?
-        ;client iret frame
-        PMI_EIP        DD ?
-        PMI_CS         DD ?
-        PMI_EFlags     DD ?
-PMIStruct ENDS
+;PMIStruct STRUC
+;        ;saved registers
+PMI_ES equ 0
+PMI_DS equ 2
+PMI_FS equ 4
+PMI_GS equ 6
+;        ;client iret frame
+PMI_EIP equ 8
+PMI_CS equ 12
+PMI_EFlags equ 16
+PMIStruct_size equ 20
 
-RMSStruct struc
-        RMS_Flags      DW ?
-        RMS_ESI        DD ?
-        RMS_EBP        DD ?
-        RMS_EAX        DD ?
-        RMS_ES         DW ?
-        RMS_DS         DW ?
-        RMS_FS         DW ?
-        RMS_GS         DW ?
-        RMS_SwitchCode DW ?
-RMSStruct ends
+;RMSStruct struc
+RMS_Flags equ 0
+RMS_ESI equ 2
+RMS_EBP equ 6
+RMS_EAX equ 10
+RMS_ES equ 14
+RMS_DS equ 16
+RMS_FS equ 18
+RMS_GS equ 20
+RMS_SwitchCode equ 22
+RMSStruct_size equ 24
 
 ;structure with client real mode callbacks info
-CBTStruct STRUC
-        CBT_EIP     DD ?
-        CBT_CS      DW ?
-        CBT_SPtrOff DD ?
-        CBT_SPtrSeg DW ?
-CBTStruct ENDS
+;CBTStruct STRUC
+CBT_EIP equ 0
+CBT_CS equ 4
+CBT_SPtrOff equ 6
+CBT_SPtrSeg equ 10
+%assign CBTStruct_size 12
 
-DC_Struct STRUC
-          DC_EDI   DD ?
-          DC_ESI   DD ?
-          DC_EBP   DD ?
-          DC_ESP   DD ?
-          DC_EBX   DD ?
-          DC_EDX   DD ?
-          DC_ECX   DD ?
-          DC_EAX   DD ?
-          DC_Flags DW ?
-          DC_ES    DW ?
-          DC_DS    DW ?
-          DC_FS    DW ?
-          DC_GS    DW ?
-          DC_IP    DW ?
-          DC_CS    DW ?
-          DC_SP    DW ?
-          DC_SS    DW ?
-DC_Struct ENDS
-EDC_Struct STRUC
-          DC_Struct <?>
-;several extra fields special for DOS extender
-          DC_ES0   DW ?     ;saved PM client selectors
-          DCStructSize = DC_ES0
-          DC_DS0   DW ?
-          DC_FS0   DW ?
-                   ;DW ?
-                   ;DD 10 dup(?)
-          ;DC_BUFFERSIZE DD ?
-          DC_REIP     DD ?
-          DC_EID      DD ?
-          DC_REFLAGS  DD ?
-          DC_REIP1    DD ?
-          DC_RCS1     DD ?
-          DC_REFLAGS1 DD ?
-          ENDS
+;DC_Struct STRUC
+%assign DC_EDI 0
+%assign DC_ESI 4
+%assign DC_EBP 8
+DC_ESP equ 12
+%assign DC_EBX 16
+%assign DC_EDX 20
+%assign DC_ECX 24
+%assign DC_EAX 28
+DC_Flags equ 32
+%assign DC_ES 34
+DC_DS equ 36
+DC_FS equ 38
+DC_GS equ 40
+DC_IP equ 42
+DC_CS equ 44
+DC_SP equ 46
+DC_SS equ 48
+DC_Struct_size equ 50
+;EDC_Struct STRUC
+;          DC_Struct <?>
+%assign DC_ES0 50 ;saved PM client selectors
+DCStructSize equ DC_ES0
+DC_DS0 equ 52
+DC_FS0 equ 54
+;                   ;DW ?
+;                   ;DD 10 dup(?)
+;          ;DC_BUFFERSIZE DD ?
+DC_REIP equ 56
+%assign DC_EID 60
+DC_REFLAGS equ 64
+DC_REIP1 equ 68
+DC_RCS1 equ 72
+DC_REFLAGS1 equ 76
+EDC_Struct_size equ 80
           ;DC_GS0   DW ?
           ;DC_SavedSize DD ?       ;saved size of the moved data
           ;DC_IntNum DB ?          ;number of requested interrupt
           ;DC_OffsetIndex  DB ?    ;index of register, contains offset of the transferred date
           ;DC_SegmentIndex DB ?    ;-- for segment register
-          DC_FirstSR0 EQU DC_ES0
-          DC_FirstSR EQU DC_ES
-          DC_FirstR EQU DC_EDI
-          DC_RCS  equ DC_EID
+DC_FirstSR0 equ DC_ES0
+DC_FirstSR equ DC_ES
+DC_FirstR equ DC_EDI
+DC_RCS equ DC_EID
           ;DC_REIP equ dword ptr DC_RCS
 
-EXC_Struct STRUC
-           EXC_REIP    DD ?
-           EXC_RCS     DD ?
-           EXC_Errcode DD ?
-           EXC_EIP     DD ?
-           EXC_CS      DD ?
-           EXC_EFlags  DD ?
-           EXC_ESP     DD ?
-           EXC_SS      DD ?
-EXC_Struct ENDS
+;EXC_Struct STRUC
+EXC_REIP equ 0
+EXC_RCS equ 4
+EXC_Errcode equ 8
+EXC_EIP equ 12
+EXC_CS equ 16
+EXC_EFlags equ 20
+EXC_ESP equ 24
+EXC_SS equ 28
+EXC_Struct_size equ 32
 
-DPROC MACRO Label
-        DFP Label
-        Label PROC C
-        ENDM
-CHK     MACRO n
-        mov ax, 4C00h+n
-        int 21h
-        ENDM
+;MCBStruct STRUC
+MCB_Prev equ 0
+MCB_Next equ 4
+MCB_StartOffset equ 8
+MCB_EndOffset equ 12
+%assign MCBStruct_size 16
 
-Descr  MACRO Base, Limit, ACR
-        DW Limit and 0FFFFh
-        DW Base and 0FFFFh
-        DB (Base shr 16) and 0FFh
-        DW (ACR and 0C0FFh) + ((Limit shr 8) and 0F00h)
-        DB (Base shr 24) and 0FFh
-       ENDM
-GDescr MACRO Offset, Selector, ACR
-        DW Offset and 0FFFFh
-        DW Selector
-        DW (ACR) shl 8
-        DW (Offset shr 16) and 0FFFFh
-       ENDM
+;PAStruct STRUC
+PA_EDI equ 0
+PA_ESI equ 4
+PA_EBP equ 8
+PA_ESP equ 12
+PA_EBX equ 16
+PA_EDX equ 20
+PA_ECX equ 24
+PA_EAX equ 28
+PAStruct_size equ 32
 
-VCPICallTrap MACRO
-        DB CallFarCode
-        DD 0
-        DW VCPICallGateSelector
-        ENDM
-VCPITrap MACRO
-        DB CallFarCode
-        DD 0
-        DW VCPITrapGateSelector
-         ENDM
-InvalidateTLB MACRO
-        DB CallFarCode
-        DD 0
-        DW InvalidateTLBGateSelector
-        ENDM
-Log     MACRO
-        call DispLog
-        ENDM
-
-MCBStruct STRUC
-        MCB_Prev        DD ?
-        MCB_Next        DD ?
-        MCB_StartOffset DD ?
-        MCB_EndOffset   DD ?
-        ENDS
-
-PAStruct STRUC
-        PA_EDI DD ?
-        PA_ESI DD ?
-        PA_EBP DD ?
-        PA_ESP DD ?
-        PA_EBX DD ?
-        PA_EDX DD ?
-        PA_ECX DD ?
-        PA_EAX DD ?
-        ENDS
-
-rdtsc   MACRO
-        DB 0Fh, 31h
-        ENDM
-ETextG equ EText
-IETextG equ IEText
+%define ETextG EText
+%define IETextG IEText

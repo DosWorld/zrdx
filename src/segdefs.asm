@@ -1,200 +1,164 @@
-;             This file is part of the ZRDX 0.50 project
+;             This file is part of the ZRDX 0.50OSE project
 ;                     (C) 1998, Sergey Belyakov
+;                     (C) 2026, Viacheslav Komenda
+;NASM version
 
 ;segment definitions for
 ;real mode rezident switchers for ZRDX DPMI host under VCPI
-KernelBase = 4*1024*1024
-SegRTNum = 0
-ifndef BePacked
-  PLShift = 10h
-else
-  ifdef XLE
-    PLShift = 1000h
-  else
-    PLShift = 1100h
-  endif
-endif
-Release = 1
-;VMM = 1
-SetupSeg MACRO Sz, DSz, S, PS
-        Local _Sz
-        ifdef RELEASE
-          _Sz = (Sz + 15) and (not 0Fh)
-        else
-          _Sz = (DSz + 15) and (not 0Fh)
-        endif
-        SegSize&S = _Sz
-        SegBase&S    = $ - XCurSegBase
-        SegStart&S   = XCurSegBase
-        XSegStart&S  = $
-        SegStart&S&R = XCurSegBaseR
-        SegEnd&S&R   = XCurSegBaseR+_Sz
-        SegBaseR&S   = $ - XCurSegBaseR
-        XCurSegBase  = XCurSegBase + _Sz
-        XCurSegBaseR = XCurSegBaseR + _Sz
-        ENDM
-SetupRTSeg EQU SetupSeg
-        XCurSegBase  = 0
-        XCurSegBaseR = 0
-VSegment MACRO Name, Sz, DSz
-        ifdef RELEASE
-          SegSize&Name = Sz
-        else
-          SegSize&Name = DSz
-        endif
-        Name&LC   = XCurSegBase
-        Name&LC16 = XCurSegBaseR
-        SegStart&Name&R = XCurSegBaseR
-        ENDM
-segment Text16  para use16 public 'CODE16'
-ends Text16
-segment Data16  para  use16 public 'DATA16'
-ends Data16
-segment RelocR0 use16 para public 'RELOCR'
-        ;SegStartRelocR label byte
-ends RelocR0
-segment IText16 para use16 public 'IDATA'
-ends IText16
-segment IData16 para use16 public 'IDATA'
-ends IData16
-segment EText   para use32 public 'EXTENDER'
-        ends
-segment EData   para use32 public 'EXTENDER'
-        ends
-IFDEF EDebug
-segment DBText
-        ends
-ENDIF
-segment IEText  para use32 public 'LOADER'
-        ends
-segment IEData  para use32 public 'LOADER'
-        ends
-segment Text    para use32 public 'CODE'
-ends Text
-segment IText   para use32 public 'CODE'
-ends IText
-segment Data    para use32 public 'DATA'
-ends Data
-segment BSSX    para use32 public 'DATA'
-        ends
-segment Stock     para public 'XXXX'
-;          db 40000 dup(?)
-          ends
-segment Stack16 para use16 stack 'STACK'
-ends Stack16
-comment &
-Text16__536
-Data16__0
-RelocR0__78
-IText16__2036
-IData16__420
-EText__2366
-EData__725
-DBText__0
-IEText__1580
-IEData__316
-Text__6714
-IText__0
-Data__338
+%assign KernelBase 4*1024*1024
+SegRTNum equ 0
+%ifndef BePacked
+%assign PLShift 10h
+%else
+%assign PLShift 1100h
+%endif
+%assign Release 1
+;%assign VMM 1
 
-Text16__543
-Data16__0
-RelocR0__88
-IText16__2049
-IData16__425
-EText__2360
-EData__751
-IEText__1589
-IEData__321
-Text__6862
-IText__0
-Data__338
-&
-segment Text16  para use16 public 'CODE16'
-        DPMIHOSTMaxLowData = XCurSegBaseR
-        SetupRTSeg 736, 750, Text16, EText16
-ends Text16
+%define zcat3(a,b,c) a %+ b %+ c
+
+%assign XCurSegBase 0
+%assign XCurSegBaseR 0
+
+%macro SetupSeg 3-4
+%ifdef Release
+        %assign _Sz ((%1) + 15) & ~15
+%else
+        %assign _Sz ((%2) + 15) & ~15
+%endif
+        zsetv zcat2(SegSize,%3), _Sz
+        zsetv zcat2(SegBase,%3), 0 - XCurSegBase
+        zequ zcat2(SegStart,%3), XCurSegBase
+        zsetv zcat2(SegBaseR,%3), 0 - XCurSegBaseR
+        %assign XCurSegBase XCurSegBase + _Sz
+        %assign XCurSegBaseR XCurSegBaseR + _Sz
+%endmacro
+%macro SetupRTSeg 3-4
+        SetupSeg %1, %2, %3
+%endmacro
+
+%macro VSegInit 3
+%ifidn %1, BSS16
+        %assign BSS16LC %2
+        %assign BSS16LC16 %3
+%elifidn %1, EBSS
+        %assign EBSSLC %2
+        %assign EBSSLC16 %3
+%elifidn %1, IEBSS
+        %assign IEBSSLC %2
+        %assign IEBSSLC16 %3
+%elifidn %1, BSS
+        %assign BSSLC %2
+        %assign BSSLC16 %3
+%else
+%error unknown virtual segment %1
+%endif
+%endmacro
+
+%macro VSegment 3
+%ifdef Release
+        zsetv zcat2(SegSize,%1), %2
+%else
+        zsetv zcat2(SegSize,%1), %3
+%endif
+        VSegInit %1, XCurSegBase, XCurSegBaseR
+        zsetv zcat3(SegStart,%1,R), XCurSegBaseR
+%endmacro
+
+segment Text16  align=16 public class=CODE16 use16
+SegBits_Text16 equ 16
+segment Data16  align=16 public class=DATA16 use16
+SegBits_Data16 equ 16
+segment RelocR0 align=16 public class=RELOCR use16
+SegBits_RelocR0 equ 16
+segment IText16 align=16 public class=IDATA use16
+SegBits_IText16 equ 16
+segment IData16 align=16 public class=IDATA use16
+SegBits_IData16 equ 16
+segment EText   align=16 public class=EXTENDER use32
+SegBits_EText equ 32
+segment EData   align=16 public class=EXTENDER use32
+SegBits_EData equ 32
+%ifdef EDebug
+segment DBText  align=1 public use16
+SegBits_DBText equ 16
+%endif
+segment IEText  align=16 public class=LOADER use32
+SegBits_IEText equ 32
+segment IEData  align=16 public class=LOADER use32
+SegBits_IEData equ 32
+segment Text    align=16 public class=CODE use32
+SegBits_Text equ 32
+segment IText   align=16 public class=CODE use32
+SegBits_IText equ 32
+segment Data    align=16 public class=DATA use32
+SegBits_Data equ 32
+segment BSSX    align=16 public class=DATA use32
+SegBits_BSSX equ 32
+segment Stock   align=16 public class=XXXX use16
+SegBits_Stock equ 16
+segment Stack16 align=16 stack class=STACK use16
+SegBits_Stack16 equ 16
+
+group DGROUP16 Text16 Data16 IText16 IData16 RelocR0
+group EGroup EText EData
+group LGROUP IEData IEText
+group DGROUP Text Data
+
+%define ETextG EText
+%define IETextG IEText
+
+segment Text16
+DPMIHOSTMaxLowData equ XCurSegBaseR
+        SetupRTSeg 760, 800, Text16, EText16
          ;RM data for IDPMI host
-segment Data16  para  use16 public 'DATA16'
+segment Data16
         SetupSeg 000, 0, Data16, Text16
-ends Data16
          ;RM stack for IDMPI host
-VSegment BSS16, 1000, 1000
-segment RelocR0 use16 para public 'RELOCR'
+        VSegment BSS16, 1000, 1000
+segment RelocR0
         SetupSeg 88 , 98, RelocR0
-ends RelocR0
-        IDPMIDataSize = OffRStackEnd
-segment IText16 para use16 public 'IDATA'
-        SetupRTSeg 1923, 2200, IText16, RelocR0
-ends IText16
-segment IData16 para use16 public 'IDATA'
-        SetupSeg 431 , 600, IData16, IText16
-ends IData16
-segment EText   para use32 public 'EXTENDER'
-        ExtenderStart = XCurSegBaseR
-        TXCurSegBase  = XCurSegBase
-        XCurSegBase   = 0
-        SetupSeg 2451, 2600, EText, IData16
-        ends
-segment EData   para use32 public 'EXTENDER'
+segment IText16
+        SetupRTSeg 2200, 2400, IText16, RelocR0
+segment IData16
+        SetupSeg 480, 600, IData16, IText16
+segment EText
+ExtenderStart equ XCurSegBaseR
+%assign TXCurSegBase XCurSegBase
+%assign XCurSegBase 0
+        SetupSeg 2720, 2800, EText, IData16
+segment EData
         SetupSeg 793, 862, EData, EText
-        ends
-VSegment EBSS, 200, 200
-         ExtenderSize = XCurSegBase
-         ExtenderFullSize = ExtenderSize+200
-IFDEF EDebug
+        VSegment EBSS, 200, 200
+%assign ExtenderSize XCurSegBase
+ExtenderFullSize equ ExtenderSize+200
+%ifdef EDebug
 segment DBText
-        DebuggerStart = XCurSegBaseR
+DebuggerStart equ XCurSegBaseR
         SetupSeg 9000, 9000, DBText
-        ends
-ENDIF
-segment IEText  para use32 public 'LOADER'
-        LoaderStart  = XCurSegBaseR
-        TXCurSegBase = TXCurSegBase + XCurSegBase
-        XCurSegBase = 0
-IFDEF XLE
-        SetupSeg 1113, 2000, IEText, EData
-ELSE
-        SetupSeg 1536, 2000, IEText, EData
-ENDIF
-        ends
-segment IEData  para use32 public 'LOADER'
+%endif
+segment IEText
+LoaderStart equ XCurSegBaseR
+%assign TXCurSegBase TXCurSegBase + XCurSegBase
+%assign XCurSegBase 0
+        SetupSeg 1660, 2000, IEText, EData
+segment IEData
         SetupSeg 313, 500, IEData, IEText
-        ends
-        ROffLoaderEnd = XCurSegBaseR
-        WinSize = (ROffLoaderEnd+0FFFh+200h) and not 0FFFh
-        LoaderSize = XCurSegBase
-        LoaderFullSize = LoaderSize+3000
-VSegment IEBSS, 3008, 3008
+%assign ROffLoaderEnd XCurSegBaseR
+%assign WinSize (ROffLoaderEnd+0FFFh+200h) & ~0FFFh
+%assign LoaderSize XCurSegBase
+LoaderFullSize equ LoaderSize+3000
+        VSegment IEBSS, 3008, 3008
         ;IDPMI host rezident code
-segment Text    para use32 public 'CODE'
-        OffProtectedStart = XCurSegBaseR
-        XCurSegBase = KernelBase
-        SetupRTSeg 6817, 9000, Text, IEData
-ends Text
-segment IText   para use32 public 'CODE'
+segment Text
+%assign OffProtectedStart XCurSegBaseR
+%assign XCurSegBase KernelBase
+        SetupRTSeg 7350, 9000, Text, IEData
+segment IText
         SetupSeg 0000, 000, IText, Text
-ends IText
-segment Data    para use32 public 'DATA'
+segment Data
         SetupSeg 364, 600, Data, IText
-ends Data
-VSegment BSS, 9F00h, 9F00h
-segment Stock   para  public 'XXXX'
-          nStock = (OffLastInit-KernelBase) + WinSize+2000h + ROffRStackEnd - XCurSegBaseR
-          db nStock dup(?)
-          XCurSegBaseR = XCurSegBaseR + nStock
-          ends
-segment Stack16 para use16 stack 'STACK'
-        StackSegBaseR = XCurSegBaseR
-        DB  200h dup (?)
-        ;DB (OffLastInit - OffFirstZeroInit+0FFFh) and 0FF000h dup(?)
-ends Stack16
-GROUP DGROUP16 Text16, Data16, IText16, IData16, RelocR0;, Reloc0, Stack16, RelocREnd, RelocEnd
-GROUP EGroup EText, Edata
-GROUP LGROUP IEData, IEText
-GROUP DGROUP  Text, Data
-LastRelocR = 0
-LastReloc  = 0
-CurRTNum   = 0
-_RRTEntryes = 0
-
+        VSegment BSS, 9F00h, 9F00h
+LastRelocR equ 0
+LastReloc equ 0
+CurRTNum equ 0

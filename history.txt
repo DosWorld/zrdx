@@ -1,96 +1,103 @@
-Версия 0.50
-- Исправлены ошибки в функции dpmi 503h, приводящие к ее неработоспособности
-  при необходимости перемещения блока.
-- Исправлена ошибка в zrxbind, приводящая к невозможности прибиндиндить
-  чистый LE файл(без MZ заголовка).
-Версия 0.49.1
-- Исправлено максимальное значение transfer buffer, которое может установить
-  zrxsetup с ffff на 1000.
-- Внесены минимальные изменения в zrxsetup.
-Версия 0.49
-- Устранена несовместимоть с бета версией Win 2000, обусловленная ошибкой
-  в VDM Win 2000.
-- Исправлена ошибка в трансляции функции 09 int 33h(установить графический
-  курсор мыши).
-- Параметр настройки "Максимальный объем захватываемой памяти" работает
-  не только в XMS но и в RAW режиме.
-- Написана утилита настройки
-- Режим открытия файла оверлея изменен с "deny none" на "deny write" что
-  должно исключать возможность его перезаписи другой задачей во время
-  загрузки.
-- Отключена поддержка xle. Пользуйтесь UPX:).
+Version 0.50OSE
+- The project is moved to free tools: the assembler sources are rewritten for
+  NASM 0.98.39, the stub is linked with Watcom wlink, aligner, bin2asm and
+  zrxsetup are built with Watcom C. Borland C, TASM, TLINK and MS link are not
+  needed any more. The build is done with wmake (see readme.txt).
+- The stub is packed with UPX (upx -9 --8086), zrxbind binds the packed stub.
+  The prebuilt stub is available as bin\stub-le.exe. The old pack.exe is not
+  used by the build any more.
+- The settings (zrxsetup) are stored in the last 14 bytes of the bound program
+  (signature "ZRXC"), not in the stub header, so the stub can be packed. zrxbind
+  writes the default settings block, the stub reads it at start. zrxsetup is
+  rewritten; it does not work with programs bound by the older
+  zrxbind.
+- Support of xle (xeload.asm, zrdxe.asm) is removed.
+- Fixed bugs in DPMI function 503h that made it fail when the block has to be
+  moved.
+- Fixed a bug in zrxbind that made it impossible to bind a pure LE file
+  (without an MZ header).
+Version 0.49.1
+- The maximum value of the transfer buffer that zrxsetup can set is fixed
+  (it was ffff, now 1000).
+- Minimal changes in zrxsetup.
+Version 0.49
+- Fixed incompatibility with the beta version of Win 2000 caused by a bug in
+  the Win 2000 VDM.
+- Fixed a bug in the translation of function 09 of int 33h (set graphics
+  mouse cursor).
+- The setup parameter "Maximum amount of memory to allocate" works not only in
+  XMS but also in RAW mode.
+- The setup utility is written.
+- The overlay file open mode is changed from "deny none" to "deny write", so
+  another task cannot overwrite it while it is being loaded.
+- Support of xle is disabled. Use UPX:).
 
-Версия 0.48
-Исправлены баги:
-- В режиме DPMI происходит смещение системного стека при завершении программы
-  в результате исключения. После многократного повтора этой ситуации
-  системный стек VM полностью сбивается и VM приходится закрывать(она
-  обычно сама закрывается:)). Дополнительно см. ниже.
-- Предел GDT и IDT устанавливается на единицу больше, чем необходимо.
+Version 0.48
+Fixed bugs:
+- In DPMI mode the system stack is shifted when a program is terminated by an
+  exception. After this situation is repeated many times the VM system stack is
+  completely corrupted and the VM has to be closed (usually it closes itself:)).
+  See also below.
+- The GDT and IDT limits are set one greater than necessary.
 
-Изменения:
-- Переделан обработчик исключений. Теперь перед выводом дампа и завершением
-  выполняется выход из режима обработки исключения, что обычно восстанавливает
-  нормальное состояние системного стека. В дамп добавлен вывод состояния стека
-  клиента, и значения eip относительно адреса загрузки.
-- Введен режим захватывания памяти VCPI+XMS: когда кончаются VCPI страницы,
-  делается попытка получить и заблокировать блок памяти через XMS. Это, в
-  частности, решает проблему совместимости с MS EMM386 первой версии в режиме
-  NOEMS.
+Changes:
+- The exception handler is reworked. Now, before the dump is printed and the
+  program is terminated, the exception handling mode is left, which usually
+  restores the normal state of the system stack. The dump now includes the
+  state of the client stack and the value of eip relative to the load address.
+- The VCPI+XMS memory allocation mode is introduced: when VCPI pages run out,
+  an attempt is made to get and lock a memory block through XMS. This solves,
+  in particular, the compatibility problem with the first version of MS EMM386
+  in NOEMS mode.
 
-Версия 0.47
-Исправлены баги:
-- Загрузчик вычисляет длину заголовка по формуле, не совместимой со
-  стандартом, но совместимой с wlink.
-- При установке недопустимой комбинации атрибутов сегмента загрузчик
-  зависает.
-- DPMI сервер считает недопустимыми LDT селекторы с RPL, отличным от 3.
+Version 0.47
+Fixed bugs:
+- The loader calculates the header length with a formula that is not compatible
+  with the standard but compatible with wlink.
+- The loader hangs when an invalid combination of segment attributes is set.
+- The DPMI server considers LDT selectors with RPL other than 3 invalid.
 
-Версия 0.46
-Исправлены баги:
-- При запуске в режиме RAW/XMS и IOPL, равном 0, происходит аварийное
-завершение на этапе инициализации.
+Version 0.46
+Fixed bugs:
+- When started in RAW/XMS mode with IOPL equal to 0, the program terminates
+  abnormally during initialization.
 
-Изменения:
-- При выдаче дампа исключения сообщается значение регистра eflags.
+Changes:
+- The value of the eflags register is reported in the exception dump.
 
-Версия 0.45.
+Version 0.45.
 
-Исправлены баги из версии 0.42:
-- Не проверяется поддержка DPMI сервером 32 битового расширения. Это приводит
-к невозможности инициализации при резидентно установленном только 16
-битовом DPMI.
-- Перед инициализацией методами raw/xms не проверяется факт работы процессора
-в виртуальном режиме. Из-за этого возможно неправильное поведение под V86
-монитором, который не предоставляет VCPI или DPMI.
-- В RAW режиме после выдачи в порт команд, разрешающих A20 не обеспечивается
-достаточная по времени задержка, необходимая для включения A20. Это приводит
-к тому, что на некоторых компьютерах(достаточно редких, правда) ZRDX
-запускается только со второго раза.
-- Неверное поведение в RAW режиме при отсутствии доступной по int 15 памяти,
-или невозможности включить A20. Если конкретнее, в этом случае происходит
-аварийное завершение с выдачей дампа, хотя система не падает.
-- Неверно работает транслятор функции VESA BIOS 4F00h.
-- Не работает функция DPMI сохранить\восстановить состояние процессора для
-реального режима.
-- zrxbind в режиме -r всегда создает bak файл, игнорирую ключ -n.
+Fixed bugs of version 0.42:
+- Support of the 32 bit extension by the DPMI server is not checked. This makes
+  initialization impossible when only a 16 bit DPMI is resident.
+- Before initialization with the raw/xms methods it is not checked whether the
+  processor is in virtual mode. Because of this, wrong behavior is possible
+  under a V86 monitor that provides neither VCPI nor DPMI.
+- In RAW mode, after the commands that enable A20 are sent to the port, the
+  delay needed for A20 to turn on is not long enough. On some computers (quite
+  rare ones, though) ZRDX starts only on the second attempt.
+- Wrong behavior in RAW mode when there is no memory available through int 15,
+  or when A20 cannot be enabled. More precisely, in this case the program
+  terminates abnormally with a dump, although the system does not crash.
+- The translator of VESA BIOS function 4F00h works incorrectly.
+- The DPMI function save/restore processor state for real mode does not work.
+- zrxbind in the -r mode always creates a bak file, ignoring the -n key.
 
-Новые возможности версии 0.45:
-- Прямая загрузка приложений, сжатых упаковщиком XLE версии 1.3.
-- Возможность работы эмулятора сопроцессора из Watcom RTL.
-- Возможность настройки некоторых параметров путем модификации заголовка
-  стаба, а именно:
-   - отключение баннера
-   - порядок детектирования VCPI/DPMI,
-   - длина буфера обмена,
-   - максимальный объем нижней памяти, который нужно оставить свободным.
-   - максимальный объем памяти, который можно взять в режиме XMS.
-- Встроенный DPMI эмулирует прямое чтение и запись управляющих и отладочных
-регистров(DRx, CRx).
-- Трансляция функции DOS 6Ch(open file extended).
+New features of version 0.45:
+- Direct loading of applications packed with the XLE packer version 1.3.
+- The floating point emulator from the Watcom RTL can be used.
+- Some parameters can be changed by modifying the stub header, namely:
+   - disabling the banner,
+   - the order of VCPI/DPMI detection,
+   - the length of the transfer buffer,
+   - the maximum amount of low memory that must be left free,
+   - the maximum amount of memory that can be taken in XMS mode.
+- The built-in DPMI emulates direct reading and writing of the control and
+  debug registers (DRx, CRx).
+- Translation of DOS function 6Ch (open file extended).
 
-Изменения в версии 0.45:
-- Перед выдачей сообщения о возникшем исключении не производится
-восстановление видеорежима с очисткой экрана.
-- При выдаче сообщения об исключении для селекторов 0-3 вместо
-  "invalid selector" пишется "null selector".
+Changes in version 0.45:
+- Before the message about an exception is printed, the video mode is not
+  restored and the screen is not cleared.
+- When an exception message is printed for selectors 0-3, "null selector" is
+  written instead of "invalid selector".
