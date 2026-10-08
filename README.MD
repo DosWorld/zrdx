@@ -7,7 +7,6 @@
   / /__|  _ <| |_| /  \
  /_____|_| \_\____/_/\_\
 ```
-</div>
 
 # 🔥 ZRDX — Zurenava DOS Extender 🔥
 
@@ -21,6 +20,7 @@
 
 *Original author: Sergey Belyakov (1998-1999) · Open source edition: Viacheslav Komenda (2026)*
 
+</div>
 
 ---
 
