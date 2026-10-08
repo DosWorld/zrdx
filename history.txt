@@ -16,10 +16,12 @@ Version 0.50OSE
   moved.
 - Fixed a bug in zrxbind that made it impossible to bind a pure LE file
   (without an MZ header).
+
 Version 0.49.1
 - The maximum value of the transfer buffer that zrxsetup can set is fixed
   (it was ffff, now 1000).
 - Minimal changes in zrxsetup.
+
 Version 0.49
 - Fixed incompatibility with the beta version of Win 2000 caused by a bug in
   the Win 2000 VDM.
@@ -39,7 +41,6 @@ Fixed bugs:
   completely corrupted and the VM has to be closed (usually it closes itself:)).
   See also below.
 - The GDT and IDT limits are set one greater than necessary.
-
 Changes:
 - The exception handler is reworked. Now, before the dump is printed and the
   program is terminated, the exception handling mode is left, which usually
@@ -61,12 +62,10 @@ Version 0.46
 Fixed bugs:
 - When started in RAW/XMS mode with IOPL equal to 0, the program terminates
   abnormally during initialization.
-
 Changes:
 - The value of the eflags register is reported in the exception dump.
 
 Version 0.45.
-
 Fixed bugs of version 0.42:
 - Support of the 32 bit extension by the DPMI server is not checked. This makes
   initialization impossible when only a 16 bit DPMI is resident.
