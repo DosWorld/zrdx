@@ -23,6 +23,7 @@ section .data
 ParamBase: dw SrcName
 
 le_found: db 0
+header_count: dw 0
 StubLeName: db 'stub-le.exe', 0
 StubPeName: db 'stub-pe.exe', 0
 StubRdfName: db 'stub-rdf.exe', 0
@@ -442,9 +443,16 @@ main_cicle:
         call DosRead
         cmp ax, 0Eh
         jb BadHeader
+        mov [header_count], ax
         mov ax, [buffer + 0]  ;signature
         cmp ax, 'MZ'
         _ifnot jne
+          cmp word [header_count], 1Ch
+          jb BadHeader
+          cmp word [buffer + 4], 0
+          je BadHeader
+          cmp word [buffer + 2], 512
+          ja BadHeader
           mov _msize_l, word [buffer + 4]
           mov _msize_h, 8000h >> (9 - 1)
           _do
@@ -458,6 +466,8 @@ main_cicle:
           sbb _msize_h, 0
           cmp word [buffer + 24], 40h
           _ifnot jne
+            cmp word [header_count], 40h
+            jb BadHeader
             cmp _msize_h, word [buffer + 40h - 2]
             _ifnot jb
               _toendif ja
@@ -584,6 +594,9 @@ BadHeader:
           _endif
           jmp BadHeader
         _endif
+        mov _t_l, _msize_l
+        or _t_l, _msize_h
+        jz BadHeader
         add _newheader_pos_l, _msize_l
         adc _newheader_pos_h, _msize_h
         _ifnot jno

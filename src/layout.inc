@@ -61,7 +61,8 @@ NTraps3c equ NTraps3
         DFB HIntHandlers, 32 * 7
         DFD SavedRealVectors, 256
         DFD LDTFree, 256
-        DFD LDTDOS, 256
+        DFD LDTDOS, 256       ;immutable real-segment aliases (0002h)
+        DFD LDTBlock, 256     ;immutable DOS allocation descriptors
         DFD nFreePages
 %ifndef Release
         DFD ExtraDW
@@ -81,6 +82,17 @@ NTraps3c equ NTraps3
         DFB CallbacksTable, N000
 
 ;KernelStack1 EQU TSS.TSS_ESP1
+        DFD SavedDebug, 6       ;DR0-DR3, DR6 and DR7 before first owned watch
+        DFD DebugUsed           ;owned hardware slots, low four bits
+        DFB DebugSaved
+%ifdef NativeHost
+        DFB NativeMode           ;FFh before first successful entry
+        DFW NativeThunkSel
+        DFD NativeCurrent
+        DFD NativeRealBase
+        DFD NativeRootStack
+        DFB NativeBoot, 36 + RMSStruct_size
+%endif
         DFD RIntFlags, 8    ;bit vector :1 - jump to saved real vector, else - to current
 
         DFD UserStackStart, 100
@@ -181,9 +193,9 @@ Page2Index equ (OffPage2 - KernelBase) >> 12
         DefSelector DPMIEntryGate, 1, 3
         DefSelector BIOSData, 1, 3
         DefSelector VCPICallGate, 1, 1
-        DefSelector VCPITrapGate, 1, 3
-        DefSelector InvalidateTLBGate, 1, 3
-        DefSelector PageMoveGate, 1, 3
+        DefSelector VCPITrapGate, 1, 1
+        DefSelector InvalidateTLBGate, 1, 1
+        DefSelector PageMoveGate, 1, 1
         DefSelector LoadLDTGate, 1, 1
 %ifdef VMM
   DefSelector SwitchTo0Gate, 1, 1

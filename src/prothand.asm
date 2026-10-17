@@ -28,17 +28,44 @@
 ;default exception handler - terminate program
         DPROC DefaultExcTrapH
         cli
+%ifdef NativeHost
+        cmp dword [ss:OffNativeCurrent], 0
+        je .legacy
+        push eax
+        mov ax, [esp + 4 + CFrCS]
+        cmp ax, [ss:OffNativeThunkSel]
+        pop eax
+        je NativeFatalClient
+        cmp byte [ss:OffNativeMode], 0
+        je NativeDefaultWordException
+.legacy:
+%endif
         mov [esp + 8], ebp
         pop ebp
         add esp, 4
         movzx ebp, byte [ebp + OffFirstTrap3 + 3 - 7] ;load redirected int number
         and ebp, 0Fh
         mov [esp + 4], ebp    ;save error code on the stack
+%ifdef NativeHost
+        cmp dword [ss:OffNativeCurrent], 0
+        jne NativeDefaultExceptionRaw
+%endif
         jmp FatalExc1
 
 ;return from exception - switch to
         DPROC RetFromExcTrapH
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        je NativeExceptionReturn16
+%endif
+ExceptionReturnFrame:
         add esp, 3 * 4    ;drop return address and errcode
+        ; A client-supplied context must never select an inner privilege
+        ; or request a hardware task/VM86 return from this CPL0 gate.
+        or byte [esp + 4], 3
+        or byte [esp + 16], 3
+        and dword [esp + 8], ~24000h
+        LLabel ExceptionReturnIret
         iretd
 
 
@@ -55,6 +82,7 @@
         DPROC PMHIntHandX
 
         LLabel ExceptionWOCodeH              ;the entry for exceptions without error code
+ExceptionWOCodeHL:
         push dword [esp]      ;push exception number again
         and dword [esp + 4], 0 ;store 0 as error code for common format
         LLabel ExceptionWithCodeH            ;the entry for exceptions without error code
@@ -64,6 +92,40 @@ ExceptionWithCodeH@84:
         cmp esp, OffKernelStack - 8 * 4
         jne ExceptionFrom0
 ExceptionFromNot0:
+        ClientFrameSP 12 + IFrESP, 12 + IFrSS
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 1
+        ja .ordinary
+        cmp dword [ss:OffNativeCurrent], 0
+        je .ordinary
+        test byte [esp + 12 + IFrCS], 2
+        jz .ordinary
+        push eax
+        push edx
+        mov eax, [esp + 12]
+        mov dx, [ss:eax*8 + OffClientExc + 4]
+        cmp dx, Trap3Selector
+        jne .system_default
+        lea edx, [eax*4 + OffDefaultExcTrap3]
+        cmp [ss:eax*8 + OffClientExc], edx
+        je .default
+        jmp short .client_handler
+.system_default:
+        cmp dx, [ss:OffNativeThunkSel]
+        jne .client_handler
+        cmp dword [ss:eax*8 + OffClientExc], NativeFatalStub - NativeInt16
+        jne .client_handler
+.default:
+        pop edx
+        pop eax
+        jmp NativeDefaultExceptionRaw
+.client_handler:
+        pop edx
+        pop eax
+        xor ebp, ebp
+        jmp NativeLockedEvent
+.ordinary:
+%endif
         test byte [esp + (4 * 4)], 2  ;check rpl in return CS
         jz FatalExc
         push es
@@ -94,6 +156,13 @@ ExceptionFromNot0:
         retf                      ;switch to client excepyion handler
 ExceptionFrom0: ;XXX
 FatalExc:
+%ifdef NativeHost
+        cmp dword [ss:esp + 12], OffExceptionReturnIret
+        jne .ordinary
+        cmp word [ss:esp + 16], Code1Selector
+        je NativeFatalClient       ;invalid user return must spare the parent
+.ordinary:
+%endif
         cmp byte [esp + 4], 1
         _ifnot jne
 %assign F 12
@@ -131,7 +200,6 @@ FatalExc1:
 
         ;Log
 %ifdef Release
-        mov byte [OffPrintToMem], 1
         mov byte [OffHasExitMessage], 1
         RRT 1
         mov edi, OffRStackStart + 4
@@ -139,7 +207,8 @@ FatalExc1:
 %else
         mov edi, 0B8000h
 %endif
-        mov ecx, 4
+        push 4
+        pop ecx
         lea esi, [esp + 40]
         cld
         _do
@@ -154,19 +223,19 @@ FatalExc1:
         _enddo loop
         mov ax, 0D0Ah
         stosw
-        mov ecx, 8
+        mov cl, 8               ;the preceding LOOP left ECX zero
         _do
         push 8
         call PrintNX
         _enddo loop
         mov ax, 0D0Ah
         stosw
-        mov cx, 2
+        mov cl, 2
         _do
         push 8
         call PrintNX
         _enddo loop
-        mov cx, 5
+        mov cl, 5
         _do
         push 4
         call PrintNX
@@ -199,6 +268,9 @@ L098:
         LLabel Exception0DHandler
         cmp esp, OffKernelStack - 6 * 4
         je near InterruptH@84
+%ifdef NativeHost
+        call NativeSoftwareGP
+%endif
 %assign F 8
         ;test [esp+F].IFrCS, 2         ;exception from kernel(CPL < 2)?
         ;jz   @@ExceptionWithCodeH
@@ -212,20 +284,40 @@ L098:
         push ds
         lds esi, [esp + F + 8 + IFrEIP]         ;cs:eip
         push eax
-        mov eax, [esi]
-        cmp al, 0Fh
-        jne ToCommonTrap@84
-        ;mov  ah, ds:[esi+1]
-        cmp ah, 20h
-        jb ToCommonTrap@84
-        cmp ah, 23h
+        ; Do not let the decoder's own memory access fault on a valid
+        ; client #GP at the end of its code segment.
+        lsl eax, word [esp + 24]
+        jnz ToCommonTrap@84
+        sub eax, 2
+        jc ToCommonTrap@84
+        cmp esi, eax
         ja ToCommonTrap@84
-        shl eax, 8
-        ;mov  al, ds:[esi+2]
-        mov al, 0C3h           ; RetNCode
-        ror eax, 8
-        xchg eax, [esp]
-        call esp
+        ; Preserve the old EAX-only FPU/CR2 compatibility without
+        ; executing arbitrary client CR/DR instructions on the host stack.
+        mov ax, [esi]
+        cmp ax, 200Fh
+        je ReadClientCR@84
+        cmp ax, 220Fh
+        jne ToCommonTrap@84
+        cmp byte [esi + 2], 0C0h  ;only MOV CR0,EAX
+        jne ToCommonTrap@84
+        mov eax, cr0
+        xor eax, [esp]
+        test eax, ~0Eh           ;only MP/EM/TS may change
+        jnz ToCommonTrap@84
+        mov eax, [esp]
+        mov cr0, eax
+        jmp short ClientCRDone@84
+ReadClientCR@84:
+        cmp byte [esi + 2], 0D0h  ;MOV EAX,CR2
+        jne ReadClientCR0@84
+        mov eax, cr2
+        jmp short ClientCRDone@84
+ReadClientCR0@84:
+        cmp byte [esi + 2], 0C0h
+        jne ToCommonTrap@84
+        mov eax, cr0
+ClientCRDone@84:
         add esp, 4
         mov esi, cr0
         mov [ss:OffPMCR0], esi
@@ -249,11 +341,27 @@ ToCommonTrap@84:
         LLabel InterruptH                ;the entry for interrupts
 InterruptHL:
 InterruptH@84:
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 1
+        ja .ordinary
+        cmp dword [ss:OffNativeCurrent], 0
+        je .ordinary
+        test byte [esp + 4 + IFrCS], 2
+        jz .ordinary
+        push dword [esp]           ;vector, then synthetic error code
+        mov dword [esp + 4], 0
+        push ebp
+        mov ebp, 1
+        ClientFrameSP 12 + IFrESP, 12 + IFrSS
+        jmp NativeLockedEvent
+.ordinary:
+%endif
         push ebp
 ;hardware interrupts from PL0 not allowed
 InterruptFromNot0:
         push eax
 %assign F 12 ;eax, ebp, int number
+        ClientFrameSP F + IFrESP, F + IFrSS
         mov eax, [esp + F + IFrCS]    ;
         test al, 10b
         ;IFNDEF Release
@@ -358,9 +466,40 @@ HIntFrom01@84:
           mov dword [ebx], OffIret2KernelAsincLTrap3 ;address of trap
         _else jmp
 %endif
+%ifdef NativeHost
+          cmp byte [ss:OffNativeMode], 1
+          ja .ordinary_stack
+          cmp dword [ss:OffNativeCurrent], 0
+          je .ordinary_stack
+          push edx
+          mov ebx, [ebp - 8]
+          mov edx, [ebp - 4]
+          call NativePickLockedStack
+          pop edx
+          jmp short .stack_ready
+.ordinary_stack:
+%endif
           lds ebx, [ebp - 8]          ;client ss:esp
+%ifdef NativeHost
+.stack_ready:
+%endif
+%ifdef NativeHost
+          cmp byte [ss:OffNativeMode], 0
+          jne .wide_trampoline
+          cmp dword [ss:OffNativeCurrent], 0
+          je .wide_trampoline
+          sub ebx, 6
+          mov word [ebx], OffIret2KernelAsincTrap3
+          mov word [ebx + 2], Trap3Selector
+          mov [ebx + 4], ax
+          jmp short .trampoline_done
+.wide_trampoline:
+%endif
           sub ebx, 12
-          mov dword [ebx], OffIret2KernelAsincTrap3 ;address of trap
+          mov dword [ebx], OffIret2KernelAsincTrap3
+%ifdef NativeHost
+.trampoline_done:
+%endif ;address of trap
 %ifdef VMM
         _endif
 %endif
@@ -368,8 +507,27 @@ HIntFrom01@84:
         push ds          ;new client ss
         push ebx         ;new client esp
         push eax         ;new client eflags
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_frame
+        cmp dword [ss:OffNativeCurrent], 0
+        jne .frame_ready
+.wide_frame:
+%endif
         mov [ebx + 8], eax
         mov dword [ebx + 4], Trap3Selector
+%ifdef NativeHost
+.frame_ready:
+%endif
+%ifdef NativeHost
+        cmp dword [ss:OffNativeCurrent], 0
+        jne .active_vector
+        push Trap3Selector
+        lea ebp, [ecx*4 + OffDefIntTrap3]
+        push ebp
+        iretd
+.active_vector:
+%endif
         push dword [ss:ecx*8 + OffClientIDT + 4]
         push dword [ss:ecx*8 + OffClientIDT]
         iretd
@@ -417,7 +575,34 @@ HIntFrom01@84:
 ;prepare RM stack and switch to
 ;rewrite return address to client stack
 ;save client ss:esp
+NormalizeClientStack:
+        pushfd
+        push edx
+        mov edx, [ss:eax + 4]
+        lar edx, edx
+        test edx, 400000h
+        jnz .wide
+        mov word [ss:eax + 2], 0
+.wide:  pop edx
+        popfd
+        ret
+
         DPROC DefIntTrapH
+        ClientFrameSP CFrESP, CFrSS
+%ifdef NativeHost
+        call NativeDefaultFrame
+        jc NativeDefaultReturn
+        cmp ah, 4Ch
+        jne .reflect
+        push ebp
+        mov ebp, [esp + 4 + CFrEIP]
+        cmp byte [ebp + OffFirstTrap3 + 3 - 7], 21h
+        pop ebp
+        jne .reflect
+        jmp NativeClientExit
+.reflect:
+%endif
+DefaultReflect@84:
         push ebx
         push ebp
         pushfd
@@ -493,6 +678,13 @@ SwitcherToVM:
         push ds
         push es
         pushfd
+        cli
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_pointer
+        movzx edi, di
+.wide_pointer:
+%endif
         mov esi, OffRMStack
         RRT
         cmp al, 0
@@ -509,6 +701,10 @@ SwitcherToVM:
         movsd
         movsd
         movsd
+%ifdef NativeHost
+        movsd
+        call NativeRestoreAlias
+%endif
         popfd
         pop es
         pop ds
@@ -518,6 +714,7 @@ SwitcherToVM:
 
 
         DPROC PMRawSwitchTrapH
+        ClientFrameSP CFrESP, CFrSS
         movzx eax, ax
         push ebp
         pushfd
@@ -537,7 +734,7 @@ SwitcherToVM:
         movzx eax, bx      ;esp
         dec ax
         sub bx, 10
-        sub eax, VMIShortStruct_size - 1
+        sub ax, VMIShortStruct_size - 1
         ;jc RStackOverflow
         add eax, edx
         mov ebp, eax
@@ -549,6 +746,9 @@ SwitcherToVM:
         mov [ebp + VMI_IP], di
         mov [ebp + VMI_ESP], ebx
         mov [ebp + VMI_ES], ecx
+        xor edx, edx             ;EAX must retain the switch-frame address
+        mov [ebp + VMI_FS], edx
+        mov [ebp + VMI_GS], edx
         pop ebp
         VCPICallTrap
 
@@ -571,6 +771,8 @@ SwitcherToVM:
         call far [OffVCPICall]
 
         DPROC VCPITrapHandler
+        cmp ah, 0Bh
+        je near DebugService
 %ifndef Release
         ;cmp  al, 5
         ;$ifnot jne
@@ -596,6 +798,161 @@ SwitcherToVM:
 %endif
         retf
 
+        ;Interrupts are disabled on entry. MOV DR uses a stack-local
+        ;instruction, following the existing MOV CR emulation convention.
+DebugService:
+        pushad
+        mov edi, [OffDebugUsed]
+        test al, al
+        jnz DebugHandle
+        mov ebp, ebx
+        shl ebp, 16
+        mov bp, cx
+        movzx eax, dl
+        dec eax
+        cmp al, 3
+        ja DebugValue
+        cmp al, 2
+        je DebugValue
+        test ebp, eax
+        jnz DebugValue
+        cmp dh, 2
+        ja DebugValue
+        test dh, dh
+        jnz .type
+        test eax, eax
+        jnz DebugValue
+.type:  mov esi, dr7
+        xor ecx, ecx
+.slot:  bt edi, ecx
+        jc .next
+        mov eax, esi
+        push ecx
+        shl ecx, 1
+        shr eax, cl
+        pop ecx
+        test al, 3
+        jz .found
+.next:  inc ecx
+        cmp ecx, 4
+        jb .slot
+        mov al, 16h
+        jmp DebugError
+.found: cmp byte [OffDebugSaved], 0
+        jne .saved
+        mov eax, dr0
+        mov [OffSavedDebug], eax
+        mov eax, dr1
+        mov [OffSavedDebug + 4], eax
+        mov eax, dr2
+        mov [OffSavedDebug + 8], eax
+        mov eax, dr3
+        mov [OffSavedDebug + 12], eax
+        mov eax, dr6
+        mov [OffSavedDebug + 16], eax
+        mov [OffSavedDebug + 20], esi
+        mov byte [OffDebugSaved], 1
+.saved: bts [OffDebugUsed], ecx
+        mov [esp + PA_EBX], cx
+        mov eax, dr6
+        btr eax, ecx
+        mov dr6, eax
+        mov ebx, ecx
+        shl ebx, 3
+        push 0C3C0230Fh       ;MOV DRn,EAX; RET, confined to this stack
+        or [esp + 2], bl
+        mov eax, ebp
+        call esp
+        add esp, 4
+        movzx eax, dl
+        dec eax
+        shl eax, 2
+        movzx ebx, dh
+        cmp bl, 2
+        jne .encoded
+        inc ebx               ;hardware RW=3 means read/write
+.encoded:
+        or eax, ebx
+        mov ebx, 0fh
+        shl ecx, 2
+        add ecx, 16
+        shl ebx, cl
+        not ebx
+        and esi, ebx
+        shl eax, cl
+        or esi, eax
+        sub ecx, 16
+        shr ecx, 1
+        mov eax, 2           ;global enable survives VCPI task switches
+        shl eax, cl
+        or esi, eax
+        or esi, 700h          ;reserved one + exact data traps on 386 (LE/GE)
+        mov dr7, esi
+        jmp short DebugOK
+DebugHandle:
+        movzx ecx, bx
+        cmp ecx, 4
+        jae DebugInvalid
+        bt edi, ecx
+        jnc DebugInvalid
+        cmp al, 2
+        jne .change
+        mov eax, dr6
+        bt eax, ecx
+        setc al
+        movzx eax, al
+        mov [esp + PA_EAX], ax
+        jmp short DebugOK
+.change:
+        cmp al, 1
+        jne .reset
+        btr [OffDebugUsed], ecx
+        mov eax, 3
+        shl ecx, 1
+        shl eax, cl
+        not eax
+        mov ebx, dr7
+        and ebx, eax
+        mov dr7, ebx
+        shr ecx, 1
+.reset: mov eax, dr6
+        btr eax, ecx
+        mov dr6, eax
+DebugOK:
+        popad
+        clc
+        retf
+DebugInvalid:
+        mov al, 23h
+        jmp short DebugError
+DebugValue:
+        mov al, 21h
+DebugError:
+        mov ah, 80h
+        mov [esp + PA_EAX], ax
+        popad
+        stc
+        retf
+
+RestoreDebug:
+        cmp byte [OffDebugSaved], 0
+        je .done
+        xor eax, eax
+        mov dr7, eax
+        mov eax, [OffSavedDebug]
+        mov dr0, eax
+        mov eax, [OffSavedDebug + 4]
+        mov dr1, eax
+        mov eax, [OffSavedDebug + 8]
+        mov dr2, eax
+        mov eax, [OffSavedDebug + 12]
+        mov dr3, eax
+        mov eax, [OffSavedDebug + 16]
+        mov dr6, eax
+        mov eax, [OffSavedDebug + 20]
+        mov dr7, eax
+.done:  ret
+
         DPROC LoadLDTHandler
         lldt bp
         retf
@@ -612,6 +969,7 @@ SwitcherToVM:
         DPROC ExitDPMIHost
 ;Entry for PL0, switches to PL1
         LLabel TerminateHandler
+        call RestoreDebug
         push Data1Selector
         pop ds
         push ds
@@ -622,6 +980,12 @@ SwitcherToVM:
         push OffTerminateHandler1
         retf
         LLabel TerminateHandler1
+%ifdef NativeHost
+        ; No client remains. Reuse the kernel dummy only during final
+        ; cleanup, after its separately allocated root anchor can be freed.
+        or byte [OffPage2 + (((OffKernelStack - 1) & ~0FFFh) - KernelBase) / 1024], 4
+        InvalidateTLB
+%endif
         push Data3Selector     ;save sp for interrup handler
         push OffUserStackEnd
         db 0C7h, 05h
@@ -700,6 +1064,7 @@ SimpleSwitchToVM:
         jmp SwitcherToVM
 
 
+%ifndef Release
         DPROC PrintByteP
         cmp byte [cs:OffPrintToMem], 0
         _ifnot je
@@ -709,9 +1074,14 @@ SimpleSwitchToVM:
           stosw
         _endif
         ret
+%endif
 
 %macro PrintByte 0
+%ifdef Release
+        stosb                    ;release diagnostics always use the RM buffer
+%else
         call PrintByteP
+%endif
 %endmacro
 %macro CloseSeg 1
         segment %1
@@ -719,7 +1089,8 @@ SimpleSwitchToVM:
 %if _csz - ($ - $$) >= 0
         times _csz - ($ - $$) db 0
 %else
-%error segment overflow
+%assign _used ($ - $$)
+%error segment %1 uses _used bytes; budget _csz
 %endif
 %endmacro
 
@@ -777,6 +1148,10 @@ SimpleSwitchToVM:
         mov eax, [OffPMCR0]
         RRT
         mov cr0, eax
+        ;Real DOS may clear IOPL. Ring-1 cleanup uses CLI/STI as well.
+        pushfd
+        or byte [esp + 1], 30h
+        popfd
         add bp, RMSStruct_size    ;ajust RM sp to top of normal RM stack
         mov [OffRMStack], ebp
         RRT
@@ -805,8 +1180,7 @@ SimpleSwitchToVM:
         lea eax, [esi + PMIStruct_size]
         push ds
         push eax
-        pushfd
-        pop eax
+        mov eax, [esi + PMI_EFlags]
         mov ax, [ebp + RMS_Flags]     ;load transferred flags
         or ah, 30h                 ;force IOPL=3
         and ah, ~(40h)             ;and NT = 0
@@ -820,10 +1194,32 @@ SimpleSwitchToVM:
         mov eax, [ebp + RMS_EAX]    ;and transfer RON from RM stack
         mov esi, [ebp + RMS_ESI]
         mov ebp, [ebp + RMS_EBP]
+%ifdef NativeHost
+        call NativeFinishIret
+%endif
         iretd
 
 
         DPROC RMRawSwitchHandler
+%ifdef NativeHost
+        cmp byte [OffNativePending], 0
+        RRT 1
+        je .client
+        mov al, 1
+        call NativeKernelStack
+        push Data1Selector
+        push OffKernelStack1End
+        push Code1Selector
+        push OffNativeResume
+        retf
+.client:
+        call NativeRestoreAlias
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_target
+        movzx ebx, bx
+        movzx edi, di
+.wide_target:
+%endif
         movzx edx, dx
         push edx
         push ebx
@@ -832,6 +1228,9 @@ SimpleSwitchToVM:
         or byte [esp + 1], 30h     ;set iopl==3
         push eax
         push edi
+        xor eax, eax
+        mov fs, eax
+        mov gs, eax
         mov es, ecx
         mov ds, [ebp + RMS_EAX]
         mov ebp, [ebp + RMS_EBP]
@@ -855,17 +1254,44 @@ SimpleSwitchToVM:
           mov dword [esi + IFrEIP], OffPMCallbackIretLTrap3
         _else jmp
 %endif
+%ifdef NativeHost
+          cmp byte [OffNativeMode], 1
+          ja .ordinary_stack
+          cmp dword [OffNativeCurrent], 0
+          je .ordinary_stack
+          call NativeLockedBridge
+          jmp short .stack_ready
+.ordinary_stack:
+%endif
           sub dword [OffPMStack], 12
           RRT 1
           les esi, [OffPMStack]
           RRT
+%ifdef NativeHost
+.stack_ready:
+%endif
           mov dword [es:esi + IFrEIP], OffPMCallbackIretTrap3
 %ifdef VMM
         _endif
 %endif
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_trampoline
+        push eax
+        pushfd
+        pop eax
+        mov word [es:esi + 2], Trap3Selector
+        mov [es:esi + 4], ax
+        pop eax
+        jmp short .trampoline_ready
+.wide_trampoline:
+%endif
         mov dword [es:esi + IFrCS], Trap3Selector
         pushfd
         pop dword [es:esi + IFrFlags] ;, eax
+%ifdef NativeHost
+.trampoline_ready:
+%endif
         push es
         push esi
         pushfd
@@ -909,6 +1335,9 @@ S equ MaxSystemSwitchCode * 3
         mov fs, eax
         mov gs, eax
         lea esi, [ebp + RMSStruct_size]
+%ifdef NativeHost
+        call NativeCallbackSegments16
+%endif
         iretd
 
 
@@ -923,6 +1352,18 @@ S equ MaxSystemSwitchCode * 3
 %endif
 
         DPROC PMCallbackIretTrapH
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 1
+        ja .ordinary_stack
+        cmp dword [ss:OffNativeCurrent], 0
+        je .ordinary_stack
+        call NativeLockedBridgeLeave
+        cmp byte [ss:OffNativeMode], 0
+        jne PMCallbackIretTrapE
+        movzx edi, di
+        jmp short PMCallbackIretTrapE
+.ordinary_stack:
+%endif
         mov eax, [esp + CFrESP]
         mov edx, [esp + CFrSS]
 PMCallbackIretTrapE:
@@ -974,12 +1415,9 @@ PMCallbackIretTrapE:
         mov edx, [ebp + RMS_FS]
         mov [esi + DC_ES], ecx
         mov bx, [ebp + RMS_Flags]
-        mov ecx, [ss:OffRMStack]
-        RRT
         mov [esi + DC_FS], edx
         mov [esi + DC_Flags], bx
 
-        mov [esi + DC_SP], ecx
 
         push es                        ;client SS
         push es
@@ -988,25 +1426,35 @@ PMCallbackIretTrapE:
         push eax                       ;new esp
         pushfd
 ;        @@CS equ ds:[eax-size RMIEStruct]
+        mov dl, [eax - RMIEStruct_size + RMIE_CS + 2]
+        mov [ss:OffA20Reset], dl
+        RRT
         mov edx, [eax - RMIEStruct_size + RMIE_RealStack]
         mov ecx, [eax - RMIEStruct_size + RMIE_EFlags]
         ;or   ch, 30h                  ;set iopl = 3
         and cl, ~(1h)                ;set CF = 0
         mov [ss:OffRMStack], edx
         RRT
-        mov [esp], cx                 ;don't restore high word of eflags from CS
+        mov [esp], ecx                ;restore the protected caller's full flags
         push dword [eax - RMIEStruct_size + RMIE_CS]
         push dword [eax - RMIEStruct_size + RMIE_EIP]
         mov fs, [eax - RMIEStruct_size + RMIE_FS]
         mov gs, [eax - RMIEStruct_size + RMIE_GS]
         mov es, [eax - RMIEStruct_size + RMIE_ES]
+%ifdef NativeHost
+        mov edi, [eax - RMIEStruct_size + RMIE_OriginalDI]
+%else
         mov edi, esi                  ;@@CS.RMIE_EDI
+%endif
         mov esi, [eax - RMIEStruct_size + RMIE_ESI]
         mov ebx, [eax - RMIEStruct_size + RMIE_EBX]
         mov ecx, [eax - RMIEStruct_size + RMIE_ECX]
         mov edx, [eax - RMIEStruct_size + RMIE_EDX]
         mov ebp, [eax - RMIEStruct_size + RMIE_EBP]
         lds eax, [eax - RMIEStruct_size + RMIE_EAX]
+%ifdef NativeHost
+        call NativeFinishIret
+%endif
         iretd
 
 
@@ -1029,10 +1477,22 @@ PMCallbackIretTrapE:
           mov dword [esi + IFrEIP], OffPassupIretLTrap3
         _else jmp
 %endif
+%ifdef NativeHost
+          cmp byte [OffNativeMode], 1
+          ja .ordinary_stack
+          cmp dword [OffNativeCurrent], 0
+          je .ordinary_stack
+          call NativeLockedBridge
+          jmp short .stack_ready
+.ordinary_stack:
+%endif
           sub dword [OffPMStack], 12
           RRT 1
           les esi, [OffPMStack]
           RRT
+%ifdef NativeHost
+.stack_ready:
+%endif
           mov dword [es:esi + IFrEIP], OffPassupIretTrap3
 %ifdef VMM
         _endif
@@ -1040,17 +1500,49 @@ PMCallbackIretTrapE:
         push es
         push esi
         pushfd
+%ifdef NativeHost
+        cmp dword [OffNativeCurrent], 0
+        jne .active_vector
+        push Trap3Selector
+        lea eax, [eax*4 + OffDefIntTrap3 - FirstPassupSwitchCode*4]
+        push eax
+        jmp short .vector_ready
+.active_vector:
+%endif
         push dword [eax*8 + OffClientIDT - ((FirstPassupSwitchCode) * 8) + 4]
         push dword [eax*8 + OffClientIDT - ((FirstPassupSwitchCode) * 8) + 0]
+%ifdef NativeHost
+.vector_ready:
+%endif
         mov eax, [esp + 8]               ;load default EFlags
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_cs
+        mov word [es:esi + 2], Trap3Selector
+        jmp short .cs_ready
+.wide_cs:
+%endif
         mov dword [es:esi + IFrCS], Trap3Selector
+%ifdef NativeHost
+.cs_ready:
+%endif
         mov ax, [ebp + RMS_Flags]
         and ah, ~(40h)                ;start client with NT = 0 and IOPL = 3
         or ah, 30h
         mov [esp + 8], eax
                                        ;replace flags
         mov ax, [ebp + RMSStruct_size + 4] ;with flags from RM int stack frame
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 0
+        jne .wide_flags
+        mov [es:esi + 4], ax
+        jmp short .flags_ready
+.wide_flags:
+%endif
         mov [es:esi + IFrFlags], eax
+%ifdef NativeHost
+.flags_ready:
+%endif
         xor eax, eax
         mov esi, [ebp + RMS_ESI]
         ;mov  ds, eax
@@ -1086,9 +1578,25 @@ PMCallbackIretTrapE:
         push eax
                                    ;set client PMStack from PL1 stack bottom
 %assign F 3 * 4
+%ifdef NativeHost
+        cmp byte [ss:OffNativeMode], 1
+        ja .ordinary_stack
+        cmp dword [ss:OffNativeCurrent], 0
+        je .ordinary_stack
+        push edx
+        call NativeLockedBridgeLeave
+        mov [ss:ebp], eax
+        mov eax, edx
+        pop edx
+        jmp short .stack_ready
+.ordinary_stack:
+%endif
         mov eax, [esp + F + CFrESP]
         mov [ebp], eax
         mov eax, [esp + F + CFrSS]
+%ifdef NativeHost
+.stack_ready:
+%endif
         push ss
         pop ds
 PassupIretTrapE:

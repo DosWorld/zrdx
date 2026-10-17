@@ -1,0 +1,29 @@
+obligation	section	fixtures	source	anchor	expectation	kind
+dos-head-allocate	9.1	NDOS16,NDOS32	tests/dpmi/DOSMEM.ASM	cmp eax, 1000Fh          ;host capability	1001h paragraphs produce a 1000Fh head limit on this 32-bit host for either client ABI.	standard
+dos-head-grow	9.3	NDOS16,NDOS32	tests/dpmi/DOSMEM.ASM	cmp eax, 1000Fh          ;S9.3	Successful growth to 1001h paragraphs restores the full head limit.	standard
+dos-head-shrink	9.3	NDOS16,NDOS32	tests/dpmi/DOSMEM.ASM	cmp eax, 0FFh	Shrinking to 10h paragraphs sets the head limit to FFh and releases followers.	standard
+int-stack-bounds	10.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	dd 0,0FFFFh,40F2h,90000004h,12,0	Out-of-segment software-INT stack raises client SS with error zero before a privileged write.	cpu-contract
+int-stack-user-pages	3.1.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	dd (KSTACK0 & ~0FFFh) | 80000000h	Supervisor stack pages reject client writes with a protection page fault.	cpu-contract
+int-stack-atomic	10.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	dd 0F000h,1FFFh,40F2h,1004h,14,6	A missing second page raises user/write nonpresent PF and leaves first-page sentinels intact.	host-policy
+register-output-masks	1	REG16,REG32,ERR16,ERR32	tests/dpmi/BASECALL.ASM	%macro KEEP31	Non-output registers survive; AX/flags and memory-call IF have explicit exceptions. Exact AX/DF/high-word preservation is stronger ZRDX policy.	host-policy
+word-pointer-width	1	LIM16	tests/dpmi/LIMTEST.ASM	or edi, 0DEAD0000h	Word-client buffer offsets ignore the upper register word.	standard
+descriptor-granularity	8.8	LIM16,LIM32	tests/dpmi/LIMTEST.ASM	mov ecx, 10h	Limits above 1 MB need all low 12 bits set; inexact request fails without accepting a rounded limit.	standard
+present-code-rights	8.9	COD16,COD32	tests/dpmi/CODEVEC.ASM	rights: db 0F8h, 0FEh, 0FCh	Present code descriptors must be readable and nonconforming; absent types follow supplied errata.	standard
+ldt-exhaustion-reuse	8.1	LDT16,LDT32,LDTAIL	tests/dpmi/LDTAIL.ASM	rounds: db 8	Eight full-table cycles exhaust and reclaim all usable slots; exact capacity and reuse order are ZRDX policy.	host-policy
+callback-minimum	11.4	CBK16,CBK32	tests/dpmi/CBKTEST.ASM	cmp word [count], 16	Host supplies at least 16 callback addresses; exactly 20 is checked separately as ZRDX policy.	standard
+callback-alternate-packet	11.4	CBK16,CBK32	tests/dpmi/CBKTEST.ASM	cmp dword [rmregs+28], 13579BDFh	Callback IRET may return ES:(E)DI pointing to a different register packet; that packet supplies returned EAX.	standard
+callback-exhaustion-reuse	11.4	CBK16,CBK32	tests/dpmi/CBKTEST.ASM	cmp byte [round], 16	Sixteen cycles invoke every slot after allocation failure and invalid frees; guards around both packets remain intact.	host-policy
+callback-failed-allocation-registers	1	CBK16,CBK32	tests/dpmi/CBKTEST.ASM	.full:  cmp ecx, 12345678h	A failed callback allocation preserves CX/DX rather than publishing a callback address.	host-policy
+nested-locked-stack	3.1.2	NATL16,NATLOCK	tests/dpmi/NATLOCK.ASM	cmp eax, 0fffh	Nested callbacks and exceptions use the existing 4 KB locked stack and reentrant services preserve their frames.	standard
+nested-state-alias	3.4	NATL16	tests/dpmi/NATLOCK.ASM	cmp word [ds:20h], 2468h	Opaque save/restore reinstates inner and outer real-stack alias state across nested mode switches.	standard
+exception-disabled-entry	10.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	test ah, 2              ;S10.4	Client exception handler enters with IF clear.	standard
+exception-restart-ip	10.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	cmp dword [ss:bp+IP], fault_ip	A fault during software-INT frame construction reports the unadvanced faulting IP.	cpu-contract
+exception-frame-edits	10.4	STK16,STK32	tests/dpmi/STKEDGE.ASM	mov dword [ss:bp+IP], resume	Far return restores edited IP/SS/SP and original client CF/DF/IF; verify both frame widths.	standard
+software-versus-default-stack	3.1.1	DEX16,DEX32	tests/dpmi/DEFLT.ASM	cmp ax, [original]	Software INT runs on application stack while default CPU-exception reflection runs on locked stack.	standard
+real-bridge-stack-words	11.1	BRG16,BRG32	tests/dpmi/BRIDGE.ASM	cmp word [ss:bp+si+4], 1234h	Stack words are copied in order; real-call control fields retain caller values after return.	standard
+memory-information-sentinel	13.1	MEM16,MEM32	tests/dpmi/MEMINFO.ASM	.check: cmp dword [si], 0FFFFFFFFh	This nonpageable host reports unsupported information fields as FFFFFFFFh and honors word/dword buffer offsets.	standard
+zero-resize-rejected	13.4	OOM16,OOM32,ONE16,ONE32,TAIL16,TAIL32,OOMB0,OOMB1,OOMB32	tests/dpmi/REALLOOM.ASM	; Reject a zero resize too	Resizing a live memory block to zero returns carry set.	standard
+failed-resize-transaction	13.4	OOM16,OOM32,ONE16,ONE32,TAIL16,TAIL32,OOMB0,OOMB1,OOMB32	tests/dpmi/REALLOOM.ASM	rounds: db 16	Sixteen failed-growth cycles preserve every DWORD in the original and adjacent blocks and restore available memory after free.	host-policy
+virtual-interrupt-state	17	BAS16,BAS32	tests/dpmi/BASECALL.ASM	mov eax, 0BAAD0902h	Disable/enable returns prior virtual IF and query returns current state.	standard
+state-buffer-size	11.6	RAW16,RAW32	tests/dpmi/RAWTEST.ASM	cmp ax, 16	ZRDX returns a 16-byte opaque state buffer; the standard requires callers to use the returned size, not a fixed 16.	host-policy
+selector-stride	8.4	BAS16,BAS32	tests/dpmi/BASECALL.ASM	cmp ax, 8	ZRDX selector stride is 8; standard only promises a power of two and requires clients to query it.	host-policy

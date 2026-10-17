@@ -27,6 +27,7 @@ malloc:
         push 1
         call AllocPages
         _ifnot jnc
+MemFreeNoMem:
           call FreeMCB
           jmp MemErrNoMem
         _endif
@@ -62,7 +63,15 @@ free:
         sub ecx, [esi + MCB_StartOffset]
         push ecx
         push dword [esi + MCB_StartOffset]
+%ifdef NativeHost
+        cmp dword [OffNativeCurrent], 0
+        jne .active
+        push 0                   ;no exited client is available for IRQ delivery
+        jmp short .release
+.active:
+%endif
         push 1
+.release:
         call FreePages
         xchg _newmcb, esi
         call FreeMCB
@@ -149,7 +158,7 @@ _err equ MemErrHandle
             push esi             ;preserve esi
             call XAllocPages     ;allocate 1 page
             pop esi
-            jz FreeAndErr@18
+            jz NoTempPage@18
 %else
             call alloc_page
             jc FreeAndErr@18
@@ -172,6 +181,11 @@ _err equ MemErrHandle
             push 1
             call AllocPages
             _toendif jnc
+%ifndef VMM
+            jmp short FreeAndErr@18
+NoTempPage@18:
+            pop esi              ;discard the unwritten physical-page slot
+%endif
 FreeAndErr@18:
             add edx, 8
             _do jmp
@@ -187,8 +201,11 @@ FreeAndErr@18:
             _while
             cmp esp, edx
             _enddo jne
+            pop eax              ;two workspace dwords, then old/new MCB
+            pop eax
             pop esi
-            jmp MemErrNoMem
+            pop eax
+            jmp MemFreeNoMem      ;unlink the uncommitted replacement block
           _else ; jmp
             neg _t
             mov _t1, dword [esi + MCB_EndOffset]
@@ -648,8 +665,8 @@ Exit2@30: ; ;mov word ptr ds:[0B8000h+160*6+50], 1F32h
         DPMIRow 8, DPMIFn_8_0
         DPMIRow 9, DPMIFn_9_0, DPMIFn_9_1, DPMIFn_9_2
         DPMIRow A, DPMIFn_A_0
-        DPMIRow B, InvalidFunction, InvalidFunction, InvalidFunction, InvalidFunction
+        DPMIRow B, DPMIFn_B_0, DPMIFn_B_1, DPMIFn_B_2, DPMIFn_B_3
         LDWord DPMITable2
-        dd OffTable20, OffTable21, OffTable22, OffTable23, OffTable24, OffTable25
-        dd OffTable26, OffTable27, OffTable28, OffTable29, OffTable2A, OffTable2B
+        db OffTable20 - OffTable20, OffTable21 - OffTable20, OffTable22 - OffTable20, OffTable23 - OffTable20, OffTable24 - OffTable20, OffTable25 - OffTable20
+        db OffTable26 - OffTable20, OffTable27 - OffTable20, OffTable28 - OffTable20, OffTable29 - OffTable20, OffTable2A - OffTable20, OffTable2B - OffTable20
         ESEG Text

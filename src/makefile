@@ -7,7 +7,7 @@
 #
 # Usage:
 #   wmake                      build zrxbind.com, zrxsetup.exe and the stubs (stub-le.exe, stub-pe.exe, stub-rdf.exe) in binder\
-#   wmake STUB=zrdx.exe        the same, but use the unpacked LE stub
+#   Default stubs are packed to 14 KB; see docs/D09WORK.MD.
 #   wmake install              copy everything from binder\ and zrxsetup.exe to ..\bin
 #   wmake clean                remove intermediate files and built programs
 #
@@ -17,15 +17,19 @@
 # Settings of a bound program (zrxsetup) are stored in the last 14 bytes of
 # the program (signature "ZRXC", written by zrxbind), so the stub may be packed.
 
-NASMOPT = -Ox
+NASMOPT = -O9
 NASM    = nasm $(NASMOPT) -f obj
 NASMBIN = nasm $(NASMOPT) -f bin
 WLINK   = wlink option quiet
 WCL     = wcl -zq -ox
 UPX     = upx -9 --8086
 STUB    = zrdxu.exe
-STUBSZ  = 29384
-PSTUBSZ = 13312
+PESTUB  = zrdxpu.exe
+RDFSTUB = zrdxru.exe
+# Binder requires whole 512-byte pages; round the old 29384 ceiling down.
+STUBSZ  = 29184
+# User-approved 14 KB packed-file ceiling; runtime limits are unchanged.
+PSTUBSZ = 14336
 
 all: binder\zrxbind.com zrxsetup.exe binder\stub-le.exe binder\stub-pe.exe binder\stub-rdf.exe .SYMBOLIC
 
@@ -36,11 +40,11 @@ binder\zrxbind.com: binder\bnd.asm autolbl.inc
 binder\stub-le.exe: $(STUB)
 	copy $(STUB) binder\stub-le.exe
 
-binder\stub-pe.exe: zrdxpu.exe
-	copy zrdxpu.exe binder\stub-pe.exe
+binder\stub-pe.exe: $(PESTUB)
+	copy $(PESTUB) binder\stub-pe.exe
 
-binder\stub-rdf.exe: zrdxru.exe
-	copy zrdxru.exe binder\stub-rdf.exe
+binder\stub-rdf.exe: $(RDFSTUB)
+	copy $(RDFSTUB) binder\stub-rdf.exe
 
 zrxsetup.exe: zrxsetup.c
 	$(WCL) -ml -fe=zrxsetup.exe zrxsetup.c
@@ -49,26 +53,32 @@ zrxsetup.exe: zrxsetup.c
 aligner.exe: aligner\aligner.c
 	$(WCL) -ml -fe=aligner.exe aligner\aligner.c
 
-zrdx.exe: zrdx0.exe aligner.exe
+zrdx.exe: zrdx0.exe aligner.exe makefile
 	copy zrdx0.exe zrdx.exe
 	aligner.exe zrdx.exe $(STUBSZ)
 
-zrdxu.exe: zrdx0.exe aligner.exe
+zrdxu.exe: zrdx0.exe aligner.exe makefile
 	-del zrdxu.exe
 	$(UPX) -o zrdxu.exe zrdx0.exe
 	aligner.exe zrdxu.exe $(PSTUBSZ)
 
-zrdxpu.exe: zrdxpe0.exe aligner.exe
+zrdxpe.exe: zrdxpe0.exe aligner.exe makefile
+	copy zrdxpe0.exe zrdxpe.exe
+	aligner.exe zrdxpe.exe $(STUBSZ)
+
+zrdxrdf.exe: zrdxrdf0.exe aligner.exe makefile
+	copy zrdxrdf0.exe zrdxrdf.exe
+	aligner.exe zrdxrdf.exe $(STUBSZ)
+
+zrdxpu.exe: zrdxpe0.exe aligner.exe makefile
 	-del zrdxpu.exe
-	-del zrdxrdf0.exe
-	-del zrdxru.exe
 	$(UPX) -o zrdxpu.exe zrdxpe0.exe
 	aligner.exe zrdxpu.exe $(PSTUBSZ)
 
 zrdxpe0.exe: zrdxpe.obj
 	$(WLINK) name zrdxpe0.exe format dos file zrdxpe.obj
 
-zrdxru.exe: zrdxrdf0.exe aligner.exe
+zrdxru.exe: zrdxrdf0.exe aligner.exe makefile
 	-del zrdxru.exe
 	$(UPX) -o zrdxru.exe zrdxrdf0.exe
 	aligner.exe zrdxru.exe $(PSTUBSZ)
@@ -80,21 +90,21 @@ zrdx0.exe: zrdx.obj
 	$(WLINK) name zrdx0.exe format dos file zrdx.obj
 
 zrdx.obj: zrdx.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-          protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-          dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-          leldr.asm extender.asm smm.asm vmm.asm segend.asm
+	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
+	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
+	leldr.asm extender.asm smm.asm vmm.asm segend.asm
 	$(NASM) zrdx.asm -o zrdx.obj
 
 zrdxpe.obj: zrdxpe.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-          protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-          dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-          peldr.asm extender.asm smm.asm vmm.asm segend.asm
+	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
+	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
+	peldr.asm extender.asm smm.asm vmm.asm segend.asm
 	$(NASM) zrdxpe.asm -o zrdxpe.obj
 
 zrdxrdf.obj: zrdxrdf.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-          protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-          dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-          rdfldr.asm extender.asm smm.asm vmm.asm segend.asm
+	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
+	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
+	rdfldr.asm extender.asm smm.asm vmm.asm segend.asm
 	$(NASM) zrdxrdf.asm -o zrdxrdf.obj
 
 install: binder\zrxbind.com zrxsetup.exe binder\stub-le.exe binder\stub-pe.exe binder\stub-rdf.exe .SYMBOLIC
@@ -112,6 +122,8 @@ clean: .SYMBOLIC
 	-del zrdx0.exe
 	-del zrdx.exe
 	-del zrdxu.exe
+	-del zrdxpe.exe
+	-del zrdxrdf.exe
 	-del zrdxpe0.exe
 	-del zrdxpu.exe
 	-del zrdxrdf0.exe

@@ -157,6 +157,12 @@ L5@7:
         rep stosd
 %endif
         ;hlt
+%ifdef NativeHost
+        jmp NativeHostStart
+MemErr1@7:
+MemErr@7:
+        jmp NativeRootFail
+%else
         mov ebx, ROffILoaderEntry + LS
 L09@7:
         xor eax, eax
@@ -176,6 +182,7 @@ MemErr@7:
         mov ebx, ROffPInitErrorE + LS
         mov si, ROffErrNoDPMIMemoryEM + LS
         jmp L09@7
+%endif
 
         DPROC PageMoveHandler
         mov ebp, cr3

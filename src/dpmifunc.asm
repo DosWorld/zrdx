@@ -18,13 +18,17 @@
 %rotate 1
 %rep %0 - 1
 %ifidn %1, InvalidFunction
-        dd OffInvalidFunction
+        dw OffInvalidFunction - KernelBase
 %else
-        dd (%1 - $$) - CurSegBase
+        dw (%1 - $$) - CurSegBase - KernelBase
 %endif
 %rotate 1
 %endrep
 %endmacro
+
+%if SegSizeText > 10000h
+%error DPMI word dispatch offsets require Text within 64 KB
+%endif
 
         SEGM Text
 ;assume cs:dgroup, ss:dgroup, es:nothing, ds:dgroup
@@ -37,30 +41,58 @@ DPMIFrame_DS equ 12
 DPMIFrame_ES equ 16
 DPMIFrame_FS equ 20
 DPMIFrame_GS equ 24
-DPMIFrame_SF equ 28
-DPMIFrame_size equ 44
+%ifdef NativeHost
+DPMIFrame_Func equ 28
+DPMIFrame_OrigSI equ 32
+DPMIFrame_OrigDI equ 36
+DPMIFrame_OrigDX equ 40
+DPMIExtra equ 16
+%else
+DPMIExtra equ 0
+%endif
+DPMIFrame_SF equ 28 + DPMIExtra
+DPMIFrame_size equ 44 + DPMIExtra
         DPROC DPMIIntEntry
         cli
+        cld                     ;client DF is restored by its saved IRET frame
+%ifdef NativeHost
+        push edx
+        push edi
+        push esi
+        push eax
+%endif
         push gs
         push fs
         push es
         push ds
         push esi
         push ebp
-%assign F 6 * 4
+%assign F 6 * 4 + DPMIExtra
         mov ebp, ss
-        cmp ah, 0Bh
         mov ds, ebp
+        ClientFrameSP F + CFrESP, F + CFrSS
+%ifdef NativeHost
+        call NativeBefore31
+        jc DPMIErrorN
+%endif
+        cmp ah, 0Bh
         movzx esi, al
         movzx ebp, ah
         ja FnNumError@10
         cmp al, [ebp + OffDPMITable2N]
-        mov ebp, [ebp*4 + OffDPMITable2]
+        ; The first level indexes a compact word table; handlers are
+        ; offsets from KernelBase within the resident 64 KB Text window.
+        movzx ebp, byte [ebp + OffDPMITable2]
         jae FnNumError@10
-        call [ebp + esi*4]
+        movzx ebp, word [ebp + esi*2 + OffTable20]
+        add ebp, KernelBase
+        call ebp
         ;clc
         or ebp, ebp           ;faster then direct clc
 DPMIIret:
+%ifdef NativeHost
+        call NativeAfter31
+%endif
         lds esi, [esp + F + CFrESP] ;load client ss:esp
         lea esi, [esi + 12]            ;instread of add to save CF
         push ds                      ;client ss
@@ -79,12 +111,16 @@ DPMIIret:
         ;mov  gs, ebp
         mov ebp, [esp + (5 * 4)]
         lds esi, [esp + (5 * 4) + 4]
+%ifdef NativeHost
+        call NativeFinishIret
+%endif
         iretd
 
 DPMIError3N:
         pop ebp
 DPMIError2N:
         pop ebp
+DPMIError1N:
         pop ebp
         jmp DPMIErrorN
 DPMIError2InvSel:
@@ -107,6 +143,9 @@ DPMIError1: ;pop 1 dword ...
         pop ebp          ;drop return address
         jmp DPMIError
         LLabel InvalidFunction
+UnsupportedCall:
+        mov al, 1
+        jmp DPMIError1       ;table dispatch pushed a return address
 FnNumError@10:
         mov al, 1
 DPMIError:
@@ -125,27 +164,41 @@ DPMIErrorN:
         FnRet
 
         DPMIFn 0, 1
-        cmp bx, [esp + DPMIFrame_SF + CFrSS]
-        je DPMIError1InvSel       ;cannot free current client stack !
+        mov si, bx
+        xor si, [esp + DPMIFrame_SF + CFrSS]
+        test si, ~3
+        jz DPMIError1InvSel       ;RPL does not distinguish the active stack
         call CheckSelector
 FreeDescriptor1:
         btr dword [OffLDTFree], esi ;clear alloc bit in flag vector
+        btr dword [OffLDTBlock], esi
         mov byte [ebp + 5], 0      ;clear descriptor to prevent next use
-        ;clear all freed client selectors on stack
-        lea esi, [ebp - OffLDT + 7]
-        push eax
-        mov ebp, -(4) * 4
-        _do
-          mov eax, esi
-          xor eax, [ebp + esp + (4 * 4) + 4 + DPMIFrame_DS]
-          and eax, 0FFFCh
-          _ifnot jnz
-            mov [ebp + esp + (4 * 4) + 4 + DPMIFrame_DS], eax
-          _endif
-          add ebp, 4
-        _enddo jnz
-        pop eax
+        push edi
+        lea edi, [esp + 4 + DPMIFrame_DS]
+        lea ebp, [esi + 1]
+        call ClearSelectorCacheRange
+        pop edi
         FnRet
+
+; ESI..EBP is an LDT-index interval; EDI addresses saved DS/ES/FS/GS.
+; Share cache invalidation between ordinary and DOS-array descriptor frees.
+ClearSelectorCacheRange:
+        pushad
+        push 4
+        pop ecx
+.loop:  movzx edx, word [edi]
+        test dl, 4
+        jz .next
+        shr edx, 3
+        cmp edx, esi
+        jb .next
+        cmp edx, ebp
+        jae .next
+        and dword [edi], 0
+.next:  add edi, 4
+        loop .loop
+        popad
+        ret
 
         DPMIFn 0, 2
         movzx ebp, word [OffLDTLimit]
@@ -197,6 +250,7 @@ RetThis@10:
 
         DPMIFn 0, 8
         call CheckSelector
+        mov esi, edx
         push edx
         shl edx, 16
         mov dx, cx
@@ -206,11 +260,13 @@ RetThis@10:
           add dx, 10h
           jnc DPMIError2InvVal2
           or dl, 80h
+          mov esi, edx
+          shr esi, 16
         _endif
         and byte [ebp + 6], 70h
         or [ebp + 6], dl
         pop edx
-        mov [ebp], dx
+        mov [ebp], si
         FnRet
 CheckSelectorInCX@10:
         lar esi, ecx
@@ -233,15 +289,15 @@ CheckACC@10:
         xor al, 70h
         test al, 70h
         jnz DPMIError2InvVal  ;this bits must be 1
-        test al, 80h          ;descriptor is prezent?
-        _ifnot jz             ;do not check other if not prezent
-          test ah, 20h
-          jnz DPMIError2InvVal
-          and al, 1110b   ;first step - valid code descriptor ?
-          cmp al, 1010b   ;code-must be nonconform and readable
-          _ifnot je        ;not a valid code
+        test ah, 20h
+        jnz DPMIError2InvVal     ;reserved extended-rights bit, even if P=0
+        test al, 80h
+        _ifnot jz               ;0.9 errata permit arbitrary absent types
+          and al, 1110b
+          cmp al, 1010b
+          _ifnot je
             test al, 1000b
-            jnz DPMIError2InvVal  ;else bad descriptor
+            jnz DPMIError2InvVal
           _endif
         _endif
         xchg ax, si
@@ -294,21 +350,34 @@ CheckACC@10:
         FnRet
         DPMIFn 0, 0Dh
         movzx esi, bx
-        xor esi, 7
-        test esi, 7
-        jnz DPMIError1InvSel    ;not an LDT PL3 selector
-        cmp esi, 16 * 8 + 8
-        jae DPMIError1InvSel    ;too large selector
+        test esi, 4
+        jz DPMIError1InvSel     ;must select the LDT; RPL is ignored
         shr esi, 3
-        jz DPMIError1InvSel    ;null selector
+        cmp esi, 16
+        jae DPMIError1InvSel    ;only indices 0-15 are reserved
         bts dword [OffLDTFree], esi
         jc DPMIError1InvSel    ;not free selector
+InitOneSelector:
+        and dword [OffLDT + esi*8], 0
+        mov dword [OffLDT + esi*8 + 4], 40F200h
         ret
 
+%ifdef NativeHost
         DPMIFn 1, 0
+        jmp NativeDOSAlloc
+        DPMIFn 1, 1
+        jmp NativeDOSFree
+        DPMIFn 1, 2
+        jmp NativeDOSResize
+%else
+        DPMIFn 1, 0
+        test bx, bx
+        jnz DOSAllocSize@10
+        dec bx                   ;query the maximum instead of a zero block
+DOSAllocSize@10:
         push 1
         call AllocSelectors
-        jc DPMIError1
+        jc DOSNoSelector@10
         push eax       ;save selector
         mov ah, 48h   ;Get Block
         ;mov  ax, 0
@@ -319,9 +388,11 @@ CheckACC@10:
           and dword [ebp + 4], 0    ;clear descriptor
           jmp DPMIError2N
         _endif
+        bts dword [OffLDTBlock], esi
         pop esi                     ;add esp, 4
         mov dx, si
         ;jmp  SetupDOSSelector
+%endif
 ;ebp - descriptor, ax - RM segment, bx - size in paragraphs
         DPROC SetupDOSSelector
         push eax
@@ -342,25 +413,60 @@ CheckACC@10:
         ret
 
 
+%ifndef NativeHost
         DPMIFn 1, 2
         call CheckSelectorInDX
+        test bx, bx
+        jnz DOSResizeSize@10
+        dec bx                   ;the failure path probes and rolls back
+DOSResizeSize@10:
         push eax
         call GetSegment@10
+        push ecx
+        mov ecx, esi
+        shl ecx, 4
+        movzx ecx, word [ecx - 13] ;DOS MCB's original paragraph count
+        push ecx
         mov ah, 4Ah
         call Dos1Call
-        jc DPMIError2N
-        ;mov  eax, esi          ;reload segment from esi
+        jnc DOSResized@10
+        cmp ax, 8
+        jne DOSResizeFailed@10
+        push eax
+        push ebx
+        mov bx, [esp + 8]         ;DOS can partially grow on error 8
+        mov ah, 4Ah
+        call Dos1Call
+        pop ebx
         pop eax
-        jmp SetupDOSSelector
-        ;FnRet
+DOSResizeFailed@10:
+        add esp, 4
+        pop ecx
+        jmp DPMIError2N
+DOSResized@10:
+        add esp, 4
+        pop ecx
+        mov ax, si                ;use the block segment, not AX=0102h
+        call SetupDOSSelector
+        pop eax
+        ret
+DOSNoSelector@10:
+        xor bx, bx
+        mov ax, 8
+        jmp DPMIError1N
 
         DPMIFn 1, 1
+        mov si, dx
+        xor si, [esp + DPMIFrame_SF + CFrSS]
+        test si, ~3
+        jnz DOSFreeStackOK@10
+        mov ax, 9                 ;DOS invalid memory block, keep SS valid
+        jmp DPMIError1N
+DOSFreeStackOK@10:
         call CheckSelectorInDX
         push esi
         call GetSegment@10
         mov ebp, eax
-        cmp dx, [esp + DPMIFrame_SF + CFrSS]
-        je DPMIError1           ;cannot free current client stack !
         mov ah, 49h              ;Free block
         call Dos1Call
         jc DPMIError2N          ;@@Err101
@@ -368,22 +474,14 @@ CheckACC@10:
         xchg eax, ebp
         lea ebp, [esi*8 + OffLDT]
         jmp FreeDescriptor1
-;convert descriptor based on ebp to RM segment in si and move eax to ebp
+; Only verified immutable DOS heads reach this conversion.
 GetSegment@10:
         mov esi, [ebp + 2]
-        test esi, 1111b      ;Base must be segment aligned
-        jnz Err101_@10
-        cmp byte [ebp + 7], 0
-        jne Err101_@10       ;too large base
-        shl esi, 8          ;clear 8 hi bits
-        shr esi, 12         ;convert to segment
-        cmp esi, 10000h
-        jae Err101_@10       ;too large base
+        shl esi, 8
+        shr esi, 12
         ret
-Err101_@10:
-        mov ax, 9          ;return "invalid segment"
-        jmp DPMIError3N
 
+%endif
 ; call int 21h from PL1
 ; RM<->PM transfers:
 ; before call: si -> es, ax, bx
@@ -477,25 +575,51 @@ DosPCall:
 ;bx - selector
 ;output: ebp -> pointer to descriptor or error handler call if selector incorrect
 ;destoy: esi
+%ifndef NativeHost
 CheckSelectorInDX:
         movzx esi, dx
-        jmp short CheckSelector1
+        test si, 4
+        jz DOSInvalid@10
+        shr esi, 3
+        bt dword [OffLDTBlock], esi
+        jnc DOSInvalid@10
+        lea ebp, [esi*8 + OffLDT]
+        ret
+DOSInvalid@10:
+        mov ax, 9
+        jmp DPMIError2N
+%endif
 
         DPROC CheckSelector
         movzx esi, bx
 CheckSelector1:
+        test esi, 4
+        jz DPMIError2InvSel       ;only LDT entries are writable by clients
         mov ebp, esi
         shr ebp, 3
         bt dword [OffLDTDOS], ebp
         jc DPMIError2InvSel
-        jmp short CheckSelectorRead1
+        bt dword [OffLDTBlock], ebp
+        jc DPMIError2InvSel
+        jmp short ReadLDT@10
 
         DPROC CheckSelectorRead
         movzx esi, bx
 CheckSelectorRead1:
         ;xor  esi, 7
         test esi, 4
-        jz DPMIError2InvSel     ;client selector must points to LDT RPL 0-3
+        jnz ReadLDT@10
+        mov ebp, esi
+        and ebp, ~7
+        cmp ebp, OffGDTEnd - OffGDT
+        jae DPMIError2InvSel
+        add ebp, OffGDT
+        movzx esi, byte [ebp + 5]
+        and esi, 70h
+        cmp esi, 70h              ;only client-accessible code/data, not gates
+        jne DPMIError2InvSel
+        ret
+ReadLDT@10:
         shr esi, 3
         bt dword [OffLDTFree], esi
         jnc DPMIError2InvSel
@@ -533,7 +657,8 @@ NextScan@10:
         dec _t
         _enddo jnz
 ;interval found
-        lea _t, [(_t1 * 8) + 7]
+SelectorsFound@10:
+        lea _t, [(_t1 * 8) - 1] ;inclusive end; 8192 entries end at FFFFh
         sub _tw, word [OffLDTLimit]
         _ifnot jbe
           push _t
@@ -558,8 +683,7 @@ NextScan@10:
         _do
           dec _t1
           bts dword [OffLDTFree], _t1
-          and dword [OffLDT + (_t1 * 8)], 0
-          mov dword [OffLDT + (_t1 * 8) + 4], 40F200h
+          call InitOneSelector
           dec _t
         _enddo jnz
         lea ebp, [(_t1 * 8) + 7]
@@ -638,6 +762,13 @@ Err@10:
           _enddo jns
           lea edi, [eax + eax*4 + OffAutoPassupRJmps - 5]
           RRT
+%ifdef NativeHost
+          cmp cx, [OffNativeThunkSel]
+          jne .old_defaults
+          cmp edx, 256 * 4
+          jb SetDefaultVect@10
+.old_defaults:
+%endif
           cmp cx, Trap3Selector
           jne SetClientVect@10
           cmp edx, 400h            ;edx points to Trap3 call gate ?
@@ -665,11 +796,19 @@ SetDefaultVect@10:
         shl ebp, 3
         mov [ebp + OffClientIDT], edx
         mov [ebp + OffClientIDT + 4], cx
-        cmp ebp, 7 * 8   ;set int7 always in IDT to allow fast FPU emulation
+%ifndef NativeHost
+        cmp ebp, 7 * 8   ;legacy fast FPU software interface
         je SetInt7@10
+%endif
         test byte [ebp + OffIDT + 2], 10b  ;PL0/1 handler installed ?
         _ifnot jz                          ;else set in IDT
 SetInt7@10:
+%ifdef NativeHost
+          cmp byte [OffNativeMode], 0
+          jne .wide_gate
+          and byte [ebp + OffIDT + 5], ~8
+.wide_gate:
+%endif
           mov [ebp + OffIDT + 2], cx
           mov [ebp + OffIDT], dx
           shld esi, edx, 16               ;place high 16 bits of edx to si
@@ -678,39 +817,30 @@ SetInt7@10:
         FnRet
 
         DPMIFn 9, 0
-;clear virtual interrupts
-        lds esi, [esp + DPMIFrame_SF + CFrESP]
-        mov al, [esi + 9]
-        shr al, 1
-        and al, 1
-        and byte [esi + 9], ~(2)    ;clear IF in client iret frame
-        FnRet
-
         DPMIFn 9, 1
-;set virtual interrupts
-        lds esi, [esp + DPMIFrame_SF + CFrESP]
-        mov al, [esi + 9]
-        shr al, 1
-        and al, 1
-        or byte [esi + 9], 2    ;clear IF in client iret frame
-        FnRet
-
         DPMIFn 9, 2
-;get virtual interrupts
         lds esi, [esp + DPMIFrame_SF + CFrESP]
-        mov al, [esi + 9]
-        shr al, 1
-        and al, 1
+        mov ebp, [esi + 8]       ;return the previous IF in all three forms
+        cmp al, 2
+        je VIFRead@10
+        shl al, 1               ;disable=0, enable=IF bit in the high byte
+        and byte [esi + 9], ~2
+        or [esi + 9], al
+VIFRead@10:
+        shr ebp, 10
+        setc al
         FnRet
 
-        LLabel APIEntryPoint
-        stc
-        retf
+        DPMIFn B, 0
+        DPMIFn B, 1
+        DPMIFn B, 2
+        DPMIFn B, 3
+        VCPITrap              ;debug operations share the existing ring-0 gate
+        jc DPMIError1
+        FnRet
 
         DPMIFn A, 0
-        mov edi, OffAPIEntryPoint
-        mov dword [esp + DPMIFrame_ES], Code3Selector
-        FnRet
+        jmp UnsupportedCall ;no vendor extensions are implemented
 
         DPMIFn 6, 4
         xor bx, bx
@@ -733,7 +863,9 @@ SetInt7@10:
         cld
         rep stosd
         xor edx, edx
+%ifdef VMM
         mov [es:edi - 30h + 20h], edx ;swap file size
+%endif
         mov ax, 0DE03h      ;get VCPI free pages
         cmp [OffVCPIMemAvailable], dl
         _ifnot je
@@ -742,6 +874,7 @@ SetInt7@10:
         add edx, [OffnFreePages] ;add free pages in my pool
         add edx, [OffFreeXMSCount]
         RRT
+%ifdef VMM
         mov eax, [OffTotalVCPIPages]
         add eax, [OffTotalXMSPages]
         RRT
@@ -758,6 +891,8 @@ SetInt7@10:
         mov [es:edi - 30h + 10h], edx
         mov [es:edi - 30h + 14h], edx
         mov [es:edi - 30h + 1Ch], edx
+%endif
+%ifdef VMM
         mov eax, edx
         shr eax, 10
         inc eax
@@ -768,15 +903,81 @@ SetInt7@10:
         _endif
         shl edx, 12         ;convert pages to bytes
         mov [es:edi - 30h], edx  ;maximum free block
+%else
+        ; Metadata occupies the permanently mapped kernel directory.
+        ; Only a new MCB page consumes another physical page.
+        cmp dword [OffFMemRover], 0
+        jne .budget
+        mov eax, [OffMCBVectorEnd]
+        cmp eax, 800000h
+        jae .empty
+        test eax, 0FFFh
+        jnz .budget
+        dec edx
+.budget:
+        xor ebx, ebx
+        test edx, edx
+        jle .store
+        mov ebp, edx
+        mov esi, OffRootMCB
+.gap:   mov eax, [esi + MCB_EndOffset]
+        mov esi, [esi + MCB_Next]
+        mov ecx, [esi + MCB_StartOffset]
+        sub ecx, eax
+        shr ecx, 12
+        shr eax, 12
+        push ebx
+        mov ebx, ebp
+        push eax
+.table: jecxz .count
+        mov edx, eax
+        shr edx, 10
+        cmp dword [OffnEntriesInTable + edx*4], 0
+        jne .present
+        dec ebx
+        jz .count
+.present:
+        mov edx, eax
+        or dx, 3FFh
+        inc edx
+        sub edx, eax
+        cmp edx, ecx
+        jbe .gap_limit
+        mov edx, ecx
+.gap_limit:
+        cmp edx, ebx
+        jbe .physical_limit
+        mov edx, ebx
+.physical_limit:
+        add eax, edx
+        sub ecx, edx
+        sub ebx, edx
+        jnz .table
+.count: pop edx
+        sub eax, edx
+        pop ebx
+        cmp eax, ebx
+        jbe .next
+        mov ebx, eax
+.next:  cmp esi, OffRootMCB
+        jne .gap
+        shl ebx, 12
+        jmp .store
+.empty: xor ebx, ebx
+.store: mov [es:edi - 30h], ebx
+%endif
         popad
         FnRet
 
 
 ;get version
         DPMIFn 4, 0
-        mov ax, 9h
-        mov bx, 1
-        mov cl, [OffCPUType]
+        mov ax, 005Ah          ;minor 0.90, decimal 90 (DPMI 1.0 Appendix C)
+        mov bx, 1              ;32-bit clients supported
+        cmp word [OffVCPICallDesc + 2], VCPISelector + 8
+        jne .v86                 ;VCPI remains active even when out of free pages
+        or bl, 2               ;host uses real mode outside VCPI
+.v86:   mov cl, [OffCPUType]
         mov dx, 870h
         FnRet
 
@@ -788,9 +989,22 @@ L045@10:
         mov bx, DGROUP16
         FnRet
         DPMIFn 3, 5
+%ifdef NativeHost
+        mov ax, 16
+%else
         mov ax, 12
+%endif
         mov cx, ROffRMSaveState
         mov edi, OffPMSaveStateTrap3
+%ifdef NativeHost
+        cmp byte [OffNativeMode], 0
+        jne L045@10
+        mov edi, NativeState16 - NativeInt16
+        mov bx, DGROUP16
+        mov si, [OffNativeThunkSel]
+        mov [esp + DPMIFrame_ESI], si
+        FnRet
+%endif
         jmp L045@10
         DPMIFn 3, 0
         DPMIFn 3, 1
@@ -816,16 +1030,23 @@ L045@10:
 %assign F 4
         mov [esi + RMIE_ESI], edx
         mov [esi + RMIE_EDI], edi            ;@@CS[26] - pointer to client DC_Struct
+%ifdef NativeHost
+        mov edx, [esp + F + DPMIFrame_OrigDI]
+        mov [esi + RMIE_OriginalDI], edx ;keep high bits separate from a 16-bit pointer
+%endif
         mov edx, [esp + F + DPMIFrame_DS]  ;@@CS[20] - saved client DS:ESI
         movzx ecx, cx
         mov [esi + RMIE_DS], dx
-        shr al, 1
         mov ebp, [ebp]              ;RMStack->ebp
-        sbb edx, edx                   ;expand CF to edx
         mov [esi + RMIE_ES], es
         mov [esi + RMIE_FS], fs
         mov [esi + RMIE_GS], gs
         mov [esi + RMIE_RealStack], ebp
+        mov dl, [ss:OffA20Reset]
+        RRT
+        mov [esi + RMIE_CS + 2], dl ;unused high CS byte: nested RM A20 policy
+        shr al, 1
+        sbb edx, edx
 ;calculate iret frame additional length(only for iret forms)
 
 ;free: eax, edx, esi, ebp
@@ -859,6 +1080,9 @@ L045@10:
           push edi
           push es
           add esi, 12                            ;interrupt frame length
+%ifdef NativeHost
+          call NativeRMParameters
+%endif
           lea edi, [ebp + edx + VMIStruct_size - 2]
           push ss
           pop es
@@ -895,6 +1119,10 @@ L045@10:
         dw RMIERetSwitchCode, DGROUP16
 
 ;ss:ebp - RM switch stack, ds:edi - dos call struct, edx - start address
+        test bh, 1
+        jz SwitchToVMWithTransfer
+        mov byte [ss:OffA20Reset], 1 ;nested calls retain the outer RM policy
+        RRT 1
 SwitchToVMWithTransfer:
         movzx eax, word [edi + DC_GS]
         mov [ebp + VMI_IP], edx
@@ -954,9 +1182,11 @@ RStackOverflow@10:
         lea esi, [esi + esi*2 - ((OffFirstSwitchCode + MaxSystemSwitchCode) * 3)]
         test esi, 3         ;address must be dword aligned
         jne DPMIError1
-        cmp esi, nMaxCallbacks * (CBTStruct_size / 3)
+        cmp esi, nMaxCallbacks * CBTStruct_size
         jae DPMIError1
-        and dword [esi + OffCallbacksTable + CBT_CS], 0
+        cmp word [esi + OffCallbacksTable + CBT_CS], 0
+        je DPMIError1       ;unused or already freed callback
+        mov word [esi + OffCallbacksTable + CBT_CS], 0
         FnRet
 
 
@@ -980,7 +1210,17 @@ RStackOverflow@10:
         mov si, di
         mov _mapregionstart, ebx
         and _mapregionstart, ~(0FFFh)
-        lea _mapregionend, [ebx + esi + 0FFFh]
+        test esi, esi
+        jz near MapRangeError@12
+        cmp ebx, 100000h
+        jb near MapRangeError@12
+        mov _mapregionend, ebx
+        add _mapregionend, esi
+        jnc MapRound@12
+        test _mapregionend, _mapregionend
+        jnz near MapRangeError@12
+MapRound@12: ;zero denotes an exclusive physical end of 4 GB
+        add _mapregionend, 0FFFh
         xor ebx, _mapregionstart
         and _mapregionend, ~(0FFFh)
         push _mapregionstart
@@ -996,6 +1236,13 @@ RStackOverflow@10:
         ;uses @@FirstDI, @@LastDI, ecx, esi, edi, ebp
         shr _firstdi, 22
         shr _lastdi, 22
+        cmp _firstdi, _lastdi
+        jae MapTables@12
+        test byte [OffPageDir + _firstdi*4], 1
+        jz MapTables@12
+        inc _firstdi                ;share the normal block's boundary table
+MapTables@12:
+        push _firstdi               ;first newly owned directory for rollback
         _do jmp
 %ifndef VMM
           lea edi, [OffPageDir + (_firstdi * 4)]
@@ -1016,6 +1263,7 @@ RStackOverflow@10:
         _while
         cmp _lastdi, _firstdi
         _enddo jne
+        add esp, 4
         pop _tmappedpage
         pop _mapregionend
         pop _mapregionstart
@@ -1026,29 +1274,46 @@ RStackOverflow@10:
         mov dword [OffRootMCB + MCB_StartOffset], _tmappedpage
         mov _mapregionstartb, 67h
         LLabel PatchPoint4
+        movzx _t, _mapregionstartb
+        or _mapregionend, _t ;compare matching PTE attributes, including PCD
         shr _tmappedpage, 12
-        _do jmp
+MapDirectory@12:
         mov _t, _tmappedpage
         shr _t, 10
         cli
-        mov _t, dword [OffPageDir + (_t * 4)]
-        mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
+        mov edi, [OffPageDir + _t*4]
+        mov [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], edi
+        lea edi, [OffnEntriesInTable + _t*4]
         InvalidateTLB
-        mov _t, _tmappedpage
-        and _t, 3FFh
-        mov dword [OffPageTableWin + (_t * 4)], _mapregionstart
+        movzx edx, si
+        and dh, 3
+MapEntries@12:
+%ifndef VMM
+        inc dword [edi]
+%endif
+        mov [OffPageTableWin + _t*4], _mapregionstart
         add _mapregionstart, 1000h
-        sti
         inc _tmappedpage
-        _while
+        inc _t
         cmp _mapregionend, _mapregionstart
-        _enddo ja
+        je MapComplete@12
+        test dh, 4               ;1024 entries: reload the window once per PDE
+        jz MapEntries@12
+        sti                      ;IRQs may reuse the window between directories
+        jmp MapDirectory@12
+MapComplete@12:
+        sti
         popad
         ret
+MapRangeError@12:
+        popad
+        mov al, 21h
+        jmp DPMIError1
 Recover@12:
-        xchg eax, edx ;write eax to edx
+        mov edx, eax
         pop ebx
-        call FreeHMPages
+        call FreeNewMapTables
+        pop eax                    ;original mapping start
 Err@12:
         pop eax
         pop eax
@@ -1059,21 +1324,43 @@ Err@12:
 ;ebx - first page
 ;edx(@@LastDI) - last page
 FreeHMPages:
+%ifdef VMM
         shr ebx, 22
-        _do jmp
-%ifndef VMM
-            xor ecx, ecx
-            lea esi, [ebx*4 + OffPageDir]
-            inc ecx
-            call XFreePages
+.loop:  cmp ebx, edx
+        jae .done
+        push dword [OffPageDir + ebx*4]
+        call free_page
+        inc ebx
+        jmp .loop
+.done:  ret
 %else
-            push dword [ebx*4 + OffPageDir]
-            call free_page
-%endif
-          inc ebx
-        _while
-          cmp ebx, edx
-        _enddo jne
+        mov eax, ebx
+        shr eax, 12
+        shl edx, 10
+        push 2                     ;shared page walker, no physical release/IRQ
+        call FreePagesN
         ret
+%endif
+
+; New mapping tables have no installed entries yet; rollback frees only
+; directories allocated by this call, excluding an existing boundary.
+FreeNewMapTables:
+.loop:  cmp ebx, edx
+        jae .done
+%ifndef VMM
+        push ebx
+        push edx
+        lea esi, [OffPageDir + ebx*4]
+        mov ecx, 1
+        call XFreePages
+        pop edx
+        pop ebx
+%else
+        push dword [OffPageDir + ebx*4]
+        call free_page
+%endif
+        inc ebx
+        jmp .loop
+.done:  ret
 
         ESEG Text

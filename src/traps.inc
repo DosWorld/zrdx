@@ -11,4 +11,7 @@
 %endif
         DefTrap3 PassupIret, 1, 0
         DefTrap3 PMRawSwitch, 1, 0
+%ifdef NativeHost
+        DefTrap3 NativeEventIret, 1, 6
+%endif
         DefTrap3 PMSaveState, 1, 0      ;must be last!

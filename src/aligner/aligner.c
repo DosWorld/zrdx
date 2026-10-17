@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     int handle;
     unsigned fsize;
     unsigned l, nl, need, NewDataOff, DataSize;
-    unsigned long v;
+    unsigned long v, image_len, header_len, reloc_end;
     char *end;
 
     if (argc < 3) return 1;
@@ -38,15 +38,27 @@ int main(int argc, char *argv[])
         return 4;
     }
 
-    l = (h->n - 1) * 512 + h->r;
-    if (l > fsize || h->hSize * 16u > l) {
+    image_len = (unsigned long)h->n * 512;
+    if (h->r != 0) image_len -= 512 - (unsigned long)h->r;
+    header_len = (unsigned long)h->hSize * 16;
+    reloc_end = (unsigned long)h->RelocOff + (unsigned long)h->nRelocs * 4;
+    if (h->r > 512 || image_len > fsize ||
+            header_len < sizeof(struct header) || header_len > image_len ||
+            (h->nRelocs != 0 && (h->RelocOff < sizeof(struct header) ||
+                                 reloc_end > header_len))) {
         close(handle);
         return 4;
     }
+    l = (unsigned)image_len;
     need = l;
     if (h->RelocOff < 0x40) {
-        NewDataOff = ((h->nRelocs * 4 + 15) & (~15)) + 0x40;
-        DataSize = l - h->hSize * 16;
+        v = (((unsigned long)h->nRelocs * 4 + 15) & ~15UL) + 0x40;
+        DataSize = l - (unsigned)header_len;
+        if (v + DataSize > sizeof(buffer)) {
+            close(handle);
+            return 4;
+        }
+        NewDataOff = (unsigned)v;
         need = NewDataOff + DataSize;
     }
     if (nl < need) {
@@ -64,13 +76,19 @@ int main(int argc, char *argv[])
         h->hSize = NewDataOff / 16;
     }
     h->n = (nl + 511) / 512;
-    h->r = nl - (h->n - 1) * 512;
-    lseek(handle, 0, SEEK_SET);
+    h->r = nl % 512;
+    if (lseek(handle, 0, SEEK_SET) < 0) {
+        close(handle);
+        return 5;
+    }
     if ((unsigned)write(handle, buffer, nl) != nl) {
         close(handle);
         return 5;
     }
-    chsize(handle, nl);
+    if (chsize(handle, nl) != 0) {
+        close(handle);
+        return 5;
+    }
     close(handle);
     return 0;
 }

@@ -169,6 +169,14 @@ ROff %+ %1 equ ($ - $$) - CurSegBaseR
         dw ((%1) >> 16) & 0FFFFh
 %endmacro
 
+; SS.B, not the client's mode or CS.B, selects the stack offset width.
+%macro ClientFrameSP 2
+        push eax
+        lea eax, [esp + 4 + %1]
+        call NormalizeClientStack
+        pop eax
+%endmacro
+
 %macro VCPICallTrap 0
         db CallFarCode
         dd 0
@@ -282,10 +290,16 @@ RMIE_FS equ 32
 RMIE_GS equ 34
 RMIE_RealStack equ 36
 ;        ;client iret frame
-RMIE_EIP equ 40
-RMIE_CS equ 44
-RMIE_EFlags equ 48
-RMIEStruct_size equ 52
+%ifdef NativeHost
+RMIE_OriginalDI equ 40
+%assign RMIEExtra 4
+%else
+%assign RMIEExtra 0
+%endif
+RMIE_EIP equ 40 + RMIEExtra
+RMIE_CS equ 44 + RMIEExtra
+RMIE_EFlags equ 48 + RMIEExtra
+RMIEStruct_size equ 52 + RMIEExtra
 
 ;stack frame for simple interrupt from client PM - save all selectors,
 ;replaced with RM segments

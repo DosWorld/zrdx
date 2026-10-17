@@ -160,6 +160,11 @@ Int10:
         dw p_esbp, r_ptr
         jmp CallMethod1
 Int2F:
+        cmp ax, 1686h
+        jne Int2FClipboard
+        mov word [ebp + DC_EAX], 0
+        jmp rrrr1
+Int2FClipboard:
         cmp ah, 17h
         jne near ToOldInt0
         mov edi, int2F17Table
@@ -217,6 +222,32 @@ GetExtVer?:
 ;------------------------------ int 4Ch -------------------------------------
 ;free all callback handlers
 ExitDPMI:
+        pushad
+        mov eax, 0900h
+        int 31h
+        push eax
+        mov edi, EID0
+.restore:
+        movzx ebx, byte [edi + EID_IntNum]
+        mov cx, [edi + EID_OldIntVectHi]
+        mov edx, [edi + EID_OldIntVect]
+        mov eax, 0205h
+        int 31h
+        add edi, EIntDescr_size
+        cmp edi, EID0 + NHookedInterrupts * EIntDescr_size
+        jb .restore
+        movzx ebx, byte [OffOldVectors + 6]
+        mov cx, [OffOldVectors + 4]
+        mov edx, [OffOldVectors]
+        mov eax, 0205h
+        int 31h
+        pop eax
+        test al, al
+        jz .disabled
+        mov eax, 0901h
+        int 31h
+.disabled:
+        popad
         mov edx, 0
         LBack MouseCallbackPlace1, 4
         shld ecx, edx, 16

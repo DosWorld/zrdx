@@ -14,11 +14,14 @@ PESectAlign equ 56
 PEImageSize equ 80
 PEHeadersSize equ 84
 PEStackReserve equ 96
+PENumDirs equ 116
 PEDirImport equ 128
 PEDirImportSize equ 132
 PEDirReloc equ 160
 PEDirRelocSize equ 164
+PEDirTLS equ 192
 PEDirTLSSize equ 196
+PEDirDelay equ 224
 PEDirDelaySize equ 228
 PEOptHdr equ 24
 ;IMAGE_SECTION_HEADER
@@ -41,6 +44,7 @@ MaxPESections equ 24
         DFD CodeSel
         DFD DataSel
         DFD EntryPoint
+        DFD PEHeaderPos
         DFD StackTop
         EVSeg IEBSS
         SEGM IEData
@@ -133,10 +137,10 @@ LoaderEntry:
         int 31h
         _ifnot jnc
           cmp bx, 100h
-          jb near ErrTransferBuf@129
+          jb ErrTransferBuf@129
           mov ax, 100h
           int 31h
-          jc near ErrTransferBuf@129
+          jc ErrTransferBuf@129
         _endif
         movzx ebx, bx
         shl ebx, 4
@@ -188,7 +192,7 @@ LoaderDbgEntry:
         push 040h
         call FileRead
         cmp al, 040h
-        jne near ErrFile@129
+        jne ErrFile@129
         mov eax, [ebp + 3Ch]
         mov [ss:FileDisp], eax
         push ss
@@ -197,53 +201,84 @@ LoaderDbgEntry:
         push 040h
         call FileRead
         cmp al, 040h
-        jne near ErrFile@129
+        jne ErrFile@129
         cmp word [ebp], 'MZ'
-        jne near ErrEXE@129
+        jne ErrEXE@129
         push ss
         push ebp
-        push dword [ebp + 3Ch]
+        mov edx, [ebp + 3Ch]
+        mov [ss:OffPEHeaderPos], edx
+        push edx
         push 400h
         call FileRead
         movzx eax, ax
-        cmp eax, 100h
-        jb near ErrFile@129
+        cmp eax, PEOptHdr + 96
+        jb ErrFile@129
+        mov edi, eax
         cmp dword [ebp], 'PE'
-        jne near ErrEXE@129
+        jne PEBadHeader
         cmp word [ebp + PEMachine], 14Ch
-        jne near ErrEXE@129
+        jne PEBadHeader
         cmp word [ebp + PEOptMagic], 10Bh
-        jne near ErrEXE@129
+        jne PEBadHeader
         test byte [ebp + PEFlags], 2
-        jz near ErrEXE@129
+        jz PEBadHeader
         test byte [ebp + PEFlags + 1], 20h
-        jnz near ErrEXE@129
+        jnz PEBadHeader
         movzx ecx, word [ebp + PENumSections]
         or ecx, ecx
-        jz near ErrEXE@129
+        jz PEBadHeader
         cmp ecx, MaxPESections
-        ja near ErrEXE@129
+        ja PEBadHeader
+        jmp short PEHeaderFields
+PEBadHeader:
+        jmp ErrEXE@129
+PEHeaderFields:
         movzx edx, word [ebp + PEOptHdrSize]
+        cmp edx, 96
+        jb PEBadHeader
+        mov ebx, edx
+        sub ebx, 96
+        shr ebx, 3
+        cmp [ebp + PENumDirs], ebx
+        ja PEBadHeader
         lea eax, [ecx + ecx*4]
         lea eax, [edx + eax*8 + PEOptHdr]
-        cmp eax, 400h
-        ja near ErrEXE@129
-        cmp dword [ebp + PEDirImportSize], 0
-        jne near ErrPEImport
-        cmp dword [ebp + PEDirDelaySize], 0
-        jne near ErrPEImport
-        cmp dword [ebp + PEDirTLSSize], 0
-        jne near ErrPETls
+        cmp eax, edi
+        ja PEBadHeader
+        add eax, [ss:OffPEHeaderPos]
+        jc PEBadHeader
+        cmp [ebp + PEHeadersSize], eax
+        jb PEBadHeader
+        cmp dword [ebp + PENumDirs], 2
+        jb PEImportsOK
+        mov eax, [ebp + PEDirImport]
+        or eax, [ebp + PEDirImportSize]
+        jne ErrPEImport
+PEImportsOK:
+        cmp dword [ebp + PENumDirs], 14
+        jb PEDelayOK
+        mov eax, [ebp + PEDirDelay]
+        or eax, [ebp + PEDirDelaySize]
+        jne ErrPEImport
+PEDelayOK:
+        cmp dword [ebp + PENumDirs], 10
+        jb PETlsOK
+        mov eax, [ebp + PEDirTLS]
+        or eax, [ebp + PEDirTLSSize]
+        jne ErrPETls
+PETlsOK:
         mov ebx, [ebp + PEImageSize]
         cmp ebx, [ebp + PEHeadersSize]
-        jb near ErrEXE@129
+        jb ErrEXE@129
         add ebx, 0FFFh
+        jc ErrEXE@129
         and ebx, ~(0FFFh)
-        jz near ErrEXE@129
+        jz ErrEXE@129
         mov [ss:OffImageSize], ebx
         mov ax, 501h
         call DPMICall
-        jc near ErrNoDPMIMemory
+        jc ErrNoDPMIMemory
         mov [ss:OffImageHandle], esi
         mov [ss:OffImageBaseA], ebx
         mov [fs:OffImageBaseAddr], ebx
@@ -262,20 +297,30 @@ LoaderDbgEntry:
         push dword [ebp + PEHeadersSize]
         call FileRead
         cmp eax, [ebp + PEHeadersSize]
-        jne near ErrFile@129
+        jne ErrFile@129
+        mov edi, [ebp + PEHeadersSize]
         movzx ecx, word [ebp + PENumSections]
         movzx esi, word [ebp + PEOptHdrSize]
         lea esi, [ebp + esi + PEOptHdr]
         _do
           mov edx, [ss:esi + PSRawSize]
-          or edx, edx
+          mov eax, [ss:esi + PSVirtualAddr]
+          cmp eax, edi
+          jb PEBadSection
+          mov ebx, [ss:esi + PSVirtualSize]
+          cmp ebx, edx
+          _ifnot jae
+            mov ebx, edx
+          _endif
+          add ebx, eax
+          jc PEBadSection
+          cmp ebx, [ebp + PEImageSize]
+          ja PEBadSection
+          mov edi, ebx
+          test edx, edx
           _ifnot jz
-            mov eax, [ss:esi + PSVirtualAddr]
-            mov ebx, eax
-            add ebx, edx
-            jc near ErrEXE@129
-            cmp ebx, [ss:OffImageSize]
-            ja near ErrEXE@129
+            cmp dword [ss:esi + PSRawPtr], 0
+            je PEBadSection
             add eax, [ss:OffImageBaseA]
             push ecx
             push esi
@@ -287,40 +332,51 @@ LoaderDbgEntry:
             pop esi
             pop ecx
             cmp eax, edx
-            jne near ErrFile@129
+            jne ErrFile@129
           _endif
           add esi, PSHeader_size
         _enddo loop
+        jmp short PESectionsOK
+PEBadSection:
+        jmp ErrEXE@129
+PESectionsOK:
         mov edi, [ss:OffImageBaseA]
         mov edx, edi
         sub edx, [ebp + PEImageBase]
         _ifnot jz
+          cmp dword [ebp + PENumDirs], 6
+          jb PEBadReloc
           mov ecx, [ebp + PEDirRelocSize]
           or ecx, ecx
-          jz near ErrPEReloc
+          jz PEBadReloc
           mov esi, [ebp + PEDirReloc]
           mov eax, esi
           add eax, ecx
-          jc near ErrPEReloc
-          cmp eax, [ss:OffImageSize]
-          ja near ErrPEReloc
+          jc PEBadReloc
+          cmp eax, [ebp + PEImageSize]
+          ja PEBadReloc
           add esi, edi
           add ecx, esi
           _do
             cmp esi, ecx
             _break jae
+            mov eax, ecx
+            sub eax, esi
+            cmp eax, 8
+            jb PEBadReloc
             mov ebx, [esi + 4]
+            test bl, 1
+            jnz PEBadReloc
             cmp ebx, 8
-            jb near ErrPEReloc
+            jb PEBadReloc
             mov eax, ecx
             sub eax, esi
             cmp ebx, eax
-            ja near ErrPEReloc
+            ja PEBadReloc
             push ecx
             lea ecx, [esi + ebx]
             push ecx
             mov ebx, [esi]
-            add ebx, edi
             add esi, 8
             _do
               cmp esi, [esp]
@@ -332,16 +388,17 @@ LoaderDbgEntry:
               and eax, 0FFFh
               cmp ecx, 3
               _ifnot jne
-                lea ecx, [ebx + eax]
-                sub ecx, edi
+                add eax, ebx
+                jc PEBadReloc
+                mov ecx, eax
                 add ecx, 4
-                jc near ErrPEReloc
-                cmp ecx, [ss:OffImageSize]
-                ja near ErrPEReloc
-                add [ebx + eax], edx
+                jc PEBadReloc
+                cmp ecx, [ebp + PEImageSize]
+                ja PEBadReloc
+                add [edi + eax], edx
               _else jmp
                 jecxz SkipReloc
-                jmp ErrPEReloc
+                jmp PEBadReloc
               _endif
 SkipReloc:
             _enddo jmp
@@ -349,9 +406,13 @@ SkipReloc:
             pop ecx
           _enddo jmp
         _endif
+        jmp short PERelocsOK
+PEBadReloc:
+        jmp ErrPEReloc
+PERelocsOK:
         mov eax, [ebp + PEEntryRVA]
-        cmp eax, [ss:OffImageSize]
-        jae near ErrEXE@129
+        cmp eax, [ebp + PEImageSize]
+        jae ErrEXE@129
         add eax, [ss:OffImageBaseA]
         mov [ss:OffEntryPoint], eax
         mov ebx, [ebp + PEStackReserve]
@@ -368,7 +429,7 @@ SkipReloc:
         mov edx, ebx
         mov ax, 501h
         call DPMICall
-        jc near ErrNoDPMIMemory
+        jc ErrNoDPMIMemory
         mov [ss:OffStackHandle], esi
         add ebx, edx
         lea eax, [ebx - 16]
@@ -428,20 +489,22 @@ FileRead:
 ;@@Size    EQU DWORD PTR SS:[esp+12].4
          mov edx, [esp + 12 + 8]
          add edx, [ss:FileDisp]
+         jc PEReadError
          mov ecx, edx
          shr ecx, 16
          mov ebx, [ss:OffFileHandle]
          mov ax, 4200h
          ;call XX
          DOSINT 42
+         jc PEReadError
          ;int  21h
-         _ifnot jc
          ;call EnableTrace
          push ds
          lds edx, [esp + 12 + 12 + 4]
          mov ecx, [esp + 12 + 4 + 4]
          mov ah, 3Fh
          DOSINT
+         jc PEReadError
          ;push eax       ;write dump
          ;mov ebx, DumpHandle
          ;mov ah, 40h
@@ -455,11 +518,13 @@ FileRead:
         ;push eax
         ;push 8
         ;call PrintN
-         _endif
          pop edx
          pop ecx
          pop ebx
          ret 16
+
+PEReadError:
+         jmp ErrFile@129
 
 ;create a selector for the object by the object index
 ;if the object is 16-bit then base = object base, limit = object length
@@ -493,7 +558,7 @@ CreateSelector:
                mov cx, 1
                xor eax, eax
                int 31h
-               jc near ErrAllocSel
+               jc ErrAllocSel
                ;$ifnot jc
                movzx ebx, ax
                mov ax, 0Ch
@@ -503,7 +568,7 @@ CreateSelector:
                pop es
                int 31h
                pop es
-               jc near ErrAllocSel
+               jc ErrAllocSel
                ;$endif
                ;mov ebx, bx
                add esp, 8

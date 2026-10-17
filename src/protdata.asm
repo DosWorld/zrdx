@@ -26,10 +26,10 @@ Traps3SetupTable:
         Descr 400h, 0FFFFh, 0F3h               ;data descriptor for 40h bios area
         LDWord VCPICallDesc
         GDescr OffVCPICallHandler, Code0Selector, 0A0h + SS_GATE_PROC3
-        GDescr OffVCPITrapHandler, Code0Selector, 0E0h + SS_GATE_PROC3
-        GDescr OffInvalidateTLBHandler, Code0Selector, 0E0h + SS_GATE_PROC3
-        GDescr OffPageMoveHandler, Code0Selector, 0E0h + SS_GATE_PROC3
-        GDescr OffLoadLDTHandler, Code0Selector, 0E0h + SS_GATE_PROC3
+        GDescr OffVCPITrapHandler, Code0Selector, 0A0h + SS_GATE_PROC3
+        GDescr OffInvalidateTLBHandler, Code0Selector, 0A0h + SS_GATE_PROC3
+        GDescr OffPageMoveHandler, Code0Selector, 0A0h + SS_GATE_PROC3
+        GDescr OffLoadLDTHandler, Code0Selector, 0A0h + SS_GATE_PROC3
 %ifdef VMM
           GDescr OffSwitchTo00, Code0Selector, 0A0h + SS_GATE_PROC3
 %endif
@@ -91,8 +91,6 @@ Traps3SetupTable:
         dd OffRootMCB
         LDWord nmemblocks
         dd 1
-        LDWord LDTBottom
-        dd OffLDT + 17 * 8 + 4 * 8
         LDWord MCBVectorEnd
         dd OffMCBVector
         LDWord nEntriesInFplist     ;nFreePagesOnDir

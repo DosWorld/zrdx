@@ -41,7 +41,8 @@ PageSize equ 1000h
           _ifnot jne
             ;allocate page for table
             lea _xdir, [OffPageDir + (_pagesubdirindex * 4)]
-            mov _xsize, 1
+            xor _xsize, _xsize
+            inc _xsize
             call XAllocPages
             jz Fail@32
           _endif
@@ -62,7 +63,8 @@ PageSize equ 1000h
             _ifnot jne
               ;free previsionaly allocated subdirectory, if main allocation failed
               lea _xdir1, [OffPageDir + (_pagesubdirindex * 4)]
-              mov _xsize, 1
+              xor _xsize, _xsize
+              inc _xsize
               call XFreePages
             _endif
 Fail@32:
@@ -165,8 +167,8 @@ XAllocPages:
         sub _lastpage, _firstpage  ;@@nd
         _ifnot jbe
         _do
-          cmp byte [esp + 4 + (8 * 4)], 0
-          _ifnot je
+          test byte [esp + 4 + (8 * 4)], 1
+          _ifnot jz
 %ifdef Release
             sti
 %endif
@@ -177,7 +179,7 @@ XAllocPages:
           shr _subdirindex, 10
           mov _xsize, dword [OffPageDir + (_subdirindex * 4)]
           mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _xsize
-          ;InvalidateTLB
+          InvalidateTLB             ;both physical frees and device unmaps use this window
           mov _xsize, 400h
           mov _xdir, _firstpage
           and _xdir, 3FFh
@@ -188,7 +190,21 @@ XAllocPages:
           _endif
           ;Log
           lea _xdir, [OffPageTableWin + (_xdir * 4)]
+          test byte [esp + 4 + (8 * 4)], 2
+          jnz UnmapDevices@32
           call XFreePages
+          jmp short PagesRemoved@32
+UnmapDevices@32:
+          push eax
+          push edi
+          push ecx
+          mov edi, esi
+          xor eax, eax
+          rep stosd               ;device memory is unmapped, never released
+          pop ecx
+          pop edi
+          pop eax
+PagesRemoved@32:
           add _firstpage, _xsize
           sub _nd, _xsize
           sub dword [OffnEntriesInTable + (_subdirindex * 4)], _xsize
@@ -206,7 +222,8 @@ XAllocPages:
 ;destroy @@XDir, edi, eax
 XFreePages:
 %define _t edi
-        InvalidateTLB
+        ;The caller has made any source window current; fplist changes
+        ;are flushed below before use. Other callers pass stack/PDE data.
         mov _t, 1023
         sub _t, dword [OffnEntriesInFplist]
         _ifnot jz

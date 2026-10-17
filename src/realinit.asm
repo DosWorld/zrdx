@@ -23,7 +23,11 @@
         LByte FileAccessEM
         db "can't open EXE$"
         LByte AlreadyVMEM
+%ifdef NativeHost
+        db 'native host needs direct VCPI/XMS/RAW ownership$'
+%else
         db 'already in V86 mode without VCPI or DPMI$'
+%endif
         LByte VCPIServerEM
         db 'unexpected VCPI host fault$'
         LByte DOSMemoryEM
@@ -49,7 +53,22 @@
 ;assume cs:DGROUP16, ds:DGROUP16, ss:DGROUP16
 RInit:
 InitDPMI:
+PSPSize equ 100h
 TryDPMI@167:
+%ifdef NativeHost
+        mov ax, 1687h
+        int 2Fh
+        test ax, ax
+        jnz .absent
+        mov si, ROffAlreadyVMEM
+        jmp RInitError
+.absent:
+        ret
+        ;InitRXV fills the switch stubs before the remaining init calls.
+%if (($-$$)-CurSegBaseR) < (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4)
+        times (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4) - (($-$$)-CurSegBaseR) db 90h
+%endif
+%else
         mov ax, 1687h
         int 2Fh
         or ax, ax
@@ -59,7 +78,6 @@ NoDPMI@167:
         _endif
         shr bx, 1
         jnc NoDPMI@167
-PSPSize equ 100h
         ;RMCodeSize = 0 ;SegSizeEText16
         mov bp, cs
         ;mov  ss, bp
@@ -89,6 +107,7 @@ PSPSize equ 100h
         mov si, ROffSwitchModeEM
         cld                 ;workaround for MS NT5(windows 2000) beta 3
         retf
+%endif
 LS equ 0
 
 VCPIRICall:
@@ -141,6 +160,7 @@ CriticalInitVCPI@167:
         mov di, dx
         dec dh
         mov es, dx
+%ifndef NativeHost
         push 0FFh
         mov ax, 0F2h
         push ax         ;
@@ -173,7 +193,7 @@ CriticalInitVCPI@167:
         add di, 8
         _enddo loop
         mov byte [ROffLDTFree + (16 / 8) + PSP], 11110b ;set bitmask for allocated descriptors
-
+%endif
         mov di, WinSize + 1000h + (OffLastInit - KernelBase) - 4  ;skip first page and
         mov si, OffProtectedStart + (OffLastInit - KernelBase) + PSP - 4
         std
@@ -229,6 +249,7 @@ MovePageRef1@167:
         ret
         LLabel PermanentPart
 
+%ifndef NativeHost
         LLabel DefaultFlatDescriptor
         Descr 0, 0FFFFFh, 0CF93h               ;Flat data descriptor
         LLabel ILoaderEntry0
@@ -295,6 +316,11 @@ MovePageRef1@167:
         int 31h
         mov bl, dl
         add bl, 5
+        mov [dword OffOldVectors + 6], bl
+        mov ax, 204h
+        int 31h
+        mov [dword OffOldVectors], edx
+        mov [dword OffOldVectors + 4], cx
         mov dx, int75handler
         mov cx, bp
         mov ax, 205h
@@ -435,6 +461,7 @@ AllocAndMove@167:
         rep movsd
         ret
 
+%endif
         .8086
 ;RInitMemError:
 ;---------------------------------- startup ----------------------------------
@@ -523,6 +550,17 @@ RInitError:
         int 21h
         _endif
 
+%ifdef NativeHost
+        mov ax, es
+        mov [cs:ROffNativeRootPSP], ax
+        push cs
+        pop ax
+        mov [cs:ROffNativeRMCS], ax
+        mov al, [cs:ROffCPUType]
+        mov [cs:ROffNativeCPU], al
+        push es
+        pop ds
+%else
         inc di
         inc di
         mov dx, di
@@ -596,6 +634,7 @@ CfgDone:
           int 21h
         _endif
 
+%endif
 ;------------ Setup linear disp for all references to 16Stub -----------------
         xor ebx, ebx
         push cs
@@ -608,8 +647,10 @@ CfgDone:
         add [di], ebx
         inc si
         _enddo jnz
+%ifndef NativeHost
         mov ax, [ROffTransferBufferPSize + PSP]  ;patch transfer buffer size
         mov [ROffPatchPointTStSz - 2 + PSP], ax  ;in loader code
+%endif
         shr byte [InitFlags + PSP], 1    ;DPMI/VCPI check sequence?
         _ifnot jnc
           call TryVCPI@167
@@ -636,7 +677,7 @@ TryXMS@167:
           dec byte [ROffXMSBlockNotAllocated + PSP]  ;disable XMS block allocation
           jmp InitRX
         _endif
-        mov word [PatchPoint1 + PSP], 05B4h    ;"mov ah, 5"
+        mov byte [ROffA20State + PSP], 5 ;host owns one local enable
 ;change gate descriptor for PM->RM mode switch in XMS/RAW
 InitRX:
         mov dword [ROffVCPICallDesc + PSP], ROffL0234 + ((VCPISelector + 8) << 16)
@@ -864,6 +905,9 @@ TryRAW@167:
         call IsA20Enabled
         _ifnot je
 PS2@167:
+        mov word [ROffXMC + PSP], ROffA20Port
+        mov [ROffXMC + 2 + PSP], cs
+        mov byte [ROffA20State + PSP], 5
         mov cx, 5000
         in al, 92h
         test al, 2
@@ -882,6 +926,7 @@ PS2@167:
         call IsA20Enabled
         je A20OK@167
 NotPS2@167:
+        mov word [ROffXMC + PSP], ROffA20KBC
         mov si, ROffA20EnableSq + PSP
         _do jmp
         movzx dx, al
@@ -950,8 +995,6 @@ A20OK@167:
         add edx, eax                       ;shift my memory base to bottom of the window
 RawPatch@167:
         mov word [PatchPoint7 + PSP], 0B866h       ;mov eax, ??????
-;@@NoA20Patch:
-        ;mov  word ptr PatchPoint1[PSP], JmpShortCode + ((Exit2-PatchPoint1-2) shl 8)
         mov bx, ROffFreeXMSCount + PSP
         call TranslateMemLimits
         jmp InitRX

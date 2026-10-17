@@ -63,6 +63,10 @@ MouseRHandlerSize equ MouseRHandlerPSize * 16
 ;pointer to current protected mode stack for DPMI client
         LDWord PMStack
         dd 0, 0
+%ifdef NativeHost
+        LDWord NativeFrameNext
+        dd 0
+%endif
         LLabel SwitchTable
         LDWord SwitchTableCR3
         dd 0 ;Must be set during init
@@ -216,11 +220,8 @@ ExitXMS:
           mov dx, [ROffXMHandle]
           call far [ROffXMC]
         _endif
-PatchPoint1:
-        ;mov  ah, 05H            ;local disable A20 always
-        jmp short Exit2         ;may be patched with "mov ah, 05h" (B4 05)
-                                 ;if A20 local enabled with XMS
-        call far [ROffXMC]
+        xor al, al
+        call HostA20              ;release exactly the host's A20 reference
 Exit2:
         cmp byte [ROffHasExitMessage], 0
         _ifnot je
@@ -262,6 +263,7 @@ UnexpectedPMError:
         push ds
         push es
         pushf
+        cli
         mov si, ROffRMStack
         or al, al
         cld
@@ -274,7 +276,12 @@ UnexpectedPMError:
           pop ds
           pop es
         _endif
-%rep 5
+%ifdef NativeHost
+%assign _statesw 8
+%else
+%assign _statesw 6
+%endif
+%rep _statesw
         movsw
 %endrep
         popf
@@ -319,6 +326,11 @@ UnexpectedPMError:
         mov ds, bx
         shr ebx, 28
         lss esp, [bx + F + VMI_ESP]
+        cmp byte [cs:ROffA20Reset], 0
+        je .a20_ready
+        xor al, al
+        call HostA20
+.a20_ready:
         mov es, [bx + F + VMI_ES]
         mov fs, [bx + F + VMI_FS]
         mov gs, [bx + F + VMI_GS]
@@ -360,6 +372,8 @@ PatchPoint:
 
 ;raw switcher to PM from RM with same format, as VCPI
 RawSwitcherToPM:
+        mov al, 1
+        call HostA20              ;a flagged RM call may have released A20
 ;-------------------------- load system tables ------------------------------
         push cs
         mov si, ROffSwitchTable + 12
@@ -384,4 +398,57 @@ RawSwitcherToPM:
         lldt [si]
         ltr [si + 2]
         jmp dword far [si + 4]
+; State 0 needs no action (VCPI or already-enabled RAW). States 5/6
+; name the paired XMS local enable/disable operations. AL=1 enables.
+        LByte A20State
+        db 0
+        LByte A20Reset
+        db 0
+; Private callers keep their real EAX/flags in the switch frame.
+; Leave the common already-enabled path without a register snapshot.
+HostA20:
+        mov ah, 6
+        sub ah, al
+        cmp ah, [cs:ROffA20State]
+        je .done
+        cmp byte [cs:ROffA20State], 0
+        je .done
+        pushad
+        push ds
+        push es
+        mov [cs:ROffA20State], ah
+        call far [cs:ROffXMC]
+        pop es
+        pop ds
+        popad
+.done:  ret
+; Private RAW replacements for the two XMS A20 operations only. Init
+; selects the same port-92 or keyboard-controller method that succeeded.
+        DPROC A20Port
+        and ah, 1
+        shl ah, 1
+        in al, 92h
+        and al, ~2
+        or al, ah
+        out 92h, al
+        retf
+        DPROC A20KBC
+        mov al, 0D1h
+        call A20Wait
+        out 64h, al
+        mov al, 0DDh
+        cmp ah, 5
+        jne .write
+        or al, 2
+.write: call A20Wait
+        out 60h, al
+        retf
+A20Wait:
+        push ax
+        xor cx, cx
+.wait:  in al, 64h
+        test al, 2
+        loopnz .wait
+        pop ax
+        ret
         ESEG Text16

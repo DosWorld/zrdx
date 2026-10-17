@@ -3,6 +3,12 @@
 ;                     (C) 2026, Viacheslav Komenda
 ;NASM version
 
+; Segment windows share the previous initialized-image total. The final
+; package trades ordinary EText padding (224) for Text16 (64)/Text (160),
+; and native init padding for Text16 (32), IData16 (16), Text (176). Selector,
+; callback and stack limits, BSS allowance and page-aligned kernel tables
+; do not grow. Task 100 transfers another 256 native init-padding bytes
+; to Text; the initialized-image total remains constant. Rationale: docs/D09SIZE.MD.
 ;segment definitions for
 ;real mode rezident switchers for ZRDX DPMI host under VCPI
 %assign KernelBase 4*1024*1024
@@ -110,7 +116,11 @@ group DGROUP Text Data
 
 segment Text16
 DPMIHOSTMaxLowData equ XCurSegBaseR
-        SetupRTSeg 800, 800, Text16, EText16
+%ifdef NativeHost
+        SetupRTSeg 1136, 1136, Text16, EText16
+%else
+        SetupRTSeg 864, 864, Text16, EText16
+%endif
          ;RM data for IDPMI host
 segment Data16
         SetupSeg 000, 0, Data16, Text16
@@ -119,16 +129,32 @@ segment Data16
 segment RelocR0
         SetupSeg 88 , 98, RelocR0
 segment IText16
+%ifdef NativeHost
+        SetupRTSeg 1424, 1424, IText16, RelocR0
+%else
         SetupRTSeg 2200, 2400, IText16, RelocR0
+%endif
 segment IData16
+%ifdef NativeHost
+        SetupSeg 496, 600, IData16, IText16
+%else
         SetupSeg 480, 600, IData16, IText16
+%endif
 segment EText
 ExtenderStart equ XCurSegBaseR
 %assign TXCurSegBase XCurSegBase
 %assign XCurSegBase 0
-        SetupSeg 3776, 3900, EText, IData16
+%ifdef NativeHost
+        SetupSeg 0, 0, EText, IData16
+%else
+        SetupSeg 3552, 3900, EText, IData16
+%endif
 segment EData
+%ifdef NativeHost
+        SetupSeg 0, 0, EData, EText
+%else
         SetupSeg 1520, 1600, EData, EText
+%endif
         VSegment EBSS, 200, 200
 %assign ExtenderSize XCurSegBase
 ExtenderFullSize equ ExtenderSize+200
@@ -141,7 +167,9 @@ segment IEText
 LoaderStart equ XCurSegBaseR
 %assign TXCurSegBase TXCurSegBase + XCurSegBase
 %assign XCurSegBase 0
-%ifdef PELDR
+%ifdef NativeHost
+        SetupSeg 0, 0, IEText, EData
+%elifdef PELDR
         SetupSeg 1408, 2600, IEText, EData
 %elifdef RDFLDR
         SetupSeg 2048, 2600, IEText, EData
@@ -149,7 +177,9 @@ LoaderStart equ XCurSegBaseR
         SetupSeg 1712, 2000, IEText, EData
 %endif
 segment IEData
-%ifdef PELDR
+%ifdef NativeHost
+        SetupSeg 0, 0, IEData, IEText
+%elifdef PELDR
         SetupSeg 256, 600, IEData, IEText
 %elifdef RDFLDR
         SetupSeg 256, 600, IEData, IEText
@@ -165,7 +195,11 @@ LoaderFullSize equ LoaderSize+3000
 segment Text
 %assign OffProtectedStart XCurSegBaseR
 %assign XCurSegBase KernelBase
-        SetupRTSeg 7680, 9000, Text, IEData
+%ifdef NativeHost
+        SetupRTSeg 15456, 15456, Text, IEData
+%else
+        SetupRTSeg 7840, 9000, Text, IEData
+%endif
 segment IText
         SetupSeg 0000, 000, IText, Text
 segment Data
