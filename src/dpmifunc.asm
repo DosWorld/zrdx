@@ -153,7 +153,7 @@ FreeDescriptor1:
         _do
           bt dword [OffLDTDOS], ebp
           _ifnot jnc
-            mov esi, [ebp*8 + OffLDT]
+            mov esi, [ebp*8 + OffLDT + 2]
             shr esi, 4
             cmp bx, si
             je RetThis@10
@@ -182,7 +182,7 @@ RetThis@10:
         FnRet
 
         DPMIFn 0, 6
-        call CheckSelector  ;(bx)
+        call CheckSelectorRead  ;(bx)
         mov ch, [ebp + 7]
         mov cl, [ebp + 4]
         mov dx, [ebp + 2]
@@ -260,7 +260,7 @@ CheckACC@10:
         FnRet
 
         DPMIFn 0, 0Ah
-        call CheckSelector  ;(bx)
+        call CheckSelectorRead  ;(bx)
         push dword [ebp]
         push edx
         mov edx, [ebp + 4]
@@ -276,7 +276,7 @@ CheckACC@10:
         FnRet
 
         DPMIFn 0, 0Bh
-        call CheckSelector
+        call CheckSelectorRead
         mov esi, [ebp]
         mov [es:edi], esi
         mov esi, [ebp + 4]
@@ -484,14 +484,21 @@ CheckSelectorInDX:
         DPROC CheckSelector
         movzx esi, bx
 CheckSelector1:
+        mov ebp, esi
+        shr ebp, 3
+        bt dword [OffLDTDOS], ebp
+        jc DPMIError2InvSel
+        jmp short CheckSelectorRead1
+
+        DPROC CheckSelectorRead
+        movzx esi, bx
+CheckSelectorRead1:
         ;xor  esi, 7
         test esi, 4
         jz DPMIError2InvSel     ;client selector must points to LDT RPL 0-3
         shr esi, 3
         bt dword [OffLDTFree], esi
         jnc DPMIError2InvSel
-        bt dword [OffLDTDOS], esi
-        jc DPMIError2InvSel
         lea ebp, [esi*8 + OffLDT]
         ret
 

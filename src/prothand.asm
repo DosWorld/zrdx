@@ -658,6 +658,15 @@ AbsSet@105:
 %ifndef VMM
         call FreeHMPages
         call CleanMemVector
+        movzx eax, word [OffLDTLimit]
+        add eax, OffLDT + 1
+        sub eax, (OffLastInit + 0FFFh) & ~0FFFh
+        _ifnot jbe
+          push eax
+          push (OffLastInit + 0FFFh) & ~0FFFh
+          push 0
+          call FreePages
+        _endif
         call ReturnFreePool
 %endif
 ;only for PL0
