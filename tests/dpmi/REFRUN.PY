@@ -4,13 +4,14 @@ from pathlib import Path
 import hashlib,json,runpy,shutil
 root=Path(__file__).resolve().parents[2]
 env=runpy.run_path(str(root/'tests/CHECK.PY'))
+cfg=env['CFG']
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--work',required=True,type=Path)
 parser.add_argument('--fixtures',required=True,type=Path)
 parser.add_argument('--bound',type=Path,help='qualified CHECK work tree for bound LE/PE/RDF comparison')
 args=parser.parse_args()
 w=args.work.resolve()
-if not w.is_relative_to(Path('/private/tmp')): raise ValueError('work must be private scratch')
+cfg['check_scratch'](w)
 w.mkdir(parents=True,exist_ok=True)
 for width in (16,32):
  for name in ('ENTRY','BRG','LIM'):
@@ -46,7 +47,7 @@ for width in (16,32):
  if 'External DPMI 1687: present' not in (w/('HOST'+str(width)+'.LOG')).read_text():fail.append('HOST'+str(width))
 if args.bound and 'External DPMI 1687: present' not in (w/'BHOST.LOG').read_text():fail.append('bound provider')
 if 'External DPMI 1687: absent' not in (w/'AFTER.LOG').read_text():fail.append('provider after unload')
-r={'provider':'HDPMI16/HDPMI32','core':'normal','failures':fail,'clients':{n:hashlib.sha256((w/(n+('.EXE' if n in ('LE','RDF','PE','PROBE') else '.COM'))).read_bytes()).hexdigest() for n in expected},'hosts':{str(n):hashlib.sha256(Path('/Users/admin/dosbox-x/C/HX/BIN/HDPMI'+str(n)+'.EXE').read_bytes()).hexdigest() for n in (16,32)}}
+r={'provider':'HDPMI16/HDPMI32','core':'normal','failures':fail,'clients':{n:hashlib.sha256((w/(n+('.EXE' if n in ('LE','RDF','PE','PROBE') else '.COM'))).read_bytes()).hexdigest() for n in expected},'hosts':{str(n):hashlib.sha256((cfg['require']('ZRDX_DRIVE_C')/'HX/BIN'/('HDPMI'+str(n)+'.EXE')).read_bytes()).hexdigest() for n in (16,32)}}
 if args.bound:r['tools']={n:hashlib.sha256((w/n).read_bytes()).hexdigest() for n in env['TOOLS']}
 env['write'](w/'RESULT.JSN' ,json.dumps(r,indent=2)+'\n');print(r)
 

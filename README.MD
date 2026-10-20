@@ -10,13 +10,15 @@
 
 # 🔥 ZRDX — Zurenava DOS Extender 🔥
 
-**A DOS4G/W-compatible 32-bit DOS extender, rebuilt with free tools.**
+**A DOS4G/W-compatible 32-bit DOS extender — rebuilt with free tools, and still tiny.**
 
 [![License: CC0](https://img.shields.io/badge/license-CC0%201.0-brightgreen?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-MS--DOS-blue?style=for-the-badge&logo=windowsterminal&logoColor=white)](#-quick-start)
-[![Version](https://img.shields.io/badge/version-0.51OSE-orange?style=for-the-badge)](history.txt)
+[![Release](https://img.shields.io/badge/release-fix39-orange?style=for-the-badge)](docs/HISTORY.MD)
+[![DPMI](https://img.shields.io/badge/DPMI-0.9%20%E2%80%94%2049%2F49-red?style=for-the-badge)](docs/D09COV.MD)
+[![Assembler](https://img.shields.io/badge/core-NASM%20assembly-purple?style=for-the-badge)](#-building-from-source)
 
-**⚡ stub 12 KB ⚡ DPMI 0.9 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡**
+**⚡ stub 14 KB ⚡ DPMI 0.9: 49 of 49 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡ LE · PE · RDOFF2 ⚡**
 
 *Original author: Sergey Belyakov (1998-1999)
 Open source edition: DosWorld (2026)*
@@ -28,25 +30,26 @@ Open source edition: DosWorld (2026)*
 ## 🚀 What is it?
 
 ZRDX is a **DOS extender**: a tiny stub that is *bound* to the start of your 32-bit
-executable. When the program starts, the stub switches the PC to protected mode,
-loads the main module and gives it a flat 32-bit world — exactly what DOS/4G(W)
-does, but small, fast and free.
+executable. The program starts, the stub switches the PC to protected mode, loads
+the main module and hands it a flat 32-bit world — exactly what DOS/4G(W) does,
+but small, free and hackable. No `DOS4GW.EXE` next to your program. 🎉
+
+It is also a **standalone DPMI 0.9 host** (`zrxdpmi.exe`) for 16-bit and 32-bit clients.
 
 | | |
 |---|---|
-| **Targets** | programs built for **DOS4G/W**, **PMODE/W**, **DOS32A**, **WDOSX** with Watcom C/C++, TMT Pascal, LadSoft C, … |
-| **Formats** | **LE** (DOS4G/W style), flat 32-bit **PE** (no imports), **RDOFF2** (`.rdf`, NASM + RLINK) |
-| **Memory** | access to all physical memory (up to **4 GB**) |
-| **DPMI** | DPMI 0.9 compatible (int 31h), except functions 0A00h-0B03h |
-| **DOS calls** | translates all functions translated by PMODE/W (except identification) and almost all of DOS4G/W's |
-| **Hosts** | runs under **DPMI**, **VCPI**, **XMS** and **RAW** (it picks what is available) |
-| **Long names** | **LFN API** (int 21h, AX=71xxh) with buffer translation; `zrxbind` and the stub use it when the system provides it |
-| **Clipboard** | **Windows clipboard API** (int 2Fh, AX=17xxh) is reflected to real mode, data buffers (text, bitmaps) are translated both ways |
-| **Size** | the packed stub is only **13 312 bytes** |
-| **Tools** | built with **NASM + Open Watcom + UPX** — no proprietary compilers |
+| 🎯 **Targets** | programs built for **DOS4G/W**, **PMODE/W**, **DOS32A**, **WDOSX** with Watcom C/C++, TMT Pascal, LadSoft C, … |
+| 📦 **Formats** | **LE** (DOS4G/W style), flat 32-bit **PE32** EXE (no imports, relocations supported), **RDOFF2** (`.rdf`, NASM + RLINK) |
+| 🧠 **Memory** | all physical memory (up to **4 GB**); in a test with 3000 MB RAM one `malloc` returned a 2995 MB block (DOS/4GW: 62 MB) |
+| 🔌 **DPMI** | **DPMI 0.9, all 49 specified INT 31h functions** — 42 full, 6 paging no-ops (memory is nonpageable), vendor lookup 0A00h without vendors. [Coverage report](docs/D09COV.MD) |
+| 🖥️ **Hosts** | runs under **DPMI**, **VCPI**, **XMS** and **RAW**; it picks what is available |
+| 🔁 **DOS calls** | translates everything PMODE/W translates (except identification) and almost all of DOS4G/W |
+| 📁 **Long names** | **LFN API** (int 21h, AX=71xxh) with buffer translation |
+| 📋 **Clipboard** | **Windows clipboard API** (int 2Fh, AX=17xxh), text and bitmaps translated both ways |
+| 📏 **Size** | every packed stub is **14 336 bytes** |
+| 🛠️ **Tools** | built with **NASM + Open Watcom + UPX** — no proprietary compilers |
 
-> 💡 If you call DOS directly, the list of all translated functions is in
-> [`src/extender.asm`](src/extender.asm).
+> 💡 The list of all translated DOS functions is in [`src/extender.asm`](src/extender.asm).
 
 ---
 
@@ -61,11 +64,11 @@ Everything you need is in [`bin/`](bin):
 | `stub-pe.exe` | the stub for **PE** programs |
 | `stub-rdf.exe` | the stub for **RDOFF2** (`.rdf`) programs |
 | `zrxsetup.exe` | changes the settings of a bound program |
+| `zrxdpmi.exe` | standalone **DPMI 0.9 host** (RAW / XMS / VCPI): `zrxdpmi PROGRAM.COM` |
 
-> ⚠️ `zrxbind.com` takes the stubs **only from its own directory** (the directory
-> where `zrxbind.com` lies, found via the DOS environment block, DOS 3.0+) — keep
-> `zrxbind.com` and the `stub-*.exe` files together. The stub is chosen by the
-> format of the input file; you do not pick it.
+> ⚠️ `zrxbind.com` takes the stubs **only from its own directory** (found via the DOS
+> environment block, DOS 3.0+) — keep `zrxbind.com` and the `stub-*.exe` files together.
+> The stub is chosen by the format of the input file; you do not pick it.
 
 ```bat
 :: 1. build a 32-bit DOS4G/W-style program (Watcom example)
@@ -84,14 +87,21 @@ Copyright(C) 2026, Viacheslav Komenda
 hello from 32-bit
 ```
 
+Want a DPMI host for a separate DPMI client instead of binding? Run it through the host:
+
+```bat
+zrxdpmi myclient.com      :: the host owns discovery (1687h) for this command only
+```
+
+The first client fixes the bitness of the VM — do not mix 16-bit and 32-bit clients in one run.
+
 ---
 
 ## 🔗 Binding: `zrxbind`
 
 The stub is **bound to the start of the executable**. `zrxbind` looks at the
 input file and picks the stub: `LE` → `stub-le.exe`, `PE` → `stub-pe.exe`,
-`RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use the
-commands `-r` or `-c`:
+`RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`:
 
 | Command | What it does |
 |---|---|
@@ -110,7 +120,7 @@ zrxbind -c doom.exe doomz.exe       :: doomz.exe = doom.exe + ZRDX
 | Format | What the loader does | Limits |
 |---|---|---|
 | **LE** | loads objects, applies fixups, creates selectors (16/32-bit, flat) | as in DOS4G/W |
-| **PE** | allocates the image anywhere, loads sections, applies base relocations, gives flat 4 GB code/data selectors, starts at the entry point | **no imports** (DOS-style PE linked with `wlink system nt`); the image must have a `.reloc` section; stack = `SizeOfStackReserve` (64 KB … 4 MB) |
+| **PE** | allocates the image at any free address, loads sections, applies **base relocations** when the address differs from `ImageBase`, gives flat 4 GB code/data selectors, starts at the entry point | PE32/i386 EXE only; **no imports, DLLs, delay imports or TLS** (clear diagnostic); a `.reloc` directory is required unless the image lands on its `ImageBase`; stack = `SizeOfStackReserve` (64 KB … 4 MB) |
 | **RDOFF2** | loads `code`/`data`/`bss`, applies relocations, starts at the exported symbol `start` (or at the code start); a return stub is on the stack, so `RET` ends the program | single module: no `import`, `library`, `segrelo`, `farimport`; `EAX`/`EBX` = linear address of the code, `EDX` = linear address of the PSP |
 
 ```bat
@@ -125,6 +135,26 @@ Want ZRDX bound at **link time**? Extract the stub and give it to `wlink`:
 zrxbind -w zrdx.exe
 wlink ... option stub=zrdx.exe
 ```
+
+---
+
+## 🔌 DPMI 0.9 coverage
+
+The built-in host was checked against the DPMI 0.9 specification (in [`docs/`](docs)):
+
+| Class | Calls | Notes |
+|---|---|---|
+| ✅ Full | **42** | descriptors, DOS memory, interrupts and exceptions, real-mode translation, callbacks, memory, physical mapping, virtual IF, **debug watchpoints 0B00h-0B03h** |
+| 🟡 No-op | **6** | 0600h-0603h, 0702h, 0703h: page lock / demand paging succeed, because memory is nonpageable |
+| 🔎 Lookup | **1** | 0A00h: optional vendor API lookup; no vendors, so every name returns CF=1 |
+
+**49 of 49** functions are in the dispatch table, for 16-bit and 32-bit clients. Current
+qualification: **55 native cases** and **17 bound API cases** on each of RAW, XMS and VCPI,
+99 loader results and 11 tooling tests. Details, limits and evidence: [`docs/D09COV.MD`](docs/D09COV.MD),
+[`docs/D09WORK.MD`](docs/D09WORK.MD), [`docs/D09ABI.MD`](docs/D09ABI.MD).
+
+> Honest note: memory is **not swapped to disk**. A deferred plan exists
+> ([`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD)); the dormant `src/vmm.asm` is not qualified.
 
 ---
 
@@ -218,7 +248,7 @@ Only **free tools**. No Borland C, no TASM, no TLINK, no MS link.
 
 | Tool | Version | Used for |
 |---|---|---|
-| [**NASM**](https://nasm.us/) | **3.02** (or newest), built with `-Ox` | the whole stub and the binder |
+| [**NASM**](https://nasm.us/) | 3.01 on the host, 0.98.39 in DOS | the whole stub and the binder |
 | [**Open Watcom**](https://github.com/open-watcom/open-watcom-v2) | `wmake`, `wlink`, `wcl` | linking and the C tools |
 | [**UPX**](https://upx.github.io/) | 5.x (tested with 5.1.0) | packing the stubs, `zrxbind.com` and `zrxsetup` |
 
@@ -226,74 +256,110 @@ Set the `WATCOM` environment variable, put the tools in `PATH` and run, in `src/
 
 ```bat
 wmake                 :: zrxbind.com, zrxsetup.exe and the stubs (stub-le/pe/rdf.exe) in binder\
-wmake STUB=zrdx.exe   :: the same, but the LE stub is not UPX-packed
+wmake STUB=zrdx.exe PESTUB=zrdxpe.exe RDFSTUB=zrdxrdf.exe   :: unpacked stubs
 wmake install         :: copy zrxbind.com, zrxsetup.exe and the stubs to ..\bin
 wmake clean
 ```
 
-`makefile` assembles with `NASMOPT = -Ox`. NASM 0.98.39 also works, use `wmake NASMOPT=-O1` for it (NASM 3.x with `-O1` produces a stub that does not start).
+`makefile` assembles with `NASMOPT = -O9` (accepted by NASM 0.98.39 and 3.x). The full
+reproducible build and check, which runs everything under DOSBox-X, is one command:
 
-### 🧪 Tests of the RDF loader
-
-`tests/rdf` holds about 50 small self-checking programs for `stub-rdf.exe` (NASM, 32-bit). Each prints `ok` or `FAIL`; `T02` checks the exit code, `T13` the command tail (run with `ABC`), `N01`..`N03` must be rejected by the loader. Programs are built both linked (`rlink rdf`, one merged segment) and raw (`nasm -f rdf` output bound as is, separate code/data/BSS segments, files `*R.EXE`).
-
-```bat
-cd tests\rdf
-build                 :: needs nasm, rlink, ..\..\bin\zrxbind.com + stubs
-run                   :: results in RUN.LOG
-clean
+```sh
+python3 tests/CHECK.PY --work /tmp/ZRXWORK
 ```
 
-Clipboard tests (`T34`-`T37`) and the LFN test (`T40`) run as LE programs (`clip.bat`); they skip themselves when the service is absent. For the bitmap and big-data cases load `clipdrv` (the real mode driver) with the host's clipboard API switched off.
+The runner needs `ZRDX_DOSCONF` (a dosbox-x config), `ZRDX_DRIVE_C` (DOS tools) and
+`ZRDX_DRIVE_D` (Open Watcom); the scratch root `ZRDX_SCRATCH` defaults to `/tmp`.
+All variables, the native host, QEMU qualification, installation and reports:
+[`docs/BUILD.MD`](docs/BUILD.MD). Do not mix stubs from different builds.
 
-Covered: DPMI selectors, memory stress (random allocate/resize/free with patterns), out-of-memory and bad sizes, exception handlers (DF), relocations (code/data/BSS, addends, 16-bit), `start` lookup, return by `RET`, PSP and registers at entry, 1 MB BSS, 70 KB data, deep recursion, DOS file I/O with buffers larger than the transfer buffer, DPMI 0400h/0501h/0502h, modules linked together.
+### 🧪 Tests
+
+| Where | What |
+|---|---|
+| `tests/CHECK.PY` | the full runner: builds in scratch, runs all suites, writes `RESULT.JSN` |
+| `tests/rdf/` | about 50 self-checking programs for the RDF and LE loaders (each prints `ok` or `FAIL`) |
+| `tests/dpmi/` | native DPMI host fixtures, 55 cases, RAW / XMS / VCPI, QEMU for CPU-fault checks |
+| `tests/pe/`, `tests/mz/`, `tests/bind/` | generated PE, MZ-aligner and binder inputs, valid and damaged |
+| `tests/clip/` | clipboard mock |
+| `tests/mem/` | `malloc` size comparison with DOS/4GW and CauseWay |
+
+Covered: DPMI selectors, memory stress (random allocate/resize/free with patterns), out-of-memory,
+exception handlers, relocations, `start` lookup, PSP and registers at entry, 1 MB BSS, deep recursion,
+DOS file I/O larger than the transfer buffer, LFN and clipboard translation.
 
 ### 📏 Memory available to `malloc`
 
-`tests/mem` has a small Watcom C program (it prints the largest block one `malloc` can return), batch files, and the built `memd.exe` (DOS/4GW), `memc.exe` (CauseWay) and `memz.exe` (ZRDX). In DOSBox-X with 3000 MB of RAM ZRDX gives one block of 2995 MB, DOS/4GW only 62 MB; CauseWay gives about 1 GB through its swap file. The numbers are in `tests/mem/README.TXT`.
+`tests/mem` has a small Watcom C program (it prints the largest block one `malloc` can return) and batch files that build `memd.exe` (DOS/4GW), `memc.exe` (CauseWay) and `memz.exe` (ZRDX); see [`docs/MEMTEST.MD`](docs/MEMTEST.MD). In DOSBox-X with 3000 MB of RAM ZRDX gave one block of 2995 MB, DOS/4GW only 62 MB; CauseWay gave about 1 GB through its swap file (old measurement, recorded in [`docs/HISTORY.MD`](docs/HISTORY.MD)).
 
 ### 🔬 Experimental: VMM
 
-`src/vmm.asm` is an experimental virtual memory manager. To try it, comment out
-`%assign Release 1` and uncomment `%assign VMM 1` in `segdefs.asm`. It is very
-incomplete: pages are not freed under VCPI (so use it with RAW/XMS only), page
-unlocking is not implemented, and the swap file handling is not quite right (it
-has to be reopened after each resize and deleted on exit). Its speed is no worse
-than DOS/4G(W).
+`src/vmm.asm` is a dormant virtual memory manager. It is **not** part of any release build
+and is not qualified. To try it, comment out `%assign Release 1` and uncomment
+`%assign VMM 1` in `segdefs.asm`. Known problems: pages are not freed under VCPI (use RAW/XMS),
+page unlocking is missing, and the swap file is reopened after each resize and not deleted on exit.
+Plan: [`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD).
 
 ---
 
 ## 🗂️ Repository
 
 ```
-bin/        prebuilt: zrxbind.com, zrxsetup.exe, stub-le.exe, stub-pe.exe, stub-rdf.exe
+bin/        prebuilt: zrxbind.com, zrxsetup.exe, stub-le.exe, stub-pe.exe,
+            stub-rdf.exe, zrxdpmi.exe (standalone DPMI host)
 src/        the sources (NASM) and the makefile
-  zrdx.asm      main file, includes everything
+  zrdx.asm      main file, includes everything (builds stub-le.exe)
+  zrdxpe.asm    PE stub root     zrdxrdf.asm  RDOFF2 stub root
+  zrxdpmi.asm   standalone DPMI host (with nathost.asm)
   gmacros.asm   macros of virtual segments and labels
   segdefs.asm   segment layout and sizes
   extender.asm  DOS/BIOS call translation tables and handlers
   dpmifunc.asm  DPMI functions (int 31h)
-  leldr.asm     LE loader        (zrdx.asm builds stub-le.exe)
-  peldr.asm     PE loader        (zrdxpe.asm builds stub-pe.exe)
-  rdfldr.asm    RDOFF2 loader    (zrdxrdf.asm builds stub-rdf.exe)
+  realinit.asm, protinit.asm  backend detection, entering PM
+  prothand.asm, realhand.asm  interrupts and mode switches
+  mem.asm, smm.asm            memory services (smm = active backend)
+  leldr.asm / peldr.asm / rdfldr.asm   LE, PE32, RDOFF2 loaders
   binder/       zrxbind.com source (bnd.asm, a .COM program)
   aligner/      stub aligner
   zrxsetup.c    the settings utility
-tests/rdf/  loader and DPMI host tests (NASM sources and DOS batch files)
-tests/mem/  malloc size comparison with DOS/4GW and CauseWay
-history.txt  changes by version
-LICENSE      CC0 1.0
+tests/      CHECK.PY and the suites above
+docs/       BUILD.MD, D09COV.MD (DPMI coverage), backlog.txt, HISTORY.MD, plans
+history.txt changes by version
+LICENSE     CC0 1.0
 ```
+
+Start with [`docs/README.MD`](docs/README.MD) — the project guide.
 
 ---
 
 ## 📜 History
 
-Version **0.51OSE**: the project moved to NASM 0.98.39 + Open Watcom + UPX, the
-settings were moved to the end of the bound file, `zrxsetup` rewritten, `zrxbind`
-became a `.COM` that reads the stubs from its directory, PE and RDOFF2 loaders
-were added. Full
-history in [`history.txt`](history.txt).
+Version **0.51OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
+to the end of the bound file, `zrxsetup` was rewritten, `zrxbind` became a `.COM` that reads the
+stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix39**: DPMI 0.9
+hardening and the native `zrxdpmi.exe` host, 14 336-byte packed stubs. See
+[`docs/HISTORY.MD`](docs/HISTORY.MD), the plans in [`docs/backlog.txt`](docs/backlog.txt) and
+[`history.txt`](history.txt).
+
+---
+
+## ⚠️ Notes and limitations
+
+- **Memory is not swapped to disk.** Swap-file paging is only a deferred plan ([`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD)).
+- **DPMI:** 0.9 only; DPMI 1.0 is not implemented and not planned. There are no vendor extensions (0A00h answers `CF=1`).
+- **PE:** one EXE, no imports, DLLs, delay imports or TLS. DLL loading is a deferred plan ([`docs/PEPLAN.MD`](docs/PEPLAN.MD)).
+- **How it was verified:** the full campaign (55 native, 17 bound, 99 loader results) was recorded on the
+  reference machine on 2026-10-18 under DOSBox-X and QEMU. CPU-fault checks and the VCPI debug-watch checks
+  need QEMU with a FreeDOS image, which is not shipped. DOSBox-X alone cannot run them. On 2026-10-20 the PE
+  loader (including relocations, 24 cases) and a fresh rebuild of all six binaries were re-checked; the QEMU
+  campaign was not repeated.
+- **Test setup is local:** the runners take DOSBox-X, the DOS tool tree, Open Watcom and the disk image from
+  environment variables (see above); none of them is shipped.
+- **Recorded source fingerprint:** `docs/TOOLS.JSN` holds the source hash from 2026-10-18; sources changed
+  afterwards but a rebuild gives byte-identical binaries.
+- **Specifications in `docs/`** (`DPMI09.HTM`, `DPMI10.TXT`, `VCPI.TXT`) are third-party documents kept for
+  reference. Their copyright stays with the original owners; the CC0 license applies to the ZRDX sources only.
+- **`src/vmm.asm` is experimental** and not part of any release build.
 
 ---
 

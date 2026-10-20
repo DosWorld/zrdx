@@ -25,8 +25,7 @@ def main():
     parser.add_argument("--timeout", type=int, default=120)
     args = parser.parse_args()
     work = args.work.resolve()
-    if not work.is_relative_to(Path("/private/tmp")):
-        raise ValueError("work must be an owned /private/tmp directory")
+    ENV["CFG"]["check_scratch"](work)
     work.mkdir(parents=True, exist_ok=True)
     source_digest = hashlib.sha256()
     shutil.copytree(ROOT / "src", work / "src", dirs_exist_ok=True)

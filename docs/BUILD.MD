@@ -5,17 +5,34 @@ C/link tools. TP7, FPC and emu2 do not build this project.
 
 ## Dependencies and environment
 
-- Host NASM 3.01: /usr/local/bin/nasm; Python 3 for tests/CHECK.PY.
-- DOSBox-X 2024.03.01: bin/dosbox-x.
-- Launcher: bin/dosbox-x.sh.
-- Configuration: dosbox-x/dosbox.conf.
-- C: mounts dosbox-x/C; D: mounts admin/dosbox-x/D.
-- C:\BIN\NASM.EXE: 0.98.39; C:\BIN\UPX.EXE: 5.1.0; RLINK.EXE.
-- D:\WATCOM\BINW: WMAKE, WLINK, WCL/WCL386, version 2.0 beta,
-  dated 2025-03-21. The compiler directory is WATCOM, not WATCOME.
+- Host: NASM 3.01 and Python 3.9+ (tests/CHECK.PY and the other runners).
+- DOSBox-X (tested with 2024.03.01) for the DOS build and fixtures.
+- A DOS tool tree (drive C:) with BIN\NASM.EXE (0.98.39), UPX.EXE (5.1.0),
+  RLINK.EXE and, for the HDPMI comparison, HX\BIN\HDPMI16/32.EXE.
+- Open Watcom (drive D:): WATCOM\BINW with WMAKE, WLINK, WCL/WCL386
+  (tested with version 2.0 beta dated 2025-03-21); the directory is
+  WATCOM, not WATCOME.
+- Optional: QEMU (tested with 10.1.2) and a FAT16 FreeDOS seed image.
 
-A recursive search of C:, including hidden files and directory symlinks,
-found one NASM.EXE. Other mounted disks were not part of that claim.
+The runners read the host settings from environment variables; nothing
+is hard-coded. Missing required settings stop the run with a message.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| ZRDX_DOSCONF | dosbox-x.conf copied as the private template | required |
+| ZRDX_DRIVE_C | folder mounted as C: (DOS tools) | required |
+| ZRDX_DRIVE_D | folder mounted as D: (Open Watcom) | required |
+| ZRDX_DOSBOX | dosbox-x executable | dosbox-x from PATH |
+| ZRDX_SCRATCH | root of all scratch trees; --work must be inside | /tmp |
+| ZRDX_DISK | FreeDOS FAT16 seed image for QEMU (QCHECK.PY --image) | none |
+
+```sh
+export ZRDX_DOSCONF=$HOME/dosbox-x/dosbox.conf
+export ZRDX_DRIVE_C=$HOME/dosbox-x/C
+export ZRDX_DRIVE_D=$HOME/dosbox-x/D
+```
+
+A recursive search of C: found one NASM.EXE on the reference machine.
 Host NASM produces OMF objects accepted by the installed DOS WLINK.
 Inherited host warnings concern two 16-bit segment relocations emitted
 inside 32-bit data and the old .8086 directive; no assembler errors occur.
@@ -25,7 +42,7 @@ inside 32-bit data and the old .8086 directive; no assembler errors occur.
 From the checkout on the host:
 
 ```sh
-python3 tests/CHECK.PY --work /private/tmp/ZRXWORK
+python3 tests/CHECK.PY --work /tmp/ZRXWORK
 ```
 
 The runner copies src/, bin/ and tests/ into scratch. It preserves the
@@ -58,9 +75,9 @@ Source fingerprint BUILD.ID prevents --skip-build after source changes.
 The runner leaves build products and logs in scratch for inspection.
 
 ```sh
-python3 tests/CHECK.PY --work /private/tmp/ZRXWORK --skip-build --bugs-only
-python3 tests/CHECK.PY --work /private/tmp/ZRXRAW --profile raw --bugs-only
-python3 tests/CHECK.PY --work /private/tmp/ZRXVCPI --profile vcpi --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRXWORK --skip-build --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRXRAW --profile raw --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRXVCPI --profile vcpi --bugs-only
 ```
 
 --bugs-only omits the long legacy campaign. XMS disables EMS; RAW also
@@ -78,7 +95,7 @@ The native host is outside ordinary wmake all/install. Build and test it
 in a private copy with the same NASM and DOS WLINK dependencies:
 
 ```sh
-python3 tests/dpmi/NATIVE.PY --work /private/tmp/ZRXNAT --build-only
+python3 tests/dpmi/NATIVE.PY --work /tmp/ZRXNAT --build-only
 ```
 
 NATIVE.PY defaults to DOSBox core=normal; --core auto/dynamic selects a
@@ -93,7 +110,7 @@ clients within one host invocation. A new invocation is a new VM.
 a private FreeDOS disk image, with HIMEMX for XMS and JEMMEX for VCPI.
 The QEMU executable is an explicit dependency, not shipped by the repo.
 Current evidence uses source-built QEMU 10.1.2, -cpu pentium and 32 MB.
-The default disk seed is /Users/admin/dosbox-x/D/hdd-fd14.img; it is copied,
+The disk seed is $ZRDX_DISK (or --image); it is copied,
 not modified. QCHECK.PY accepts --image for another compatible FAT16 seed.
 NATIVE.JSN/RESULT.JSN record source/input hashes, provider and failures.
 
@@ -187,8 +204,9 @@ imports, TLS or delay imports. Proposed DLL APIs in PEPLAN.MD do not exist.
   MAPEXIT/CBEXIT reuse the parameterized real-mode T59X launcher.
 - tests/clip/MOCK.ASM -> DOS NASM -f bin -> MOCK.COM. It retains raw
   clipboard bytes for translation tests and chains unrelated INT 2Fh.
-- tests/pe/HELLO.ASM -> host NASM -> HELLO.BIN; GEN.PY -> .PE inputs
-  and RUN.BAT -> zrxbind -> EXE -> RESULT.LOG (one valid, 17 invalid).
+- tests/pe/HELLO.ASM, RELOC.ASM (linked at three bases) -> host NASM
+  -> .BIN; GEN.PY -> 24 .PE inputs (3 valid, 21 invalid) and RUN.BAT
+  -> zrxbind -> EXE -> RESULT.LOG.
 - tests/mz/GEN.PY -> six EXE inputs and RUN.BAT -> aligner -> RESULT.LOG;
   verify() checks exact payload preservation and unchanged rejected files.
 - tests/bind/GEN.PY -> four BAD inputs and RUN.BAT -> binder -> RESULT.LOG.
@@ -209,8 +227,8 @@ observed CPU profiles; it is not a full release qualification command.
 
 To reproduce independent-provider comparisons, build native fixtures,
 assemble PORTABLE=1 LIM16/32 for valid-input comparison as documented in
-D09WORK.MD, then run REFRUN.PY --work /private/tmp/ZRXREF --fixtures
-/private/tmp/PORTABLE --bound /private/tmp/ZRXWORK. The --bound argument
+D09WORK.MD, then run REFRUN.PY --work /tmp/ZRXREF --fixtures
+/tmp/PORTABLE --bound /tmp/ZRXWORK. The --bound argument
 names a qualified CHECK work tree; LE/RDF status 42 and quiet PE/PROBE
 output are checked under HDPMI32. RUNS.TSV -> REPORT.PY -> D09RUNS.JSN
 retains the actual final input hashes; SIZES.PY and PERF.PY generate the
@@ -252,13 +270,13 @@ expanded native QEMU campaign on a busy host; this is a runner watchdog,
 not a change to DOS memory, callback or stack limits. For matched timings:
 
 ```sh
-python3 tests/dpmi/QCHECK.PY --qemu /private/tmp/QEMU09/BUILD/qemu-system-i386 \
-  --fixtures /private/tmp/ZRXNAT --native-host /path/to/previous/ZRXDPMI.EXE \
-  --work /private/tmp/ZRTPRE --profile raw --case LATENC --icount
-python3 tests/dpmi/QCHECK.PY --qemu /private/tmp/QEMU09/BUILD/qemu-system-i386 \
-  --fixtures /private/tmp/ZRXNAT --native-host /private/tmp/ZRXNAT/ZRXDPMI.EXE \
-  --work /private/tmp/ZRTPOST --profile raw --case LATENC --icount
-python3 tests/dpmi/PERF.PY --before /private/tmp/ZRTPRE --after /private/tmp/ZRTPOST
+python3 tests/dpmi/QCHECK.PY --qemu /tmp/QEMU09/BUILD/qemu-system-i386 \
+  --fixtures /tmp/ZRXNAT --native-host /path/to/previous/ZRXDPMI.EXE \
+  --work /tmp/ZRTPRE --profile raw --case LATENC --icount
+python3 tests/dpmi/QCHECK.PY --qemu /tmp/QEMU09/BUILD/qemu-system-i386 \
+  --fixtures /tmp/ZRXNAT --native-host /tmp/ZRXNAT/ZRXDPMI.EXE \
+  --work /tmp/ZRTPOST --profile raw --case LATENC --icount
+python3 tests/dpmi/PERF.PY --before /tmp/ZRTPRE --after /tmp/ZRTPOST
 ```
 
 Save the previous installed host before replacement. Use the same freshly
@@ -279,36 +297,36 @@ VERIFY.PY must build CONTROL for the matching real/VCPI profile.
 The commands use the existing recorded environment, not an independent host.
 
 ```sh
-python3 tests/CHECK.PY --work /private/tmp/ZRLOAD
-python3 tests/dpmi/NATIVE.PY --work /private/tmp/ZRNAT --build-only
+python3 tests/CHECK.PY --work /tmp/ZRLOAD
+python3 tests/dpmi/NATIVE.PY --work /tmp/ZRNAT --build-only
 python3 - <<'PYRUN'
 from pathlib import Path
 import runpy
 import subprocess
 import sys
 
-qemu = '/private/tmp/QEMU09/BUILD/qemu-system-i386'
-native = Path('/private/tmp/ZRNAT')
+qemu = '/tmp/QEMU09/BUILD/qemu-system-i386'
+native = Path('/tmp/ZRNAT')
 cases = runpy.run_path('tests/dpmi/CATALOG.PY')['NATIVE']
 for profile in ('raw', 'xms', 'vcpi'):
     command = [sys.executable, 'tests/dpmi/QCHECK.PY', '--qemu', qemu,
                '--fixtures', str(native), '--native-host', str(native / 'ZRXDPMI.EXE'),
-               '--work', '/private/tmp/ZRN' + profile.upper(), '--profile', profile,
+               '--work', '/tmp/ZRN' + profile.upper(), '--profile', profile,
                '--timeout', '600']
     extra = [] if profile == 'vcpi' else ['DRSAVE', 'A20R' if profile == 'raw' else 'A20X']
     for name in list(cases) + extra:
         command += ['--case', name]
     subprocess.run(command, check=True)
-    bound = Path('/private/tmp/ZRB' + profile.upper())
+    bound = Path('/tmp/ZRB' + profile.upper())
     subprocess.run([sys.executable, 'tests/dpmi/VERIFY.PY', '--work', str(bound),
-                    '--tools', '/private/tmp/ZRLOAD/bin', '--profile', profile,
+                    '--tools', '/tmp/ZRLOAD/bin', '--profile', profile,
                     '--build-only', '--timeout', '600'], check=True)
     subprocess.run([sys.executable, 'tests/dpmi/QCHECK.PY', '--qemu', qemu,
                     '--fixtures', str(bound / 'tests/dpmi'), '--work', str(bound / 'QEMU'),
                     '--profile', profile, '--timeout', '600'], check=True)
 PYRUN
-python3 tests/dpmi/SIZES.PY --work /private/tmp/ZRSIZE \
-  --native /private/tmp/ZRNAT --ordinary /private/tmp/ZRLOAD
+python3 tests/dpmi/SIZES.PY --work /tmp/ZRSIZE \
+  --native /tmp/ZRNAT --ordinary /tmp/ZRLOAD
 ```
 
 QCHECK counts include HOST: native RAW/XMS have 58 cases (55 plus discovery

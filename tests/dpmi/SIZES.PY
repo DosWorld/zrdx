@@ -3,11 +3,13 @@ import argparse
 import hashlib
 from pathlib import Path
 import re
+import runpy
 import shutil
 import struct
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
+CFG = runpy.run_path(str(ROOT / "tests/dpmi/ZRCFG.PY"))
 
 
 def main():
@@ -17,8 +19,7 @@ def main():
     parser.add_argument("--ordinary", required=True, type=Path)
     args = parser.parse_args()
     work = args.work.resolve()
-    if not work.is_relative_to(Path("/private/tmp")):
-        raise ValueError("measurements require an owned scratch directory")
+    CFG["check_scratch"](work)
     work.mkdir(parents=True, exist_ok=True)
     src = work / "src"
     shutil.copytree(ROOT / "src", src, dirs_exist_ok=True)

@@ -1,6 +1,7 @@
 """Read FAT16 images and put test files into an owned scratch image copy."""
 import argparse
 from pathlib import Path
+import runpy
 import struct
 
 
@@ -90,9 +91,8 @@ class Fat16:
         return data[:size]
 
     def put_root(self, name, data):
-        # Mutations are restricted to /private/tmp; never modify the user's disk.
-        if not self.path.resolve().is_relative_to(Path("/private/tmp")):
-            raise ValueError("writes require an owned /private/tmp image copy")
+        # Mutations are restricted to the scratch root; never modify the user's disk.
+        runpy.run_path(str(Path(__file__).with_name("ZRCFG.PY")))["check_scratch"](self.path)
         target = self.name83(name)
         try:
             offset, old = self.find(name)

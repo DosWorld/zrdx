@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import runpy
 import shutil
@@ -10,6 +11,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+CFG = runpy.run_path(str(ROOT / "tests/dpmi/ZRCFG.PY"))
 Fat16 = runpy.run_path(str(ROOT / "tests/dpmi/FAT16.PY"))["Fat16"]
 CATALOG = runpy.run_path(str(ROOT / "tests/dpmi/CATALOG.PY"))
 EXPECTED = dict(CATALOG["BOUND"], HOST=None)
@@ -24,7 +26,8 @@ def textfile(path, text):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--qemu", required=True, type=Path)
-    parser.add_argument("--image", type=Path, default=Path("/Users/admin/dosbox-x/D/hdd-fd14.img"))
+    parser.add_argument("--image", type=Path, default=os.environ.get("ZRDX_DISK"),
+                        help="seed FAT16 image (default $ZRDX_DISK)")
     parser.add_argument("--fixtures", required=True, type=Path)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--profile", choices=("raw", "xms", "vcpi"), default="raw")
@@ -34,9 +37,11 @@ def main():
     parser.add_argument("--icount", action="store_true", help="deterministic virtual-clock benchmark profile")
     parser.add_argument("--timeout", type=int, default=180)
     args = parser.parse_args()
+    if args.image is None:
+        raise ValueError("give --image or set ZRDX_DISK")
+    args.image = Path(args.image)
     work = args.work.resolve()
-    if not work.is_relative_to(Path("/private/tmp")):
-        raise ValueError("work must be an owned /private/tmp directory")
+    CFG["check_scratch"](work)
     work.mkdir(parents=True, exist_ok=True)
     disk = work / "TEST.IMG"
     if disk.resolve() == args.image.resolve():

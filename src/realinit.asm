@@ -6,7 +6,7 @@
         SEGM IData16
 %ifdef VMM
         LByte SwapFileName
-        db 'zrdx!.swp', 0
+        db 'zrdx.swp', 0
         LByte SwapFileEM
         db 'swap I/O error', 0
 %endif

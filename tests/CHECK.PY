@@ -13,6 +13,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
+CFG = runpy.run_path(str(ROOT / "tests/dpmi/ZRCFG.PY"))
 TOOLS = ("zrxbind.com", "zrxsetup.exe", "stub-le.exe", "stub-pe.exe", "stub-rdf.exe")
 
 
@@ -39,7 +40,7 @@ def fingerprint():
 
 
 def config(work, profile, real_clip, lfn="true", core="auto"):
-    original = Path("/Users/admin/dosbox-x/dosbox.conf").read_text()
+    original = CFG["require"]("ZRDX_DOSCONF").read_text()
     write(work / "USER.CON", original)
     base = re.split(r"(?m)^\[autoexec\]\s*$", original)[0]
     values = {"core": core, "lfn": lfn, "cycles": "max", "xms": "false" if profile == "raw" else "true",
@@ -52,8 +53,8 @@ def config(work, profile, real_clip, lfn="true", core="auto"):
                         ("true" if profile == "vcpi" else "false") + "\n")
     auto = r"""[autoexec]
 @echo off
-mount -q C /Users/admin/dosbox-x/C
-mount -q D /Users/admin/dosbox-x/D
+mount -q C DRIVEC
+mount -q D DRIVED
 mount -q R WORKDIR
 set WATCOM=D:\WATCOM
 set INCLUDE=D:\WATCOM\H
@@ -62,7 +63,7 @@ set PATH=C:\BIN;D:\WATCOM\BINW;Z:\;Z:\SYSTEM;Z:\BIN
 R:
 call AUDIT.BAT
 exit
-""".replace("WORKDIR", str(work))
+""".replace("WORKDIR", str(work)).replace("DRIVEC", str(CFG["require"]("ZRDX_DRIVE_C"))).replace("DRIVED", str(CFG["require"]("ZRDX_DRIVE_D")))
     write(work / "DOSBOX.CON", base + auto)
 
 
@@ -72,7 +73,7 @@ def dos(work, batch, timeout):
     (work / "STOP.TXT").unlink(missing_ok=True)
     env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
     with (work / "HOST.LOG").open("w") as log:
-        proc = subprocess.Popen(["/Users/admin/bin/dosbox-x", "-conf", str(work / "DOSBOX.CON"),
+        proc = subprocess.Popen([CFG["dosbox"](), "-conf", str(work / "DOSBOX.CON"),
                                  "-nogui", "-nomenu"], stdout=log, stderr=subprocess.STDOUT, env=env)
         write(work / "DOSBOX.PID", str(proc.pid) + "\n")
         deadline = time.monotonic() + timeout
@@ -103,7 +104,7 @@ def main():
     parser.add_argument("--real-clip", action="store_true", help="use the DOSBox host clipboard instead of the fixture")
     parser.add_argument("--timeout", type=int, default=900)
     args = parser.parse_args()
-    work = (args.work or Path(tempfile.mkdtemp(prefix="ZRX", dir="/private/tmp"))).resolve()
+    work = (args.work or Path(tempfile.mkdtemp(prefix="ZRX", dir=CFG["scratch"]()))).resolve()
     if work == ROOT or ROOT in work.parents:
         raise RuntimeError("work must be outside the checkout")
     work.mkdir(parents=True, exist_ok=True)
@@ -153,7 +154,10 @@ echo FAILED > STATUS.LOG
         if not path.is_file():
             raise RuntimeError("missing tool " + file)
     command([nasm, "-f", "bin", "HELLO.ASM", "-o", "HELLO.BIN"], work / "tests/pe")
-    pe_cases = runpy.run_path(str(work / "tests/pe/GEN.PY"))["generate"](work / "tests/pe")
+    for out, base in (("RELOC", "0x401000"), ("RELOC2", "0x501000"), ("RELOCH", "0x10001000")):
+        command([nasm, "-f", "bin", "-DBASE=" + base, "RELOC.ASM", "-o", out + ".BIN"], work / "tests/pe")
+    pe_gen = runpy.run_path(str(work / "tests/pe/GEN.PY"))
+    pe_cases = pe_gen["generate"](work / "tests/pe")
     if (work / "tests/mz/GEN.PY").exists():
         runpy.run_path(str(work / "tests/mz/GEN.PY"))["generate"](work / "tests/mz")
     bind_cases = runpy.run_path(str(work / "tests/bind/GEN.PY"))["generate"](work / "tests/bind")
@@ -198,7 +202,8 @@ echo FAILED > STATUS.LOG
     for name in pe_cases:
         if name + " OK" not in pe or name + " FAILED" in pe or name + " BIND_FAILED" in pe:
             errors.append("PE " + name + " failed")
-    if pe.count("ZRDX loader error:") != len(pe_cases) - 1 or "PE single module: ok" not in pe:
+    if (pe.count("ZRDX loader error:") != len(pe_cases) - len(pe_gen["VALID"])
+            or "PE single module: ok" not in pe or pe.count("PE reloc: ok") != 2):
         errors.append("PE expected loader diagnostics missing")
     mz = work / "tests/mz/RESULT.LOG"
     if mz.exists() and "FAILED" in mz.read_text():
