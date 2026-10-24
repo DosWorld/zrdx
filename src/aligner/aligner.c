@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
         memmove(buffer + NewDataOff, buffer + h->hSize * 16, DataSize);
         memmove(buffer + 0x40, buffer + h->RelocOff, h->nRelocs * 4);
         memset(buffer + 0x1C, 0, 0x40 - 0x1C);
-        strcpy(buffer + 0x1C, "Zurenava DOS extender v0.51OSE");
+        strcpy(buffer + 0x1C, "Zurenava DOS extender v0.52OSE");
         memset(buffer + NewDataOff + DataSize, 0, sizeof(buffer) - NewDataOff - DataSize);
         h->RelocOff = 0x40;
         *((unsigned long *)(buffer + 0x40 - 4)) = nl;

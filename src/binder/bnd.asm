@@ -7,7 +7,7 @@
 %assign sf_y 16
 %assign sf_n 32
 %assign header_size 200h
-;             This file is part of the ZRDX 0.51OSE project
+;             This file is part of the ZRDX OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -203,7 +203,7 @@ start:
         rep stosw            ;initialize BSS to zero
         mov ah, 9
 section .data
-IntroMsg: db 'Zurenava DOS extender bind utility ver.0.51OSE. (C) 1998-1999, Sergey Belyakov', 13, 10, '(C) 2026, Viacheslav Komenda', 13, 10, '$'
+IntroMsg: db 'Zurenava DOS extender bind utility ver.0.52OSE. (C) 1998-1999, Sergey Belyakov', 13, 10, '(C) 2026, Viacheslav Komenda', 13, 10, '$'
 CfgTrailer: db 'ZRXC'
         dw 0
         dw 400h

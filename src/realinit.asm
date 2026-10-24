@@ -1,4 +1,4 @@
-;             This file is part of the ZRDX 0.51OSE project
+;             This file is part of the ZRDX OSE project
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
@@ -11,7 +11,7 @@
         db 'swap I/O error', 0
 %endif
         LByte IntroMsg
-        db 'Zurenava DOS extender, version 0.51OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
+        db 'Zurenava DOS extender, version 0.52OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
         LByte FirstError
         db 'ZRDX init error:$'
         LByte VersionEM

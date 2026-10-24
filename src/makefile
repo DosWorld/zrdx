@@ -1,4 +1,4 @@
-# ZRDX 0.51OSE build file for Open Watcom wmake
+# ZRDX OSE build file for Open Watcom wmake
 #
 # Tools (must be in PATH):
 #   NASM 0.98.39 (other versions may produce different OMF objects),

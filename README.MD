@@ -82,7 +82,7 @@ hellz.exe
 ```
 
 ```
-Zurenava DOS extender, version 0.51OSE. Copyright(C) 1998-1999, Sergey Belyakov
+Zurenava DOS extender, version 0.52OSE. Copyright(C) 1998-1999, Sergey Belyakov
 Copyright(C) 2026, Viacheslav Komenda
 hello from 32-bit
 ```
@@ -334,7 +334,7 @@ Start with [`docs/README.MD`](docs/README.MD) — the project guide.
 
 ## 📜 History
 
-Version **0.51OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
+Version **0.52OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
 to the end of the bound file, `zrxsetup` was rewritten, `zrxbind` became a `.COM` that reads the
 stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix39**: DPMI 0.9
 hardening and the native `zrxdpmi.exe` host, 14 336-byte packed stubs. See

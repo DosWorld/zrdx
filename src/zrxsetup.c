@@ -41,7 +41,7 @@ static void pack(const struct config *c)
 
 static void usage(void)
 {
-    puts("Zurenava DOS extender setup utility v.0.51OSE (C) 2026, Viacheslav Komenda");
+    puts("Zurenava DOS extender setup utility v.0.52OSE (C) 2026, Viacheslav Komenda");
     puts("Usage:");
     puts("zrxsetup [options] <filename>");
     puts("Where options are:");
