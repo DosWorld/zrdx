@@ -7,7 +7,10 @@ the first two are its relocation sites. No DLL/import features.
 from pathlib import Path
 import struct
 
-VALID = ("GOOD", "MULTI", "BASEHI")
+VALID = ("GOOD", "MULTI", "BASEHI", "MODS", "EXPS", "EXPB", "HOST",
+         "CHAIN", "CYCLE", "ORD", "ICYC", "RT", "RF", "FWDA", "FWDO", "BOUND", "LOWMEM",
+         "LACK", "HOSTC")
+PMXONLY = ("MODS", "EXPS", "EXPB", "HOSTC")
 PE = 0x80
 RELOC = 0x42000040
 
@@ -103,6 +106,258 @@ def reloc_cases(folder):
     return cases
 
 
+JOBS = (("MODS", "MODS.ASM", ()), ("EXPS", "EXPS.ASM", ()),
+        ("EXPB", "EXPB.ASM", ()),
+        ("DRV8", "DRV.ASM", ("-DEXPECT=8",)),
+        ("DRV41", "DRV.ASM", ("-DEXPECT=41",)),
+        ("DRV42", "DRV.ASM", ("-DEXPECT=42",)),
+        ("FNCALL", "FN.ASM", ("-DCALLIMP",)),
+        ("FN40", "FN.ASM", ("-DVALUE=40",)),
+        ("FN42", "FN.ASM", ("-DVALUE=42",)),
+        ("FN55", "FN.ASM", ("-DVALUE=55",)),
+        ("DRV55", "DRV.ASM", ("-DEXPECT=55",)),
+        ("DRV40", "DRV.ASM", ("-DEXPECT=40",)),
+        ("INIT", "INIT.ASM", ()),
+        ("DMA", "DM.ASM", ("-DLETTER=65",)),
+        ("DMB", "DM.ASM", ("-DLETTER=66",)),
+        ("DMC", "DM.ASM", ("-DLETTER=67",)),
+        ("DMP", "DM.ASM", ("-DLETTER=80",)),
+        ("DMQ", "DM.ASM", ("-DLETTER=81",)),
+        ("DMX", "DM.ASM", ("-DLETTER=88",)),
+        ("DMY", "DM.ASM", ("-DLETTER=89", "-DRESULT=0")),
+        ("DMF", "DM.ASM", ("-DLETTER=70", "-DRESULT=0")),
+        ("FN99", "FN.ASM", ("-DVALUE=99",)),
+        ("RT", "RT.ASM", ("-I../../sdk/",)),
+        ("PLUGX", "PLUGX.ASM", ()),
+        ("REENT", "REENT.ASM", ()),
+        ("RF", "RT.ASM", ("-I../../sdk/", "-DTAG='unload'", "-DRETEXIT")),
+        ("PLUGF", "PLUGF.ASM", ()),
+        ("EXITD", "EXITD.ASM", ()),
+        ("LOWMEM", "LOWMEM.ASM", ("-I../../sdk/",)),
+        ("LACK", "LACK.ASM", ("-I../../sdk/",)))
+GRAPH = ("HOST", "CHAIN", "CYCLE", "FWDA", "FWDO", "BOUND")
+INITS = ("ORD", "ICYC")
+RUNTIME = ("RT",)
+UNLOAD = ("RF",)
+LOWMEMS = ("LOWMEM",)
+
+BAD = "bad PE format"
+EXPECT = {"EXPBAD": BAD, "EXPSHORT": BAD, "IMPBAD": BAD, "IMPSIZE": BAD,
+          "IMPORT": BAD, "IMPOK": "bad PE import table",
+          "ALIGN": BAD, "ALIGN2": BAD, "DLLFLAG": BAD,
+          "PE32P": "unsupported PE format", "ARM": "unsupported PE format",
+          "NODLL": "can't open PE DLL: MISSING.DLL", "NOSYM": "unresolved PE import: C.DLL",
+          "COLL": "PE module name conflict: DUP.DLL", "NOTDLL": "bad PE DLL image: X.DLL",
+          "ORD": ("CBA", "PE init: ok"), "ICYC": ("QP", "PE init: ok"),
+          "IFAIL": ("XYx", "PE DLL initialization failed: IY.DLL"),
+          "RT": ("FR", "PE runtime: ok"),
+          "RF": ("CBAabcCBAabcQPpq", "PE unload: ok", "PE exit detach"),
+          "FWDLOOP": "unresolved PE import: LOOP1.DLL", "FWDMISS": "can't open PE DLL: NOPE.DLL",
+          "BOUNDX": "bad PE import table",
+          "TRUNCD": "can't open PE DLL: TRUNC.DLL", "ARMD": "bad PE DLL image: ARM.DLL",
+          "BRELD": "bad PE DLL image: BREL.DLL", "HUGED": "out of DPMI memory",
+          "LOWMEM": "PE low memory: ok", "LACK": "PE lack: skip", "HOSTC": "PE C: ok", "TLS": "PE TLS is not supported",
+          "DELAY": "PE directory is not supported"}
+
+
+def export_blob(rva, modname, badnames=False):
+    """Export directory: base 5, 6 slots (1 empty, 1 forwarder)."""
+    names = [b"Alpha", b"Beta", b"Fwd", b"Gamma", b"alpha"]
+    order = [0, 2, 4, 3, 5]
+    strs = bytearray(modname + b"\0")
+    where = []
+    for n in names + [b"C.Fc"]:
+        where.append(rva + 96 + len(strs))
+        strs += n + b"\0"
+    funcs = [0x1010, 0, 0x1020, 0x1030, where[-1], 0x1040]
+    blob = struct.pack("<IIHHIIIIIII", 0, 0, 0, 0, rva + 96, 5, 6, 5,
+                       rva + 40, 0x5000 if badnames else rva + 64, rva + 84)
+    blob += b"".join(struct.pack("<I", f) for f in funcs)
+    blob += b"".join(struct.pack("<I", w) for w in where[:-1])
+    blob += b"".join(struct.pack("<H", o) for o in order)
+    return (blob + bytes(96 - len(blob)) + bytes(strs))
+
+
+def export_case(folder, stem, badnames=False):
+    lo = (folder / (stem + ".BIN")).read_bytes()
+    hi = (folder / (stem + "2.BIN")).read_bytes()
+    blob = export_blob(0x2000, (stem + ".EXE").encode(), badnames)
+    image = bytearray(make_pe(
+        [(b".text", 0x1000, lo, 0x60000020), (b".edata", 0x2000, blob, 0x40000040),
+         (b".reloc", 0x3000, reloc_blocks(sites_of(lo, hi, 0x1000)), RELOC)],
+        0x400000))
+    struct.pack_into("<II", image, PE + 120, 0x2000, len(blob))
+    return bytes(image)
+
+
+def module(folder, job, modname, exports=(), imports=(), dll=False, oft=True,
+           bound=False):
+    """PE with one .rdata at 2000h: imports (IAT 2400h, lookup 2600h,
+    names from 2800h) and exports at 2C00h."""
+    lo = (folder / (job + ".BIN")).read_bytes()
+    hi = (folder / (job + "2.BIN")).read_bytes()
+    secs = [(b".text", 0x1000, lo, 0x60000020)]
+    imp = None
+    if imports:
+        blob = bytearray(0x800 + 0x400)
+        desc, iat, npos = b"", 0x400, 0x800
+        for dname, syms in imports:
+            dpos = npos
+            blob[npos:npos + len(dname) + 1] = dname.encode() + b"\0"
+            npos += (len(dname) + 2) & ~1
+            first = iat
+            for s in syms:
+                if isinstance(s, int):
+                    val = 0x80000000 | s
+                else:
+                    val = 0x2000 + npos
+                    blob[npos:npos + 2 + len(s) + 1] = b"\0\0" + s.encode() + b"\0"
+                    npos += (len(s) + 4) & ~1
+                struct.pack_into("<I", blob, iat, val)
+                struct.pack_into("<I", blob, iat + 0x200, val)
+                iat += 4
+            iat += 4
+            if bound and oft:
+                for k in range((iat - first) // 4 - 1):
+                    struct.pack_into("<I", blob, first + 4 * k, 0x77000000 + k)
+            desc += struct.pack("<IIIII", 0x2600 + first - 0x400 if oft else 0,
+                                0xFFFFFFFF if bound else 0, 0, 0x2000 + dpos,
+                                0x2000 + first)
+        blob[:len(desc)] = desc
+        imp = bytes(blob[:npos])
+    exp = None
+    rdata = bytearray(imp or b"")
+    if exports:
+        funcs = sorted(exports)
+        strs = bytearray(modname.encode() + b"\0")
+        where = []
+        for n, _ in funcs:
+            where.append(0x2C00 + 96 + len(strs))
+            strs += n.encode() + b"\0"
+        frva = []
+        for _, r in funcs:
+            if isinstance(r, str):
+                frva.append(0x2C00 + 96 + len(strs))
+                strs += r.encode() + b"\0"
+            else:
+                frva.append(r)
+        exp = struct.pack("<IIHHIIIIIII", 0, 0, 0, 0, 0x2C00 + 96, 1, len(funcs),
+                          len(funcs), 0x2C00 + 40, 0x2C00 + 40 + 4 * len(funcs),
+                          0x2C00 + 40 + 8 * len(funcs))
+        exp += b"".join(struct.pack("<I", r) for r in frva)
+        exp += b"".join(struct.pack("<I", w) for w in where)
+        exp += b"".join(struct.pack("<H", i) for i in range(len(funcs)))
+        exp = exp + bytes(96 - len(exp)) + bytes(strs)
+        rdata = rdata.ljust(0xC00, b"\0") + exp
+    if rdata:
+        secs.append((b".rdata", 0x2000, bytes(rdata), 0xc0000040))
+    secs.append((b".reloc", 0x3000, reloc_blocks(sites_of(lo, hi, 0x1000)), RELOC))
+    image = bytearray(make_pe(secs, 0x400000, 0x2102 if dll else 0x102))
+    if imp:
+        struct.pack_into("<II", image, PE + 128, 0x2000, 20 * (len(imports) + 1))
+    if exp:
+        struct.pack_into("<II", image, PE + 120, 0x2C00, len(exp))
+    return bytes(image)
+
+
+def graph_cases(folder):
+    """Import graph fixtures: EXE cases plus DLL files in folder."""
+    def dll(name, *args, **kw):
+        (folder / name).write_bytes(module(folder, *args, **kw))
+    dll("PLUG.DLL", "FNCALL", "PLUG.DLL", [("PlugGo", 0x1000)],
+        [("HOST.EXE", ["HostVal"])], dll=True)
+    dll("B.DLL", "FNCALL", "B.DLL", [("Fb", 0x1000)], [("C.DLL", ["Fc"])],
+        dll=True, oft=False)
+    dll("C.DLL", "FN40", "C.DLL", [("Fc", 0x1000)], dll=True)
+    dll("CYC1.DLL", "FN42", "CYC1.DLL", [("F1", 0x1000)],
+        [("CYC2.DLL", ["F2"])], dll=True)
+    dll("CYC2.DLL", "FN42", "CYC2.DLL", [("F2", 0x1000)],
+        [("CYC1.DLL", ["F1"])], dll=True)
+    dll("DUP.DLL", "FN40", "COLL.EXE", [("F", 0x1000)], dll=True)
+    dll("X.DLL", "FN40", "X.DLL", [("F", 0x1000)], dll=False)
+    f = [("F", 0x1000)]
+    dll("IA.DLL", "DMA", "IA.DLL", f, [("IB.DLL", ["F"]), ("IC.DLL", ["F"])], dll=True)
+    dll("IB.DLL", "DMB", "IB.DLL", f, [("IC.DLL", ["F"])], dll=True)
+    dll("IC.DLL", "DMC", "IC.DLL", f, dll=True)
+    dll("IP.DLL", "DMP", "IP.DLL", f, [("IQ.DLL", ["F"])], dll=True)
+    dll("IQ.DLL", "DMQ", "IQ.DLL", f, [("IP.DLL", ["F"])], dll=True)
+    dll("IX.DLL", "DMX", "IX.DLL", f, dll=True)
+    dll("IY.DLL", "DMY", "IY.DLL", f, dll=True)
+    dll("EXTRA.DLL", "FN99", "EXTRA.DLL", [("Extra", 0x1000)], dll=True)
+    dll("EXTRAF.DLL", "DMF", "EXTRAF.DLL", f, dll=True)
+    dll("REENT.DLL", "REENT", "REENT.DLL", f,
+        [("RT.EXE", ["LoadLibrary", "GetLastError"])], dll=True)
+    dll("PLUGX.DLL", "PLUGX", "PLUGX.DLL", [("PlugRun", 0x1010)],
+        [("RT.EXE", ["LoadLibrary", "GetProcAddress", "GetModuleHandle",
+                     "FreeLibrary", "GetLastError"])], dll=True)
+    dll("EXITD.DLL", "EXITD", "EXITD.DLL", f, dll=True)
+    dll("PLUGF.DLL", "PLUGF", "PLUGF.DLL", [("PlugRun", 0x1010)],
+        [("RF.EXE", ["LoadLibrary", "GetModuleHandle", "FreeLibrary"])],
+        dll=True)
+    dll("REAL.DLL", "FN55", "REAL.DLL", [("Real", 0x1000)], dll=True)
+    dll("FWD.DLL", "FN40", "FWD.DLL",
+        [("Alias", "REAL.Real"), ("ByOrd", "REAL.#1")], dll=True)
+    dll("LOOP1.DLL", "FN40", "LOOP1.DLL", [("A", "LOOP2.A")], dll=True)
+    dll("LOOP2.DLL", "FN40", "LOOP2.DLL", [("A", "LOOP1.A")], dll=True)
+    dll("MISS.DLL", "FN40", "MISS.DLL", [("X", "NOPE.Y")], dll=True)
+    good = module(folder, "FNCALL", "BAD.DLL", [("F", 0x1000)],
+                  [("HOST.EXE", ["HostVal"])], dll=True)
+    def broken(name, offset, fmt, value):
+        b = bytearray(good)
+        struct.pack_into(fmt, b, PE + offset, value)
+        (folder / name).write_bytes(bytes(b))
+    (folder / "TRUNC.DLL").write_bytes(good[:0x300])
+    broken("ARM.DLL", 4, "<H", 0x1c0)
+    broken("BREL.DLL", 164, "<I", 4)
+    broken("HUGE.DLL", 80, "<I", 0x70000000)
+    exe = lambda job, name, imports, exports=(), **kw: module(
+        folder, job, name, exports, imports, **kw)
+    return {
+        "HOST": exe("DRV8", "HOST.EXE", [("PLUG.DLL", ["PlugGo"])],
+                    [("HostVal", 0x1010)]),
+        "CHAIN": exe("DRV41", "CHAIN.EXE", [("B.DLL", ["Fb"])]),
+        "CYCLE": exe("DRV42", "CYCLE.EXE", [("CYC1.DLL", ["F1"])]),
+        "NODLL": exe("DRV8", "NODLL.EXE", [("MISSING.DLL", ["F"])]),
+        "NOSYM": exe("DRV8", "NOSYM.EXE", [("C.DLL", ["Nope"])]),
+        "COLL": exe("DRV8", "COLL.EXE", [("DUP.DLL", ["F"])]),
+        "NOTDLL": exe("DRV8", "NOTDLL.EXE", [("X.DLL", ["F"])]),
+        "FWDA": exe("DRV55", "FWDA.EXE", [("FWD.DLL", ["Alias"])]),
+        "FWDO": exe("DRV55", "FWDO.EXE", [("FWD.DLL", ["ByOrd"])]),
+        "FWDLOOP": exe("DRV8", "FWDLOOP.EXE", [("LOOP1.DLL", ["A"])]),
+        "FWDMISS": exe("DRV8", "FWDMISS.EXE", [("MISS.DLL", ["X"])]),
+        "BOUND": exe("DRV40", "BOUND.EXE", [("C.DLL", ["Fc"])], bound=True),
+        "BOUNDX": exe("DRV40", "BOUNDX.EXE", [("C.DLL", ["Fc"])], oft=False,
+                      bound=True),
+        "RT": exe("RT", "RT.EXE", [("PLUGX.DLL", ["PlugRun"])],
+                  [("LoadLibrary", 0x1020), ("GetModuleHandle", 0x1040),
+                   ("GetProcAddress", 0x1060), ("FreeLibrary", 0x1080),
+                   ("GetLastError", 0x10A0)]),
+        "RF": exe("RF", "RF.EXE", [("PLUGF.DLL", ["PlugRun"])],
+                  [("LoadLibrary", 0x1020), ("GetModuleHandle", 0x1040),
+                   ("GetProcAddress", 0x1060), ("FreeLibrary", 0x1080),
+                   ("GetLastError", 0x10A0)]),
+        "LOWMEM": exe("LOWMEM", "LOWMEM.EXE", [("EXTRA.DLL", ["Extra"])]),
+        "LACK": exe("LACK", "LACK.EXE", [("EXTRA.DLL", ["Extra"])]),
+        "TRUNCD": exe("DRV8", "TRUNCD.EXE", [("TRUNC.DLL", ["F"])]),
+        "ARMD": exe("DRV8", "ARMD.EXE", [("ARM.DLL", ["F"])]),
+        "BRELD": exe("DRV8", "BRELD.EXE", [("BREL.DLL", ["F"])]),
+        "HUGED": exe("DRV8", "HUGED.EXE", [("HUGE.DLL", ["F"])]),
+        "ORD": exe("INIT", "ORD.EXE", [("IA.DLL", ["F"])]),
+        "ICYC": exe("INIT", "ICYC.EXE", [("IP.DLL", ["F"])]),
+        "IFAIL": exe("INIT", "IFAIL.EXE", [("IX.DLL", ["F"]), ("IY.DLL", ["F"])]),
+    }
+
+
+def wants_pmx(data):
+    """Binder rule (docs/PEABI.MD): DLL flag or non-empty imports."""
+    pe = struct.unpack_from("<I", data, 0x3c)[0]
+    flags = struct.unpack_from("<H", data, pe + 22)[0]
+    dirs, rva, size = struct.unpack_from("<III", data, pe + 116)[0], 0, 0
+    if dirs >= 2:
+        rva, size = struct.unpack_from("<II", data, pe + 128)
+    return bool(flags & 0x2000 or rva or size)
+
+
 def generate(folder):
     folder = Path(folder)
     code = (folder / "HELLO.BIN").read_bytes()
@@ -113,6 +368,15 @@ def generate(folder):
                       struct.pack("<IIHH", 0x1000, 12, 0x3001, 0), RELOC)],
                     0x400000)
     cases = {"GOOD": bytes(image)}
+    lo = (folder / "MODS.BIN").read_bytes()
+    hi = (folder / "MODS2.BIN").read_bytes()
+    cases["MODS"] = bytes(make_pe(
+        [(b".text", 0x1000, lo, 0x60000020),
+         (b".reloc", 0x2000, reloc_blocks(sites_of(lo, hi, 0x1000)), RELOC)],
+        0x400000))
+    cases.update(graph_cases(folder))
+    cases["EXPS"] = export_case(folder, "EXPS")
+    cases["EXPB"] = export_case(folder, "EXPB", True)
     def change(name, off, val, fmt="<I"):
         b = bytearray(image)
         struct.pack_into(fmt, b, off, val)
@@ -142,21 +406,73 @@ def generate(folder):
     change("HEADERS", pe+84, 0)
     change("ENTRY", pe+40, 0x3000)
     change("IMPORT", pe+128, 0x1000)
+    change("IMPSIZE", pe+132, 8)
+    change("DLLFLAG", pe+22, struct.unpack_from("<H", image, pe+22)[0] | 0x2000, "<H")
+    change("EXPBAD", pe+120, 0x2fe0)
+    change("EXPSHORT", pe+120, 0x1000)
+    change("IMPBAD", pe+128, 0x2ff0)
+    change("IMPOK", pe+128, 0x1000)
+    change("ALIGN", pe+56, 0x1800)
+    change("ALIGN2", pe+60, 0x2000)
+    change("PE32P", pe+24, 0x20b, "<H")
+    change("ARM", pe+4, 0x1c0, "<H")
+    change("TLS", pe+192, 0x1000)
+    change("DELAY", pe+224, 0x1000)
+    change("COM", pe+232, 0x1000)
+    change("COMSZ", pe+236, 8)
     cases["TRUNC"] = bytes(image[:pe+250])
+    for name, off, val in (("EXPBAD", pe+124, 0x40), ("EXPSHORT", pe+124, 8),
+                           ("IMPBAD", pe+132, 0x20), ("IMPOK", pe+132, 20),
+                           ("TLS", pe+196, 0x18), ("DELAY", pe+228, 0x20)):
+        b = bytearray(cases[name])
+        struct.pack_into("<I", b, off, val)
+        cases[name] = bytes(b)
     cases.update(reloc_cases(folder))
+    # Open Watcom C fixtures (task 165), built by c/BUILD.BAT.
+    cdir = folder / "c"
+    if not (cdir / "PLUGC.DLL").exists():
+        raise RuntimeError("c/PLUGC.DLL missing, see c/BUILD.LOG")
+    cases["HOSTC"] = (cdir / "HOSTC.EXE").read_bytes()
+    dll = (cdir / "PLUGC.DLL").read_bytes()
+    if dll.count(b"HOSTCZEXE") != 1:
+        raise RuntimeError("PLUGC.DLL import name not found")
+    (folder / "PLUGC.DLL").write_bytes(dll.replace(b"HOSTCZEXE", b"HOSTC.EXE"))
     for name, data in cases.items():
         (folder / (name + ".PE")).write_bytes(data)
     lines = ["@echo off", "if exist RESULT.LOG del RESULT.LOG"]
     for name in cases:
-        lines += ["R:" + chr(92) + "BIN" + chr(92) + "zrxbind -y " + name + ".PE " + name + ".EXE > NUL",
-                  "if errorlevel 1 echo " + name + " BIND_FAILED >> RESULT.LOG",
-                  name + ".EXE >> RESULT.LOG"]
+        pre = 'if "%1"=="P2" ' if name in PMXONLY else ""
+        lines += [pre + "R:" + chr(92) + "BIN" + chr(92) + "zrdxbind -y " + name + ".PE " + name + ".EXE > NUL",
+                  pre + "if errorlevel 1 echo " + name + " BIND_FAILED >> RESULT.LOG",
+                  pre + "copy " + name + ".EXE " + name + ".%1 > NUL",
+                  pre + name + ".EXE >> RESULT.LOG"]
         if name in VALID:
-            lines += ["if errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
-                      "if not errorlevel 1 echo " + name + " OK >> RESULT.LOG"]
+            lines += [pre + "if errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
+                      pre + "if not errorlevel 1 echo " + name + " OK >> RESULT.LOG"]
         else:
             lines += ["if errorlevel 255 echo " + name + " OK >> RESULT.LOG",
                       "if not errorlevel 255 echo " + name + " FAILED >> RESULT.LOG"]
+    # Unbound run (task 170): the PE is passed to stub-pmx.exe by name.
+    ub = ["@echo off", "if exist RESULT.LOG del RESULT.LOG", "mkdir UNB > NUL",
+          "copy *.DLL UNB > NUL", "set ZRDXROLE=1"]
+    for name in cases:
+        ub += ["copy " + name + ".PE UNB" + chr(92) + name + ".EXE > NUL",
+               "R:" + chr(92) + "BIN" + chr(92) + "STUB-PMX.EXE UNB" + chr(92) + name + ".EXE >> RESULT.LOG"]
+        if name in VALID:
+            ub += ["if errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
+                   "if not errorlevel 1 echo " + name + " OK >> RESULT.LOG"]
+        else:
+            ub += ["if errorlevel 255 echo " + name + " OK >> RESULT.LOG",
+                   "if not errorlevel 255 echo " + name + " FAILED >> RESULT.LOG"]
+    ub += ["set ZRDXROLE="]
+    (folder / "UNB.BAT").write_bytes(("\r\n".join(ub) + "\r\n").encode("ascii"))
+    # Same through the client role of zrdxdpmi.exe (task 171, external host).
+    un = [x.replace("R:" + chr(92) + "BIN" + chr(92) + "STUB-PMX.EXE",
+                    "R:" + chr(92) + "BIN" + chr(92) + "ZRDXDPMI.EXE") for x in ub]
+    (folder / "UNBN.BAT").write_bytes(("\r\n".join(un) + "\r\n").encode("ascii"))
+    # Host role of zrdxdpmi.exe (task 172): no marker, the host wraps the PE.
+    uh = [x for x in un if "set ZRDXROLE" not in x]
+    (folder / "UNBH.BAT").write_bytes(("\r\n".join(uh) + "\r\n").encode("ascii"))
     # DOS paths contain one backslash, regardless of host string escaping.
     (folder / "RUN.BAT").write_bytes(("\r\n".join(lines) + "\r\n").encode("ascii"))
     return list(cases)

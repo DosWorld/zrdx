@@ -157,7 +157,7 @@ xms: dd 0
 enables: dw 0
 disables: dw 0
 failed: db 0
-host: db 'ZRXDPMI.EXE',0
+host: db 'ZRDXDPMI.EXE',0
 tail: db 10, ' BRG16.COM',13
 tail2: db 11, ' NATL16.COM',13
 block: dw 0, tail, 0, 5Ch, 0, 6Ch, 0

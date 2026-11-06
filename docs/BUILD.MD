@@ -42,7 +42,7 @@ inside 32-bit data and the old .8086 directive; no assembler errors occur.
 From the checkout on the host:
 
 ```sh
-python3 tests/CHECK.PY --work /tmp/ZRXWORK
+python3 tests/CHECK.PY --work /tmp/ZRDXWORK
 ```
 
 The runner copies src/, bin/ and tests/ into scratch. It preserves the
@@ -75,9 +75,9 @@ Source fingerprint BUILD.ID prevents --skip-build after source changes.
 The runner leaves build products and logs in scratch for inspection.
 
 ```sh
-python3 tests/CHECK.PY --work /tmp/ZRXWORK --skip-build --bugs-only
-python3 tests/CHECK.PY --work /tmp/ZRXRAW --profile raw --bugs-only
-python3 tests/CHECK.PY --work /tmp/ZRXVCPI --profile vcpi --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRDXWORK --skip-build --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRDXRAW --profile raw --bugs-only
+python3 tests/CHECK.PY --work /tmp/ZRDXVCPI --profile vcpi --bugs-only
 ```
 
 --bugs-only omits the long legacy campaign. XMS disables EMS; RAW also
@@ -85,6 +85,10 @@ disables XMS; VCPI enables EMS emm386 and active startup. HOST.LOG records
 1687h, DE00h and 4300h discovery rather than inferring a provider from a
 setting alone. HDPMI16/32 native comparisons and HDPMI32 bound LE/PE/RDF qualification
 are recorded in D09RUNS.JSN; this does not substitute for built-in tests.
+DOSBox-X 2024.03.01 fails the VCPI profile (PROBE, UNSUP, CBACK,
+PHYSMAP, MAPEXIT, CBEXIT) with old and new tools alike; the same
+cases pass under QEMU with JEMMEX (QCHECK.PY --profile vcpi), so
+use QEMU for VCPI.
 --supplied diagnoses existing bin artifacts without rebuilding; it is
 not evidence that current sources build. --real-clip uses the DOSBox
 clipboard and has different format/text semantics; see HISTORY.MD (archive STAGE1).
@@ -95,13 +99,13 @@ The native host is outside ordinary wmake all/install. Build and test it
 in a private copy with the same NASM and DOS WLINK dependencies:
 
 ```sh
-python3 tests/dpmi/NATIVE.PY --work /tmp/ZRXNAT --build-only
+python3 tests/dpmi/NATIVE.PY --work /tmp/ZRDXNAT --build-only
 ```
 
 NATIVE.PY defaults to DOSBox core=normal; --core auto/dynamic selects a
 separate qualification profile (task 068). It copies the user's config
-and records the actual core. --build-only creates ZRXDPMI.EXE and COM
-fixtures without claiming a test pass. Invoke ZRXDPMI PROGRAM.COM in DOS
+and records the actual core. --build-only creates ZRDXDPMI.EXE and COM
+fixtures without claiming a test pass. Invoke ZRDXDPMI PROGRAM.COM in DOS
 to run a native client; the host owns discovery only for that command.
 The first successful client fixes VM bitness. Do not mix 16/32-bit
 clients within one host invocation. A new invocation is a new VM.
@@ -116,7 +120,8 @@ NATIVE.JSN/RESULT.JSN record source/input hashes, provider and failures.
 
 The native suite now has 55 cases, including IRQ16/32 suspended-kernel
 EXEC, register sentinels, raw/state transitions and private-stack checks.
-The default DOSBox selection has 53 cases. QEMU adds NMX16/32
+The default DOSBox selection has 51 cases (NMX and KST are
+skipped without --qemu). QEMU adds NMX16/32
 actual-#NM cases. Explicit --case NMX16/--case NMX32 is available on
 DOSBox but the observed emulator profile does not deliver the TS trap;
 this is a recorded failed qualification there, not a claimed pass.
@@ -129,7 +134,7 @@ The earlier 39-case DOSBox subset is historical, not a current full-suite
 qualification. Current required CPU-fault evidence comes from QEMU.
 See D09WORK.MD, D09RUNS.JSN and D09ABI.MD for current exact evidence.
 No native artifact is installed by NATIVE.PY itself. The qualified
-release now includes bin/zrxdpmi.exe; see the installation section.
+release now includes bin/zrdxdpmi.exe; see the installation section.
 
 ## DOS-only build
 
@@ -151,9 +156,10 @@ No assertion of byte-identical output between assembler versions is made.
 Assembly roots zrdx.asm, zrdxpe.asm and zrdxrdf.asm include the shared
 runtime and select LE, PE and RDF loaders. NASM -> OMF -> DOS WLINK ->
 UPX -9 --8086 -> aligner yields the default 14336-byte packed stubs.
-Watcom WCL builds zrxsetup.exe and aligner.exe; binder/bnd.asm -> NASM
-binary -> UPX yields zrxbind.com. The user explicitly approved increasing
-PSTUBSZ from 13312 to 14336 on 2026-10-18 (HISTORY.MD task 094). Runtime
+Watcom WCL builds zrdxconf.exe and aligner.exe; binder/bnd.asm -> NASM
+binary -> UPX yields zrdxbind.com. The user explicitly approved increasing
+PSTUBSZ from 13312 to 14336 on 2026-10-18 (HISTORY.MD task 094).
+stub-pmx.exe alone uses PMXSZ = 18432 (approved 2026-11-05). Runtime
 resource capacities and initialized code totals are unchanged.
 
 The unpacked 29184-byte forms remain available. Select them consistently
@@ -173,21 +179,32 @@ D09WORK.MD/TOOLS.JSN identify hashes, tests and retained CPU-profile limits.
 
 ## Installation and use
 
-wmake install copies five matching files into ../bin: zrxbind.com,
-zrxsetup.exe, stub-le.exe, stub-pe.exe and stub-rdf.exe. Keep them together:
-the binder loads its stubs relative to its own executable. Back up the
-previous set before replacing it. Install only after source build and
-regression checks pass. Build the separate native host with NATIVE.PY
---build-only, qualify it as above, then copy its ZRXDPMI.EXE to
-bin/zrxdpmi.exe alongside the five ordinary tools. The installed set has
-been verified this way; TOOLS.JSN records its prior-set backup. There is
+wmake install copies seven matching files into ../bin: zrdxbind.com,
+zrdxconf.exe, zrdxdpmi.exe, stub-le.exe, stub-pe.exe,
+stub-pmx.exe and stub-rdf.exe.
+Keep them together: the binder loads its stubs relative to its own
+executable. Back up the previous set before replacing it. Install only
+after source build and regression checks pass. wmake also builds the
+product zrdxdpmi.exe from src/zrdxnp.asm (host + PE loader);
+NATIVE.PY --build-only builds the host-only zrdxdpmi.asm, and
+--image zrdxnp the product, for the fixtures. TOOLS.JSN records the prior-set backup. There is
 no remote upload/deployment target.
+
+```sh
+python3 tests/le/LECHK.PY --self
+python3 tests/le/LECHK.PY --work /tmp/ZRDXLE
+```
+
+The LE check builds BADOBJ.ASM into an LE with a selector fixup,
+clears the flags of the fixup target in a copy and expects exit
+code 255 (not a hang) while the original exits with 42. --self
+runs only the host part; the DOS part needs the ZRDX_* variables.
 
 ```bat
 wcl386 -l=dos4g -bt=dos HELLO.C
-R:\BIN\zrxbind -c HELLO.EXE HELLZ.EXE
+R:\BIN\zrdxbind -c HELLO.EXE HELLZ.EXE
 HELLZ.EXE
-R:\BIN\zrxsetup HELLZ.EXE
+R:\BIN\zrdxconf HELLZ.EXE
 ```
 
 -c creates a bound copy; -r replaces a stub in-place; -n suppresses the
@@ -197,7 +214,7 @@ imports, TLS or delay imports. Proposed DLL APIs in PEPLAN.MD do not exist.
 ## Test input, converter and output relationships
 
 - tests/rdf/*.ASM plus T.INC -> BUILD/ONE/ONER/ONELE/ONEN.BAT using
-  DOS NASM, RLINK/WLINK and zrxbind -> EXE/COM -> RUN.BAT -> RUN.LOG.
+  DOS NASM, RLINK/WLINK and zrdxbind -> EXE/COM -> RUN.BAT -> RUN.LOG.
   Expected success/error statuses are in CHK/CHKN and the fixture code.
 - tests/dpmi/*.ASM -> PROBE.BAT and ../rdf/ONE.BAT -> EXE/COM ->
   PROBE, UNSUP, CBACK, PHYSMAP, MAPEXIT, CBEXIT and HOST .LOG files.
@@ -206,7 +223,7 @@ imports, TLS or delay imports. Proposed DLL APIs in PEPLAN.MD do not exist.
   clipboard bytes for translation tests and chains unrelated INT 2Fh.
 - tests/pe/HELLO.ASM, RELOC.ASM (linked at three bases) -> host NASM
   -> .BIN; GEN.PY -> 24 .PE inputs (3 valid, 21 invalid) and RUN.BAT
-  -> zrxbind -> EXE -> RESULT.LOG.
+  -> zrdxbind -> EXE -> RESULT.LOG.
 - tests/mz/GEN.PY -> six EXE inputs and RUN.BAT -> aligner -> RESULT.LOG;
   verify() checks exact payload preservation and unchanged rejected files.
 - tests/bind/GEN.PY -> four BAD inputs and RUN.BAT -> binder -> RESULT.LOG.
@@ -227,8 +244,8 @@ observed CPU profiles; it is not a full release qualification command.
 
 To reproduce independent-provider comparisons, build native fixtures,
 assemble PORTABLE=1 LIM16/32 for valid-input comparison as documented in
-D09WORK.MD, then run REFRUN.PY --work /tmp/ZRXREF --fixtures
-/tmp/PORTABLE --bound /tmp/ZRXWORK. The --bound argument
+D09WORK.MD, then run REFRUN.PY --work /tmp/ZRDXREF --fixtures
+/tmp/PORTABLE --bound /tmp/ZRDXWORK. The --bound argument
 names a qualified CHECK work tree; LE/RDF status 42 and quiet PE/PROBE
 output are checked under HDPMI32. RUNS.TSV -> REPORT.PY -> D09RUNS.JSN
 retains the actual final input hashes; SIZES.PY and PERF.PY generate the
@@ -271,10 +288,10 @@ not a change to DOS memory, callback or stack limits. For matched timings:
 
 ```sh
 python3 tests/dpmi/QCHECK.PY --qemu /tmp/QEMU09/BUILD/qemu-system-i386 \
-  --fixtures /tmp/ZRXNAT --native-host /path/to/previous/ZRXDPMI.EXE \
+  --fixtures /tmp/ZRDXNAT --native-host /path/to/previous/ZRDXDPMI.EXE \
   --work /tmp/ZRTPRE --profile raw --case LATENC --icount
 python3 tests/dpmi/QCHECK.PY --qemu /tmp/QEMU09/BUILD/qemu-system-i386 \
-  --fixtures /tmp/ZRXNAT --native-host /tmp/ZRXNAT/ZRXDPMI.EXE \
+  --fixtures /tmp/ZRDXNAT --native-host /tmp/ZRDXNAT/ZRDXDPMI.EXE \
   --work /tmp/ZRTPOST --profile raw --case LATENC --icount
 python3 tests/dpmi/PERF.PY --before /tmp/ZRTPRE --after /tmp/ZRTPOST
 ```
@@ -310,7 +327,7 @@ native = Path('/tmp/ZRNAT')
 cases = runpy.run_path('tests/dpmi/CATALOG.PY')['NATIVE']
 for profile in ('raw', 'xms', 'vcpi'):
     command = [sys.executable, 'tests/dpmi/QCHECK.PY', '--qemu', qemu,
-               '--fixtures', str(native), '--native-host', str(native / 'ZRXDPMI.EXE'),
+               '--fixtures', str(native), '--native-host', str(native / 'ZRDXDPMI.EXE'),
                '--work', '/tmp/ZRN' + profile.upper(), '--profile', profile,
                '--timeout', '600']
     extra = [] if profile == 'vcpi' else ['DRSAVE', 'A20R' if profile == 'raw' else 'A20X']
@@ -344,3 +361,63 @@ build scratch. tests/mem retains sources and batch scripts; its three
 EXEs must be rebuilt as described in MEMTEST.MD. Closed review documents
 are consolidated in HISTORY.MD. EVID manifests and converter inputs are
 retained because report regeneration and historical comparisons use them.
+
+## VENDOR test (experimental)
+
+The vendor entry (task 149) is built only with %assign VENDOR 1
+in src/segdefs.asm. To test it on QEMU (RAW, XMS, VCPI):
+
+    python3 tests/dpmi/VENDRUN.PY --qemu <qemu-system-i386>
+        --image <FreeDOS image> --work <dir in ZRDX_SCRATCH>
+
+It copies the tree, enables VENDOR, runs CHECK.PY and then the
+VENDOR fixture on each profile. The native host is not built
+with the entry.
+
+## SWAP test (experimental)
+
+SWAP builds are not part of the ordinary build. To check the
+demand-paging code on QEMU (RAW and XMS, 8 MB guest):
+
+    python3 tests/swap/SWAPRUN.PY --qemu <qemu-system-i386>
+        --image <FreeDOS image> --work <dir in ZRDX_SCRATCH>
+
+It copies the tree, enables SWAP, runs CHECK.PY, builds the
+SWAPT fixture with the SWAP stub and runs it with QCHECK.PY
+(--mem sets guest RAM). The same fixture fails on ordinary
+stubs and under VCPI, which is the control.
+
+SWAPRUN.PY runs SWAPT (demand paging, locks), SWAPF (store
+full: allocation fails, stack stays locked), SWAPC (crash:
+the swap file must not be left) and SWAPK (long TEMP path
+with an LFN driver) on RAW and XMS, for bound programs and
+for the native host. A full cycle takes over ten minutes.
+The swap file lives in the directory named by TEMP (else
+TMP, else the current one); long names need an LFN driver.
+SWAP-only ceilings: Text 10340 (native 17956), Text16 912
+(native 1200), IText16 2160 (native 1488), Data 400, packed
+stubs 15872. A SWAP build does not change ordinary builds.
+
+SWAPRUN.PY --fail builds a tree with SWAPFAIL as well and runs
+SWAPW (write error) and SWAPR (read error) on RAW; see
+SWAPDES.MD.
+
+The swap size of the native host is in its command line:
+
+    zrdxdpmi /S20 PROG.EXE
+
+The swap size of bound programs is set with zrdxconf:
+
+    zrdxconf /S20 PROG.EXE
+
+/S takes hex megabytes (0-80, 0 = off, the default). The
+fixtures use /S10 (16 MB).
+
+## Win32 DLLs (tasks 178, 179)
+
+KERNEL32.DLL and USER32.DLL are built in DOS with Open Watcom:
+`cd win32` and `BUILD.BAT` (BUILD.LOG lists compiler errors and
+"NOT BUILT" if a DLL is missing). CHECK.PY builds them for its
+tests. For a release copy both to bin/: a Win32 program finds
+them next to itself or in the current directory. They are not
+part of the stub set, so TOOLS.JSN does not hash them.

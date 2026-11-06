@@ -15,7 +15,8 @@ def generate(folder):
     folder = Path(folder)
     cases = {"FULL": (original(), 0), "LEGACY": (original(), 0),
              "RELOCS": (original(), 4), "HEADER": (original(), 4),
-             "PAGES": (original(), 4), "SMALL": (original(), 2)}
+             "PAGES": (original(), 4), "SMALL": (original(), 2),
+             "TAIL": (original() + bytes(range(16)), 0)}
     struct.pack_into("<H", cases["LEGACY"][0], 2, 512)
     struct.pack_into("<H", cases["RELOCS"][0], 6, 40)
     struct.pack_into("<H", cases["HEADER"][0], 8, 0xf000)
@@ -37,11 +38,14 @@ def generate(folder):
 
 def verify(folder):
     folder = Path(folder)
-    for name in ("FULL", "LEGACY"):
+    for name in ("FULL", "LEGACY", "TAIL"):
         data = (folder / (name + ".EXE")).read_bytes()
-        if len(data) != 1536 or struct.unpack_from("<HH", data, 2) != (0, 3):
+        size = 1552 if name == "TAIL" else 1536
+        if name == "TAIL" and data[1536:] != bytes(range(16)):
+            raise RuntimeError("aligner lost the tail: " + name)
+        if len(data) != size or struct.unpack_from("<HH", data, 2) != (0, 3):
             raise RuntimeError("aligner size/page header mismatch: " + name)
-        if data[64:1056] != original()[32:] or any(data[1056:]):
+        if data[64:1056] != original()[32:] or any(data[1056:1536]):
             raise RuntimeError("aligner lost or changed load bytes: " + name)
     for name in ("RELOCS", "HEADER", "PAGES", "SMALL"):
         data = (folder / (name + ".EXE")).read_bytes()

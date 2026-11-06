@@ -1,0 +1,53 @@
+system nt
+name TWCS.EXE
+file TWCS.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import __setjmp3 MSVCRT._setjmp3
+import _longjmp MSVCRT.longjmp
+import _signal MSVCRT.signal
+import _raise MSVCRT.raise
+import _towupper MSVCRT.towupper
+import _towlower MSVCRT.towlower
+import _iswalpha MSVCRT.iswalpha
+import _iswupper MSVCRT.iswupper
+import _iswlower MSVCRT.iswlower
+import _iswdigit MSVCRT.iswdigit
+import _iswspace MSVCRT.iswspace
+import _iswpunct MSVCRT.iswpunct
+import _wcslen MSVCRT.wcslen
+import _wcscpy MSVCRT.wcscpy
+import _wcsncpy MSVCRT.wcsncpy
+import _wcscat MSVCRT.wcscat
+import _wcsncat MSVCRT.wcsncat
+import _wcscmp MSVCRT.wcscmp
+import _wcsncmp MSVCRT.wcsncmp
+import __wcsicmp MSVCRT._wcsicmp
+import _wcschr MSVCRT.wcschr
+import _wcsrchr MSVCRT.wcsrchr
+import _wcsstr MSVCRT.wcsstr
+import _wcsspn MSVCRT.wcsspn
+import _wcscspn MSVCRT.wcscspn
+import _wcspbrk MSVCRT.wcspbrk
+import _wcstok MSVCRT.wcstok
+import __wcsdup MSVCRT._wcsdup
+import __wcslwr MSVCRT._wcslwr
+import __wcsupr MSVCRT._wcsupr
+import __wcsrev MSVCRT._wcsrev
+import _wcstod MSVCRT.wcstod
+import _wcstol MSVCRT.wcstol
+import _wcstoul MSVCRT.wcstoul
+import __wtoi MSVCRT._wtoi
+import __itow MSVCRT._itow
+import _mbstowcs MSVCRT.mbstowcs
+import _wcstombs MSVCRT.wcstombs
+import _mbtowc MSVCRT.mbtowc
+import _wctomb MSVCRT.wctomb
+import _exit MSVCRT.exit
+import _printf MSVCRT.printf
+import _free MSVCRT.free
+import _swprintf MSVCRT.swprintf
+import __snwprintf MSVCRT._snwprintf
+import __scwprintf MSVCRT._scwprintf
+import _wprintf MSVCRT.wprintf
+import _fputws MSVCRT.fputws

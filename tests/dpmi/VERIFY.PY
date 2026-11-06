@@ -10,14 +10,16 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 ENV = runpy.run_path(str(ROOT / "tests/CHECK.PY"))
-CASES = runpy.run_path(str(ROOT / "tests/dpmi/CATALOG.PY"))["BOUND"]
+CATALOG = runpy.run_path(str(ROOT / "tests/dpmi/CATALOG.PY"))
+CASES = CATALOG["BOUND"]
 
 DEPENDENCIES = {"MAPEXIT": "PHYSMAP", "CBEXIT": "CBACK"}
 
 COM_CASES = ("MAPEXIT", "CBEXIT")
 
 EXPERIMENTS = {"ENTERH": "ENTERH native bootstrap: ENTRY32 native initialization: ok\nok",
-               "ENTER16": "ENTERH native bootstrap: ENTRY16 native initialization: ok\nok"}
+               "ENTER16": "ENTERH native bootstrap: ENTRY16 native initialization: ok\nok",
+               **CATALOG["SWAP"], **CATALOG["VENDOR"]}
 
 
 def check_result(folder, cases):
@@ -80,8 +82,8 @@ def main():
                 source = "-DREALMODE=" + str(int(args.profile != "vcpi")) + " " + source
             commands = ["nasm -s -f rdf " + source + " -o " + name + ".RDO",
                         "rlink rdf /o=" + name + ".RDF " + name + ".RDO",
-                        r"R:\BIN\ZRXBIND -y " + name + ".RDF " + name + ".EXE",
-                        r"R:\BIN\ZRXSETUP /B0 " + name + ".EXE"]
+                        r"R:\BIN\ZRDXBIND -y " + name + ".RDF " + name + ".EXE",
+                        r"R:\BIN\ZRDXCONF /B0 " + ("/S" + CATALOG["SWAP_SIZE"].get(name, "10") + " " + CATALOG["SWAP_OPTS"].get(name, "") if name in CATALOG["SWAP"] else "") + name + ".EXE"]
             for index, command in enumerate(commands):
                 lines += [command + (" > " if index == 0 else " >> ") + name + ".BLD", "if errorlevel 1 goto bad"]
     if external:

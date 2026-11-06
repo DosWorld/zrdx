@@ -19,7 +19,7 @@ def generate(folder):
     lines = ["@echo off", "if exist RESULT.LOG del RESULT.LOG"]
     for name, data in cases.items():
         (folder / (name + ".BAD")).write_bytes(data)
-        lines += [r"R:\BIN\ZRXBIND -y " + name + ".BAD " + name + ".EXE",
+        lines += [r"R:\BIN\ZRDXBIND -y " + name + ".BAD " + name + ".EXE",
                   "if errorlevel 1 if not errorlevel 2 echo " + name + " OK >> RESULT.LOG",
                   "if not errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
                   "if errorlevel 2 echo " + name + " FAILED >> RESULT.LOG"]

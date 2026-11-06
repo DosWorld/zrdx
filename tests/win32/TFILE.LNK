@@ -1,0 +1,39 @@
+system nt
+name TFILE.EXE
+file TFILE.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import __errno MSVCRT._errno
+import _exit MSVCRT.exit
+import _fopen MSVCRT.fopen
+import _fclose MSVCRT.fclose
+import _fflush MSVCRT.fflush
+import _fputc MSVCRT.fputc
+import _putc MSVCRT.putc
+import _fgetc MSVCRT.fgetc
+import _getc MSVCRT.getc
+import _ungetc MSVCRT.ungetc
+import _fread MSVCRT.fread
+import _fwrite MSVCRT.fwrite
+import _fputs MSVCRT.fputs
+import _puts MSVCRT.puts
+import _putchar MSVCRT.putchar
+import _fgets MSVCRT.fgets
+import _fseek MSVCRT.fseek
+import _ftell MSVCRT.ftell
+import _rewind MSVCRT.rewind
+import _feof MSVCRT.feof
+import _ferror MSVCRT.ferror
+import _clearerr MSVCRT.clearerr
+import __fileno MSVCRT._fileno
+import _setvbuf MSVCRT.setvbuf
+import _setbuf MSVCRT.setbuf
+import _tmpfile MSVCRT.tmpfile
+import _remove MSVCRT.remove
+import __fdopen MSVCRT._fdopen
+import __fcloseall MSVCRT._fcloseall
+import __flushall MSVCRT._flushall
+import __filelength MSVCRT._filelength
+import __open MSVCRT._open
+import __close MSVCRT._close
+import __iob MSVCRT._iob

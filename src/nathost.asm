@@ -31,6 +31,7 @@ NC_Debug equ 100
 NC_Physical equ 104
 NC_Protected equ 108        ;private PTEs must be restored before recycling
 NC_RMAlias equ 112
+NC_InDos equ 116
 NC_SelBits equ 128
 NC_MemBits equ NC_SelBits + 1024
 NC_MemBytes equ ((OffClientPages-OffMCBVector)/MCBStruct_size+7)/8
@@ -40,7 +41,8 @@ NC_Kernel1 equ NC_Stack - (OffKernelStack1End - OffKernelStack1Start)
 %error native context alignment padding cannot hold the kernel continuation
 %endif
 NC_Frames equ NC_Stack + LockedStackSize
-NC_Size equ NC_Frames + 4096
+NC_Vectors equ NC_Frames + 4096 ;parent's PM vectors
+NC_Size equ NC_Vectors + 8192
 
         VSegm BSS16
         DFB NativeTail, 128
@@ -175,6 +177,9 @@ NativeRMEntry:
         push word RawSwitchCode
         ret
         DPROC NativeRootExit
+%ifdef SWAP
+        call SwapRDelete
+%endif
         mov al, [cs:ROffNativeExitCode]
         mov ah, 4Ch
         int 21h
@@ -306,15 +311,33 @@ NativeRootVM:
         mov ecx, NC_Size / 4
         rep stosd
         mov [ebp + NC_Handle], edx
+%ifdef SWAP
+        call NativeUnpage
+%endif
         mov eax, [OffRootMCB + MCB_StartOffset]
         mov [ebp + NC_Physical], eax
         mov esi, [OffNativeCurrent]
         mov [ebp + NC_Parent], esi
         mov [OffNativeCurrent], ebp
+%ifdef SWAP
+        ;the client runs inside its own EXEC: its InDOS baseline
+        ;(SwapSlots + 1, see SwapDisk) is the current value
+        mov edx, [OffNativeRealBase]
+        mov al, [edx + ROffSwapSlots + 1]
+        mov [ebp + NC_InDos], al
+        mov esi, [edx + ROffSwapInDos]
+        test esi, esi
+        jz .nobase
+        mov al, [esi]
+        mov [edx + ROffSwapSlots + 1], al
+.nobase:
+%endif
         mov esi, OffNativeBoot
         mov edi, ebp
         mov ecx, NS_Size / 4
         rep movsd
+        clc
+        call NativeVectors
         lea eax, [ebp + NC_Frames]
         mov edx, [OffNativeRealBase]
         mov [edx + ROffNativeFrameNext], eax
@@ -591,13 +614,49 @@ NativeFreeInitial:
 .public_pages:
         mov edx, [ebp + NC_Handle]
         mov eax, [ebp + NC_Parent]
+        test eax, eax
+        jz .novectors
+        stc
+        call NativeVectors
+.novectors:
         mov [OffNativeCurrent], eax
+%ifdef SWAP
+        mov ecx, [OffNativeRealBase]
+        mov al, [ebp + NC_InDos]
+        mov [ecx + ROffSwapSlots + 1], al
+%endif
         call NativeSetLockedStack
         mov esi, edx
         shr esi, 16
         mov edi, edx
         mov eax, 0502h
         call NativeCall31
+        ret
+
+; The PM vectors (client tables and IDT gates) are per client.
+; In: CF=0 save them in the context, CF=1 restore from it.
+NativeVectors:
+        pushad
+        cld
+        sbb eax, eax
+        lea edx, [ebp + NC_Vectors]
+        mov esi, OffClientIDT
+        mov ecx, 512
+        call .move
+        mov esi, OffClientExc
+        mov ecx, 64
+        call .move
+        mov esi, OffIDT
+        mov ecx, 512
+        call .move
+        popad
+        ret
+.move:  mov edi, edx
+        lea edx, [edx + ecx*4]
+        test eax, eax
+        jz .copy
+        xchg esi, edi
+.copy:  rep movsd
         ret
 
 NativeClientExit:
@@ -1025,6 +1084,31 @@ NativeReleaseResources:
         cmp edx, NC_MemBytes * 8
         jb .mem
         ret
+
+%ifdef SWAP
+; The context pages are kernel data touched at PL0: they are
+; never evicted (a PL0 fault cannot be served). Called as soon
+; as the block is allocated, before anything else can evict it.
+NativeUnpage:
+        pushad
+        mov eax, ebp
+        shr eax, 12
+        push NC_Size / 4096
+        pop ecx
+.page:  mov edx, eax
+        shr edx, 10
+        mov edx, [OffPageDir + edx*4]
+        mov [OffPage2 + ((OffPageTableWin-KernelBase) >> 10)], edx
+        InvalidateTLB
+        mov esi, eax
+        and esi, 3FFh
+        and byte [OffPageTableWin + esi*4 + 1], ~(SwapPageable >> 8)
+        inc eax
+        loop .page
+        InvalidateTLB
+        popad
+        ret
+%endif
 
 ; Metadata is supervisor-only. The existing one-page locked client stack
 ; remains user-accessible. Pair the toggle on publication and final free;

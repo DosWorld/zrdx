@@ -1,0 +1,30 @@
+system nt
+name TIO.EXE
+file TIO.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import __errno MSVCRT._errno
+import _malloc MSVCRT.malloc
+import _calloc MSVCRT.calloc
+import _realloc MSVCRT.realloc
+import _free MSVCRT.free
+import __msize MSVCRT._msize
+import __open MSVCRT._open
+import __close MSVCRT._close
+import __read MSVCRT._read
+import __write MSVCRT._write
+import __lseek MSVCRT._lseek
+import __tell MSVCRT._tell
+import __filelength MSVCRT._filelength
+import __setmode MSVCRT._setmode
+import __isatty MSVCRT._isatty
+import __get_osfhandle MSVCRT._get_osfhandle
+import __access MSVCRT._access
+import __unlink MSVCRT._unlink
+import _rename MSVCRT.rename
+import __mkdir MSVCRT._mkdir
+import __rmdir MSVCRT._rmdir
+import __chdir MSVCRT._chdir
+import __getcwd MSVCRT._getcwd
+import __commit MSVCRT._commit
+import _exit MSVCRT.exit

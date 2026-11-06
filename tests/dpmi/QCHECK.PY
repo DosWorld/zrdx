@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import runpy
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -17,6 +18,9 @@ CATALOG = runpy.run_path(str(ROOT / "tests/dpmi/CATALOG.PY"))
 EXPECTED = dict(CATALOG["BOUND"], HOST=None)
 NATIVE_CASES = CATALOG["NATIVE"]
 AUX_CASES = CATALOG["AUX"]
+SWAP_CASES = CATALOG["SWAP"]
+VENDOR_CASES = CATALOG["VENDOR"]
+SWAP_CRASH = CATALOG["SWAP_CRASH"]
 
 
 def textfile(path, text):
@@ -31,7 +35,8 @@ def main():
     parser.add_argument("--fixtures", required=True, type=Path)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--profile", choices=("raw", "xms", "vcpi"), default="raw")
-    parser.add_argument("--case", action="append", choices=tuple(EXPECTED) + tuple(NATIVE_CASES) + tuple(AUX_CASES))
+    parser.add_argument("--case", action="append", choices=tuple(EXPECTED) + tuple(NATIVE_CASES) + tuple(AUX_CASES) + tuple(SWAP_CASES) + tuple(VENDOR_CASES))
+    parser.add_argument("--mem", type=int, default=32, help="guest RAM in MB")
     parser.add_argument("--native-host", type=Path)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--icount", action="store_true", help="deterministic virtual-clock benchmark profile")
@@ -48,7 +53,7 @@ def main():
         raise ValueError("cannot overwrite source image")
     shutil.copyfile(args.image, disk)
     volume = Fat16(disk, writable=True)
-    available = dict(EXPECTED, **NATIVE_CASES, **AUX_CASES)
+    available = dict(EXPECTED, **NATIVE_CASES, **AUX_CASES, **SWAP_CASES, **VENDOR_CASES)
     cases = {name: available[name] for name in dict.fromkeys(["HOST"] + args.case)} if args.case else EXPECTED
     inputs = {}
     fixture_manifest = args.fixtures.parent.parent / "D09.JSN"
@@ -58,13 +63,15 @@ def main():
             raise ValueError("CONTROL requires fixtures built for the selected real/VCPI profile")
     if args.native_host:
         data = args.native_host.read_bytes()
-        volume.put_root("ZRXDPMI.EXE", data)
-        inputs["ZRXDPMI.EXE"] = hashlib.sha256(data).hexdigest()
+        volume.put_root("ZRDXDPMI.EXE", data)
+        inputs["ZRDXDPMI.EXE"] = hashlib.sha256(data).hexdigest()
     payloads = list(cases)
     if "DRSAVE" in cases:
         if not args.native_host or args.profile == "vcpi":
             raise ValueError("DRSAVE needs a native host and real-mode RAW/XMS entry")
         payloads += [n for n in ("BAS32", "NEST32") if n not in payloads]
+    if "SWAPN" in cases and "SWAPCH" not in payloads:
+        payloads.append("SWAPCH")
     if "A20R" in cases:
         if not args.native_host or args.profile != "raw":
             raise ValueError("A20R needs --native-host and --profile raw")
@@ -106,6 +113,10 @@ def main():
     subprocess.run([shutil.which("nasm"), "-f", "bin", str(ROOT / "tests/dpmi/QEXIT.ASM"),
                     "-o", str(work / "QEXIT.COM")], check=True)
     volume.put_root("QEXIT.COM", (work / "QEXIT.COM").read_bytes())
+    if "SWAPK" in cases:
+        subprocess.run([shutil.which("nasm"), "-f", "bin", str(ROOT / "tests/dpmi/LMKD.ASM"),
+                        "-o", str(work / "LMKD.COM")], check=True)
+        volume.put_root("LMKD.COM", (work / "LMKD.COM").read_bytes())
     config = ["DOS=LOW", "FILES=40", "BUFFERS=20"]
     if args.icount:
         config += ["SWITCHES=/F"]
@@ -116,20 +127,33 @@ def main():
     config += [r"SHELL=C:\COMMAND.COM C:\ /E:1024 /P=C:\FDAUTO.BAT"]
     volume.put_root("FDCONFIG.SYS", ("\r\n".join(config) + "\r\n").encode("ascii"))
     batch = ["@echo off", "C:", "cd " + chr(92)]
+    swap = any(name in SWAP_CASES for name in cases)
+    if swap:
+        batch += ["mkdir ZTMP", "set TEMP=C:" + chr(92) + "ZTMP"]
+    if "SWAPK" in cases:
+        longdir = "C:" + chr(92) + "Long Swap Directory"
+        batch += ["C:" + chr(92) + "FREEDOS" + chr(92) + "BIN" + chr(92) + "DOSLFN.COM",
+                  "LMKD.COM " + longdir]
     for number, name in enumerate(cases):
+        if name == "SWAPK":
+            batch += ["set TEMP=" + longdir]
         suffix = ".COM" if name in ("HOST", "MAPEXIT", "CBEXIT") or name in NATIVE_CASES or name in AUX_CASES or name == "A20RM" else ".EXE"
-        prefix = "ZRXDPMI " if args.native_host and name not in ("HOST", "A20X", "A20R", "DRSAVE") else ""
+        prefix = ("ZRDXDPMI " + ("/S" + CATALOG["SWAP_SIZE"].get(name, "10") + " " if name in SWAP_CASES else "")) if args.native_host and name not in ("HOST", "A20X", "A20R", "DRSAVE") else ""
         batch += [prefix + name + suffix + " > " + name + ".LOG",
                   "if errorlevel 1 goto fail" + str(number),
                   "echo 0 > " + name + ".STS", "goto done" + str(number),
                   ":fail" + str(number), "echo 1 > " + name + ".STS", ":done" + str(number)]
+        if name == "SWAPK":
+            batch += ["set TEMP=C:" + chr(92) + "ZTMP"]
+    if swap:
+        batch += ["dir /b /a C:" + chr(92) + "ZTMP > ZTMP.LOG"]
     batch += ["echo OK > QDONE.LOG", "QEXIT.COM"]
     volume.put_root("FDAUTO.BAT", ("\r\n".join(batch) + "\r\n").encode("ascii"))
     inputs["KERNEL.SYS"] = hashlib.sha256(volume.get("KERNEL.SYS")).hexdigest()
     inputs["COMMAND.COM"] = hashlib.sha256(volume.get("COMMAND.COM")).hexdigest()
     volume.file.close()
     command = [str(args.qemu), "-machine", "pc", "-accel", "tcg", "-cpu", "pentium",
-               "-m", "32", "-display", "none", "-serial", "none", "-monitor", "stdio",
+               "-m", str(args.mem), "-display", "none", "-serial", "none", "-monitor", "stdio",
                "-drive", "file=" + str(disk) + ",format=raw,if=ide", "-boot", "c",
                "-no-reboot", "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04"]
     if args.icount:
@@ -181,8 +205,21 @@ def main():
             case_status = b"missing"
         outputs[name] = output
         textfile(work / (name + ".LOG"), output + "\n")
-        if case_status != b"0" or (expected is not None and output != expected):
+        if case_status != (b"1" if name in SWAP_CRASH else b"0") or (expected is not None and output != expected):
             failures.append(name + " failed")
+    if any(name in SWAP_CASES for name in cases):
+        left = volume.get("ZTMP.LOG").decode("ascii", errors="replace")
+        textfile(work / "ZTMP.LOG", left)
+        if left.strip() and "not found" not in left.lower():
+            failures.append("swap file left: " + left.strip())
+        if "SWAPK" in cases:
+            for _, entry in volume.directory():
+                if entry[0] in (0, 0xe5) or not entry[11] & 16 or entry[0] == 0x2e or entry[11] == 15:
+                    continue
+                cluster = struct.unpack_from("<H", entry, 26)[0]
+                for _, sub_entry in volume.directory(cluster):
+                    if sub_entry[:4] == b"ZRDX" and sub_entry[8:11] == b"TMP" and sub_entry[0] != 0xe5:
+                        failures.append("swap file left in the long directory")
     provider = outputs["HOST"]
     if "External DPMI 1687: absent" not in provider:
         failures.append("unexpected external DPMI provider")

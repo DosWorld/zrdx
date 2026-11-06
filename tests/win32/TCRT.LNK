@@ -1,0 +1,15 @@
+system nt
+name TCRT.EXE
+file TCRT.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import ___getmainargs MSVCRT.__getmainargs
+import _atexit MSVCRT.atexit
+import _exit MSVCRT.exit
+import __initterm MSVCRT._initterm
+import __controlfp MSVCRT._controlfp
+import __fpreset MSVCRT._fpreset
+import ___p__fmode MSVCRT.__p__fmode
+import ___p___initenv MSVCRT.__p___initenv
+import __acmdln MSVCRT._acmdln
+import ___zrdx_split MSVCRT.__zrdx_split

@@ -84,6 +84,19 @@ SwitchTableTR: dw TSSSelector
 SwitchTableCS: dw Code0Selector
         LByte HasExitMessage
         db 0
+%ifdef SWAP
+        LWord SwapHandle
+        dw 0
+        LWord SwapPSP
+        dw 0
+        LDWord SwapInDos
+        dd 0
+        LWord SwapSlots
+        db 0                       ;size in MB
+        db 0                       ;InDOS baseline (SwapInit)
+        LWord SwapNameSeg
+        dw 0
+%endif
 int15handler:
         cmp ah, 88h
         _ifnot je
@@ -176,7 +189,32 @@ XMSICall@1:
         call far [ROffXMC]
         or ax, ax
         ret
-
+%ifdef SWAP
+;delete the swap file (if one was created)
+SwapRDelete:
+        cmp word [cs:ROffSwapHandle], 0
+        _ifnot je
+%ifdef NativeHost
+          mov bx, [cs:ROffSwapHandle]    ;still open here
+          mov ah, 3Eh
+          int 21h
+%endif
+          push ds
+          mov ds, [cs:ROffSwapNameSeg]
+          xor dx, dx
+          xor si, si
+          mov cx, 7                 ;any attributes
+          mov ax, 7141h
+          stc
+          int 21h
+          _ifnot jnc
+            mov ah, 41h
+            int 21h
+          _endif
+          pop ds
+        _endif
+        ret
+%endif
 
 ;warning - this code executed after program termination
 ;in a free dos memory block on small and unstable stack
@@ -222,6 +260,9 @@ ExitXMS:
         _endif
         xor al, al
         call HostA20              ;release exactly the host's A20 reference
+%ifdef SWAP
+        call SwapRDelete
+%endif
 Exit2:
         cmp byte [ROffHasExitMessage], 0
         _ifnot je

@@ -1,0 +1,26 @@
+system nt
+name TUCRT.EXE
+file TUCRT.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import ___stdio_common_vfprintf UCRTBASE.__stdio_common_vfprintf
+import ___stdio_common_vsprintf UCRTBASE.__stdio_common_vsprintf
+import ___stdio_common_vsprintf_s UCRTBASE.__stdio_common_vsprintf_s
+import ___stdio_common_vfscanf UCRTBASE.__stdio_common_vfscanf
+import ___stdio_common_vsscanf UCRTBASE.__stdio_common_vsscanf
+import ___acrt_iob_func UCRTBASE.__acrt_iob_func
+import __configure_narrow_argv UCRTBASE._configure_narrow_argv
+import __get_initial_narrow_environment UCRTBASE._get_initial_narrow_environment
+import __crt_atexit UCRTBASE._crt_atexit
+import __initialize_onexit_table UCRTBASE._initialize_onexit_table
+import __register_onexit_function UCRTBASE._register_onexit_function
+import __execute_onexit_table UCRTBASE._execute_onexit_table
+import __controlfp_s UCRTBASE._controlfp_s
+import __set_fmode UCRTBASE._set_fmode
+import __get_fmode UCRTBASE._get_fmode
+import ___p___argc UCRTBASE.__p___argc
+import ___p___argv UCRTBASE.__p___argv
+import ___p__acmdln UCRTBASE.__p__acmdln
+import _exit UCRTBASE.exit
+import __strdup UCRTBASE._strdup
+import _free UCRTBASE.free

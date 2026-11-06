@@ -71,9 +71,7 @@ NExitPages equ (OffLastInit - KernelBase + 4095) / 4096
 NLoaderPages equ WinSize >> 12
         pop eax
         _enddo jmp
-%ifndef VMM
         and byte [OffPageDir + 4], ~(2) ;disable client write access to server area
-%endif
         cld
 
 %define _nextrarpages ecx
@@ -131,31 +129,13 @@ L5@7:
             _enddo jne
           _endif
         _endif
+%ifdef SWAP
+        call SwapInit
+%endif
         sti
         ;push OffGDT+40h 20 10
         ;+(InvalidateTLBGateSelector and not 7) 8 10
         ;call MemDump
-%ifdef VMM
-        mov eax, [OffPage2 + ((OffPageDirAlias - KernelBase) >> 10)]
-        mov [OffPageDir + 8], eax
-        mov eax, [OffPage2 + ((OffPageExtinfoTable - KernelBase) >> 10)]
-        mov [OffPageDir + 12], eax
-        mov eax, [OffPageDir + 4]
-        mov [OffPageDirAlias + 4], eax
-        InvalidateTLB
-        ;push 10000
-        ;push OffGDT
-        ;call d_write_page
-        mov edi, Offswap_file_bitmap
-        push 800h
-        push edi
-        push 0
-        call alloc_pages
-        or eax, -(1)
-        cld
-        mov ecx, 800h >> 5
-        rep stosd
-%endif
         ;hlt
 %ifdef NativeHost
         jmp NativeHostStart

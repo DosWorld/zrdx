@@ -4,12 +4,6 @@
 
 ;real mode init routines
         SEGM IData16
-%ifdef VMM
-        LByte SwapFileName
-        db 'zrdx.swp', 0
-        LByte SwapFileEM
-        db 'swap I/O error', 0
-%endif
         LByte IntroMsg
         db 'Zurenava DOS extender, version 0.52OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
         LByte FirstError
@@ -27,6 +21,14 @@
         db 'native host needs direct VCPI/XMS/RAW ownership$'
 %else
         db 'already in V86 mode without VCPI or DPMI$'
+%endif
+%ifdef NATIVEPE
+        LByte NoHostEM
+        db 'no DPMI host for the PE run$'
+        LByte PEWrapEM
+        db "command line too long for the PE run$"
+        LByte RoleClient
+        db 0
 %endif
         LByte VCPIServerEM
         db 'unexpected VCPI host fault$'
@@ -49,42 +51,28 @@
         LLabel CRLF
         db 13, 10, '$'
         ESEG IData16
-        SEGM IText16
-;assume cs:DGROUP16, ds:DGROUP16, ss:DGROUP16
-RInit:
-InitDPMI:
-PSPSize equ 100h
-TryDPMI@167:
-%ifdef NativeHost
-        mov ax, 1687h
-        int 2Fh
-        test ax, ax
-        jnz .absent
-        mov si, ROffAlreadyVMEM
-        jmp RInitError
-.absent:
-        ret
-        ;InitRXV fills the switch stubs before the remaining init calls.
-%if (($-$$)-CurSegBaseR) < (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4)
-        times (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4) - (($-$$)-CurSegBaseR) db 90h
+%ifndef NativeHost
+%define CLIENTROLE
+%elifdef NATIVEPE
+%define CLIENTROLE
 %endif
-%else
+%macro ClientBody 2
         mov ax, 1687h
         int 2Fh
         or ax, ax
         _ifnot jz
-NoDPMI@167:
+%1:
           ret
         _endif
         shr bx, 1
-        jnc NoDPMI@167
+        jnc %1
         ;RMCodeSize = 0 ;SegSizeEText16
         mov bp, cs
         ;mov  ss, bp
         lea ax, [bp + si + ((ROffLoaderEnd + 200h + 15) / 16) + MouseRHandlerPSize]
         lea bx, [bp + MouseRHandlerPSize]
         lea bp, [bx + si]
-        add [ROffMemBlock0Size + PSP], si
+        add [ROff %+ %2 + PSP], si
         cmp ax, [2]
         mov si, OffDOSMemoryEM
         ja near RInitError
@@ -107,8 +95,287 @@ NoDPMI@167:
         mov si, ROffSwitchModeEM
         cld                 ;workaround for MS NT5(windows 2000) beta 3
         retf
+%endmacro
+        SEGM IText16
+;assume cs:DGROUP16, ds:DGROUP16, ss:DGROUP16
+RInit:
+InitDPMI:
+PSPSize equ 100h
+TryDPMI@167:
+%ifdef NATIVEPE
+        cmp byte [cs:ROffRoleClient], 0
+        jne TryClient@171
+%endif
+%ifdef NativeHost
+        mov ax, 1687h
+        int 2Fh
+        test ax, ax
+        jnz .absent
+        mov si, ROffAlreadyVMEM
+        jmp RInitError
+.absent:
+        ret
+        ;InitRXV fills the switch stubs before the remaining init calls.
+%if (($-$$)-CurSegBaseR) < (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4)
+        times (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4) - (($-$$)-CurSegBaseR) db 90h
+%endif
+%else
+        ClientBody NoDPMI@167, MemBlock0Size
+%endif
+%ifdef NATIVEPE
+TryClient@171:
+        call TryClientX@171
+        mov si, ROffNoHostEM
+        jmp RInitError
+TryClientX@171:
+        ClientBody NoClientRet@171, MemBlock0SizeL
 %endif
 LS equ 0
+
+%ifdef PEMAX
+;ds = environment. CF set if it holds ZRDXROLE= (task 170).
+RoleScan@170:
+        push bx
+        xor bx, bx
+.n:     cmp byte [bx], 0
+        je .no
+        cmp word [bx], 525Ah
+        jne .skip
+        cmp word [bx + 2], 5844h
+        jne .skip
+        cmp word [bx + 4], 4F52h
+        jne .skip
+        cmp word [bx + 6], 454Ch
+        jne .skip
+        cmp byte [bx + 8], '='
+        je .yes
+.skip:  inc bx
+        js .no
+        cmp byte [bx - 1], 0
+        jne .skip
+        jmp .n
+.yes:   pop bx
+        stc
+        ret
+.no:    pop bx
+        clc
+        ret
+
+;Open the file named by the first token of the command tail
+;(es = PSP). Out: ax = handle; di and es are kept.
+RoleOpen@170:
+        push ds
+        push es
+        pop ds
+        mov si, 81h
+.sp:    lodsb
+        cmp al, ' '
+        je .sp
+        dec si
+        cmp word [si], '/#'
+        jne .tok
+        cmp byte [si + 2], 'R'
+        jne .tok
+        cmp byte [si + 3], ' '
+        jne .tok
+        add si, 3
+        jmp .sp
+.tok:   cmp byte [si], 0Dh
+        je .fail
+        mov dx, si
+        mov bp, si
+.en:    inc bp
+        cmp byte [ds:bp], 21h
+        jae .en
+        mov al, [ds:bp]
+        push ax
+        mov byte [ds:bp], 0
+        push dx
+        mov bx, 20h
+        xor cx, cx
+        mov dx, 1
+        mov ax, 716Ch
+        stc
+        int 21h
+        pop dx
+        jnc .ok
+        mov si, dx
+        mov ax, 3D20h
+        int 21h
+        jc .bad
+.ok:    mov bx, ax
+        pop ax
+        mov [ds:bp], al
+        mov ax, bx
+        pop ds
+        ret
+.bad:   pop ax
+        mov [ds:bp], al
+.fail:  mov si, ROffFileAccessEM
+        jmp RInitError
+
+;ds = environment, es = PSP. CF set if the run is a client role: the
+;environment holds ZRDXROLE= or the command tail starts with the
+;marker token "/#R" (task 172).
+RoleCheck@172:
+        call RoleScan@170
+        jc .yes
+        push si
+        mov si, 81h
+.sp:    es lodsb
+        cmp al, ' '
+        je .sp
+        cmp al, '/'
+        jne .no
+        es lodsw
+        cmp ax, '#R'
+        jne .no
+        es lodsb
+        cmp al, ' '
+        je .yes0
+        cmp al, 0Dh
+        je .yes0
+.no:    pop si
+        clc
+        ret
+.yes0:  pop si
+.yes:   stc
+        ret
+
+%ifdef NATIVEPE
+;Host role, ds = es = PSP. If the first token of the command tail
+;names a PE file, the tail becomes "<own path> /#R <old tail>": the
+;host then runs itself as the client role (task 172).
+PEWrap@172:
+        mov si, 81h
+.sp:    lodsb
+        cmp al, ' '
+        je .sp
+        cmp al, 9
+        je .sp
+        cmp al, 0Dh
+        je near .none
+        dec si
+        mov dx, si
+        mov bp, si
+.en:    inc bp
+        cmp byte [ds:bp], 21h
+        jae .en
+        mov al, [ds:bp]
+        push ax
+        mov byte [ds:bp], 0
+        mov ax, 3D00h
+        int 21h
+        jc .res0
+        mov bx, ax
+        sub sp, 64
+        mov di, sp
+        push ds
+        push ss
+        pop ds
+        mov dx, di
+        mov cx, 64
+        mov ah, 3Fh
+        int 21h
+        jc .rd
+        cmp ax, 64
+        jb .rd
+        cmp word [di], 'MZ'
+        jne .rd
+        mov dx, [di + 3Ch]
+        mov cx, [di + 3Eh]
+        mov ax, 4200h
+        int 21h
+        jc .rd
+        mov dx, di
+        mov cx, 4
+        mov ah, 3Fh
+        int 21h
+        jc .rd
+        cmp ax, 4
+        jb .rd
+        cmp word [di], 'PE'
+        jne .rd
+        cmp word [di + 2], 0
+        jne .rd
+        mov si, 1
+        jmp short .cl
+.rd:    xor si, si
+.cl:    mov ah, 3Eh
+        int 21h
+        pop ds
+        add sp, 64
+        jmp short .res
+.res0:  xor si, si
+.res:   pop ax
+        mov [ds:bp], al
+        or si, si
+        jnz .pe
+.none:  ret
+.pe:    mov es, [2Ch]
+        xor di, di
+        xor ax, ax
+        cld
+.ev:    cmp byte [es:di], 0
+        je .evd
+        mov cx, 7FFFh
+        sub cx, di
+        repne scasb
+        jne near .fail
+        jmp .ev
+.evd:   add di, 3
+        mov si, di
+.pl:    cmp byte [es:di], 0
+        je .pld
+        inc di
+        cmp di, 7FFFh
+        jb .pl
+        jmp .fail
+.pld:   mov cx, di
+        sub cx, si
+        mov bx, cx
+        add bx, 5
+        xor ax, ax
+        mov al, [80h]
+        mov dx, ax
+        add dx, bx
+        cmp dx, 126
+        ja .fail
+        push es
+        push ds
+        pop es
+        push si
+        push cx
+        mov si, 81h
+        add si, ax
+        mov di, si
+        add di, bx
+        mov cx, ax
+        inc cx
+        std
+        rep movsb
+        cld
+        mov [80h], dl
+        pop cx
+        pop si
+        pop ds
+        mov di, 81h
+        mov al, ' '
+        stosb
+        rep movsb
+        mov al, ' '
+        stosb
+        mov ax, '/#'
+        stosw
+        mov al, 'R'
+        stosb
+        push es
+        pop ds
+        ret
+.fail:  mov si, ROffPEWrapEM
+        jmp RInitError
+%endif
+%endif
 
 VCPIRICall:
         int 67h
@@ -138,12 +405,7 @@ VCPIRIEmulator:
 
 CriticalInitVCPI@167:
         mov dx, ds
-%ifndef VMM
-          add dx, (ROffRStackEnd + 1FFFh + PSPSize) / 16
-%else
-        ;allocate additional space for vmm disk transfer buffer
-          add dx, (ROffRStackEnd + 1000h + 1FFFh + PSPSize) / 16
-%endif
+          add dx, (RMBSSEnd + 1FFFh + PSPSize) / 16
         mov dl, 0              ;page aligment
         mov cl, 0
         cmp cx, dx
@@ -249,7 +511,7 @@ MovePageRef1@167:
         ret
         LLabel PermanentPart
 
-%ifndef NativeHost
+%ifdef CLIENTROLE
         LLabel DefaultFlatDescriptor
         Descr 0, 0FFFFFh, 0CF93h               ;Flat data descriptor
         LLabel ILoaderEntry0
@@ -280,6 +542,12 @@ MovePageRef1@167:
         mov bp, ExtenderStart + LS
         call AllocAndMove@167          ;allocate and move extender
         mov [ROffExtenderSel + LS], bx
+%ifdef PEMAX
+        mov [ROffExtenderSelB + LS], bx
+        mov [ROffExtenderSelC + LS], bx
+        mov [ROffExtenderSelD + LS], bx
+        mov [ROffExtenderSelE + LS], bx
+%endif
         mov bp, bx                 ;save code selector for extender
         mov ds, ax
         push bx                     ;save code selector on the stack
@@ -288,6 +556,13 @@ MovePageRef1@167:
 ;assume es:EGroup
         mov [dword OffSelReference0 - 4], ax
         mov [dword OffSelReference1 - 2], ax
+%ifdef PEMAX
+        mov [dword OffPESelD - 4], ax
+        push ax
+        mov ax, [dword OffFlatSelector]
+        mov [dword OffPESelE - 4], ax
+        pop ax
+%endif
         pusha
         mov ah, 0fh
         int 10h
@@ -550,6 +825,13 @@ RInitError:
         int 21h
         _endif
 
+%ifdef NATIVEPE
+        call RoleCheck@172
+        _ifnot jnc
+          mov byte [cs:ROffRoleClient], 1
+          jmp ClientFront@171
+        _endif
+%endif
 %ifdef NativeHost
         mov ax, es
         mov [cs:ROffNativeRootPSP], ax
@@ -560,7 +842,15 @@ RInitError:
         mov [cs:ROffNativeCPU], al
         push es
         pop ds
-%else
+%ifdef NATIVEPE
+        call PEWrap@172
+%endif
+%endif
+%ifdef CLIENTROLE
+%ifdef NATIVEPE
+        jmp FrontDone@171
+ClientFront@171:
+%endif
         inc di
         inc di
         mov dx, di
@@ -569,6 +859,13 @@ RInitError:
         js RInitError
         cmp [di - 1], ah
         _enddo jne
+%ifdef PEMAX
+        call RoleCheck@172
+        jnc NoRole@170
+        call RoleOpen@170
+        jmp short RoleOpened@170
+NoRole@170:
+%endif
         mov si, ROffFileAccessEM
         push dx
         push si
@@ -588,9 +885,14 @@ RInitError:
           int 21h
           jc RInitError
         _endif
+%ifdef PEMAX
+RoleOpened@170:
+%endif
         push es
         pop ds
+%ifndef NativeHost
         add [ROffEnvSize + PSP], di
+%endif
         mov [ROffFileHandle + PSP], ax
         pushad
         mov bx, ax
@@ -610,7 +912,7 @@ RInitError:
         jc CfgFree
         cmp ax, 14
         jne CfgFree
-        cmp dword [si], 'ZRXC'
+        cmp dword [si], 'ZRDX'
         jne CfgFree
         add si, 4
         mov di, InitFlags + PSP
@@ -634,6 +936,9 @@ CfgDone:
           int 21h
         _endif
 
+%ifdef NATIVEPE
+FrontDone@171:
+%endif
 %endif
 ;------------ Setup linear disp for all references to 16Stub -----------------
         xor ebx, ebx
@@ -647,7 +952,7 @@ CfgDone:
         add [di], ebx
         inc si
         _enddo jnz
-%ifndef NativeHost
+%ifdef CLIENTROLE
         mov ax, [ROffTransferBufferPSize + PSP]  ;patch transfer buffer size
         mov [ROffPatchPointTStSz - 2 + PSP], ax  ;in loader code
 %endif
@@ -659,6 +964,76 @@ CfgDone:
           call TryDPMI@167
           call TryVCPI@167
         _endif
+%ifdef SWAP
+;only the host needs the file (no VCPI, no DPMI provider)
+        push ds
+        pop es
+%ifdef NativeHost
+;optional "/S<hex MB>" before the program name sets the swap
+;size; it is blanked out of the command tail (task 133)
+        mov si, 81h
+SwSk@167:
+        lodsb
+        cmp al, ' '
+        je SwSk@167
+        cmp al, '/'
+        jne SwArgs@167
+        lea di, [si - 1]
+        lodsb
+        and al, 0DFh
+        cmp al, 'S'
+        jne SwArgs@167
+        xor bx, bx
+SwHx@167:
+        lodsb
+        sub al, '0'
+        cmp al, 9
+        jbe SwDg@167
+        and al, 0DFh
+        sub al, 7
+        cmp al, 10
+        jb SwBlank@167
+SwDg@167:
+        cmp al, 15
+        ja SwBlank@167
+        shl bl, 4
+        or bl, al
+        jmp SwHx@167
+SwBlank@167:
+        mov [InitFlags + PSP + 1], bl
+        mov cx, si
+        sub cx, di
+        dec cx
+        mov al, ' '
+        rep stosb
+SwArgs@167:
+%endif
+;swap: the size in megabytes is the high byte of InitFlags
+;(0 = off); the file itself is made at the first page out
+;(SwapCreate). Keep the host PSP and the InDOS flag address.
+        mov al, [InitFlags + PSP + 1]
+        mov [ROffSwapSlots + PSP], al
+        test al, al
+        jz SwNone@167
+        mov ah, 51h
+        int 21h
+        mov [ROffSwapPSP + PSP], bx
+        mov ax, [2Ch]              ;the real environment, before
+        mov [ROffSwapNameSeg + PSP], ax  ;the PM selector replaces it
+        push es
+        mov ah, 34h
+        int 21h                  ;InDOS flag address
+        mov ax, es
+        pop es
+        movzx eax, ax
+        shl eax, 4
+        movzx ebx, bx
+        add eax, ebx
+        mov [ROffSwapInDos + PSP], eax
+SwNone@167:
+        push ds
+        pop es
+%endif
 TryXMS@167:
 ;look for PE bit in cr0 - must be cleared for RAW/XMS!
         smsw ax
@@ -729,21 +1104,6 @@ VETest@167:
 InitRXV:
         push ds
         pop es
-%ifdef VMM
-;----------------- open swap file -------------------
-          mov dx, ROffSwapFileName + PSP
-          mov ah, 3Ch
-          mov cx, 20h
-          int 21h            ;create swap file
-          mov si, OffSwapFileEM
-          jc RInitError
-          mov [ROffswap_file_handle + PSP], ax
-          xchg bx, ax
-          mov dx, 1
-          xor cx, cx
-          mov ax, 4200h
-          int 21h             ;seek to 1
-%endif
 ;save all interrupt vectors
         mov di, ROffSavedRealVectors + PSP
         xor si, si
@@ -792,6 +1152,11 @@ PatchPoint7End:
         ; -- special set trap selector for int 31h --
         mov word [ROffFirstTrap3 + PSP + (4 * 31h) + 5], DPMIEntryGateSelector
         mov byte [dword ROffFirstTrap3 + OffPMSaveStateTrap3 + 7 + PSP], RetfCode
+%ifdef VENDORON
+%ifndef VENDORPE
+        mov byte [dword ROffFirstTrap3 + OffVendorTrap3 + 7 + PSP], RetfCode
+%endif
+%endif
 
 ;-------------------------- init some TSS fields ------------------------
         mov dword [ROffTSS + PSP + TSS_ESP0], OffKernelStack
@@ -1048,11 +1413,6 @@ Init8HandlersAbs:
           mov cx, (OffException0DHandler & 0FFFFh) - 7
           cmp di, 0Dh
           _toendif je
-%ifdef VMM
-            mov cx, (OffException0EHandler & 0FFFFh) - 7
-            cmp di, 0Eh
-            _toendif je
-%endif
           mov cx, (OffExceptionOrInterruptH & 0FFFFh) - 7
           bt word [ROffPassupIntPMap + PSP], di
           _ifnot jc

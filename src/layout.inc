@@ -2,6 +2,15 @@
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 ;NASM version
+%ifdef VENDOR
+%ifndef NativeHost
+%define VENDORON
+%endif
+%endif
+%ifdef PEMAX
+%define VENDORON
+%define VENDORPE
+%endif
 
 ;layout of the virtual segments, must precede the code
 
@@ -50,10 +59,6 @@ DTASize equ 40h
 NTraps3c equ NTraps3
 
         VSegm BSS
-%ifdef VMM
-        DFD swap_file_size      ;current size of the swap file
-        DFD free_swap_cluster   ;index of possible first free cluster in the swap file
-%endif
         DFD n_fplists
         DFD Exception0DStack
         DFD TotalPagesCount
@@ -101,11 +106,6 @@ NTraps3c equ NTraps3
         DFL KernelStack1End
         DFB KernelStackStart, 200h
         DFL KernelStack
-%ifdef VMM
-  DFD SavedPMStack, 2
-  DFB LockedStack, 1000h
-  DFL LockedStackBottom
-%endif
 %ifndef Release
 %assign Vl 500 / 10
         DFD TVector, Vl      ;for test only
@@ -133,10 +133,6 @@ LockedStackSize equ 1000h
 ;DFB LockedStackStart, LockedStackSize
 ;DFL LockedStack
         DFD nEntriesInTable, 1024
-%ifdef VMM
-        DFD PageDirAlias, 1024      ;page table for direct access to all page tables
-        DFD PageExtinfoTable, 1024  ;page table for page extinfo array
-%endif
         DFD LDT, (17 + 4) * 2
         DFL LastInit
         DFD LDTNext, 4000h - (17 + 4) * 2
@@ -151,15 +147,7 @@ LockedStackSize equ 1000h
 ;DFD PageDirAlias, 1024
 ;DFD PageExtinfo_table, 1024
 %assign F (800000h - LC) >> 2
-%ifdef VMM
-%assign F F - 1024 * 32
-%endif
         DFD MCBVector, F          ;Must be Last !
-%ifdef VMM
-        DFD swap_file_bitmap, 1024 * 32
-        DFD PageTables, 1024 * 1024
-        DFD PageExtinfo, 1024 * 1024
-%endif
         DFL ClientPages
 
 ;PageDirEntry   = Page2[(OffPageDir-KernelBase) shr 10]
@@ -173,10 +161,6 @@ Page2Index equ (OffPage2 - KernelBase) >> 12
 ;SDir0Entry      = Page2[(OffSDir0Win-KernelBase) shr 10]
 ;SDir1Entry      = Page2[(OffSDir1Win-KernelBase) shr 10]
 ;FpListPte       = Page2[(OffFpList-KernelBase) shr 10]      ;fplist_entry
-%ifdef VMM
-;PageDirAliasPte= Page2[(OffPageDirAlias-KernelBase) shr 10]      ;fplist_entry
-;PageExtinfoTablePte=Page2[(OffPageExtinfoTable-KernelBase) shr 10]      ;fplist_entry
-%endif
         EVSeg BSS
 
 %assign SelectorNum 8
@@ -197,9 +181,6 @@ Page2Index equ (OffPage2 - KernelBase) >> 12
         DefSelector InvalidateTLBGate, 1, 1
         DefSelector PageMoveGate, 1, 1
         DefSelector LoadLDTGate, 1, 1
-%ifdef VMM
-  DefSelector SwitchTo0Gate, 1, 1
-%endif
         DefSelector Trap3, 1, 3         ;PL3 selector for traps
         DefSelector LockedStack, 1, 3   ;not flat selector for client locked stack
         DefSelector TSS

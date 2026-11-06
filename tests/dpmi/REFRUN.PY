@@ -23,7 +23,7 @@ if args.bound:
  for n in env['TOOLS']:shutil.copyfile(args.bound/'bin'/n,w/n)
  for source,target in [('tests/rdf/T02.RDO','LE.RDO'),('tests/rdf/T02.exe','RDF.EXE'),('tests/pe/GOOD.EXE','PE.EXE'),('tests/dpmi/PROBE.EXE','PROBE.EXE')]:
   shutil.copyfile(args.bound/source,w/target)
- b += ['rlink le /zrdx /o=LE.EXE LE.RDO > LE.BLD','if errorlevel 1 goto bad','ZRXBIND -r -n -y LE.EXE >> LE.BLD','if errorlevel 1 goto bad','ZRXSETUP /B0 LE.EXE >> LE.BLD','if errorlevel 1 goto bad','ZRXSETUP /B0 PE.EXE > PE.BLD','if errorlevel 1 goto bad']
+ b += ['rlink le /zrdx /o=LE.EXE LE.RDO > LE.BLD','if errorlevel 1 goto bad','ZRDXBIND -r -n -y LE.EXE >> LE.BLD','if errorlevel 1 goto bad','ZRDXCONF /B0 LE.EXE >> LE.BLD','if errorlevel 1 goto bad','ZRDXCONF /B0 PE.EXE > PE.BLD','if errorlevel 1 goto bad']
 
 for width in (16,32):
  b += [r'C:\HX\BIN\HDPMI'+str(width)+'.EXE -r > HDP'+str(width)+'.LOG','HOST.COM > HOST'+str(width)+'.LOG']

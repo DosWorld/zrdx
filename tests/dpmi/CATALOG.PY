@@ -92,3 +92,20 @@ AUX = {'DRSAVE': 'BAS32 base and register contracts: ok\n'
  'A20X': 'BRG16 real mode bridges: ok\n'
          'NATL16 locked events: ok\n'
          'A20X paired host ownership: ok'}
+
+SWAP = {'SWAPT': 'SWAPT demand paging: ok',
+        'SWAPF': 'SWAPF store full: ok',
+        'SWAPC': None,
+        'SWAPK': 'SWAPT demand paging: ok',
+        'SWAPN': 'SWAPN nested paging: SWAPCH child: ok\nok',
+        'SWAPCH': 'SWAPCH child: ok',
+        'SWAPW': 'SWAPW write failure: ok',
+        'SWAPR': None}
+# Must end with a client fault (exit status 1)
+# Needs a VENDOR build (tests/dpmi/VENDRUN.PY)
+VENDOR = {'VENDOR': 'VENDOR entry: ok'}
+SWAP_CRASH = ('SWAPC', 'SWAPR')
+# zrdxconf /S value of a case (default 10h); SWAPFAIL builds only
+SWAP_SIZE = {'SWAPW': '71', 'SWAPR': '72'}
+# more zrdxconf options of a case: the parent leaves memory to its child
+SWAP_OPTS = {'SWAPN': '/X800 '}

@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--profile", choices=("raw", "xms", "vcpi"), default="xms")
     parser.add_argument("--case", action="append", choices=tuple(EXPECTED))
     parser.add_argument("--core", choices=("normal", "auto", "dynamic"), default="normal")
+    parser.add_argument("--image", choices=("zrdxdpmi", "zrdxnp"), default="zrdxdpmi",
+                        help="root source linked as the native host")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--qemu", type=Path)
     parser.add_argument("--timeout", type=int, default=120)
@@ -101,17 +103,17 @@ def main():
     subprocess.run([shutil.which("nasm"), "-f", "bin", str(ROOT / "tests/dpmi/HOST.ASM"),
                     "-o", str(work / "HOST.COM")], check=True)
     subprocess.run([shutil.which("nasm"), "-O9", "-f", "obj", "-l", "NATIVE.LST",
-                    "zrxdpmi.asm", "-o", "zrxdpmi.obj"], cwd=work / "src", check=True)
+                    args.image + ".asm", "-o", args.image + ".obj"], cwd=work / "src", check=True)
     ENV["config"](work, "xms", False)
     ENV["dos"](work, "\n".join([
-        "@echo off", "cd src", "wlink option quiet option map=NATIVE.MAP name zrxdpmi.exe format dos file zrxdpmi.obj > LINK.LOG",
-        "if errorlevel 1 goto bad", "copy zrxdpmi.exe .." + chr(92), "cd ..",
+        "@echo off", "cd src", "wlink option quiet option map=NATIVE.MAP name zrdxdpmi.exe format dos file " + args.image + ".obj > LINK.LOG",
+        "if errorlevel 1 goto bad", "copy zrdxdpmi.exe .." + chr(92), "cd ..",
         "echo OK > STATUS.LOG", "goto end", ":bad", "cd R:" + chr(92), "echo FAILED > STATUS.LOG", ":end"]) + "\n", args.timeout)
-    cases = args.case or [name for name in EXPECTED if args.qemu or not name.startswith("NMX")]
+    cases = args.case or [name for name in EXPECTED if args.qemu or not name.startswith(("NMX", "KST"))]
     failures = []
     if not args.build_only and args.qemu:
         command = [sys.executable, str(ROOT / "tests/dpmi/QCHECK.PY"), "--qemu", str(args.qemu),
-                   "--native-host", str(work / "ZRXDPMI.EXE"), "--fixtures", str(work),
+                   "--native-host", str(work / "ZRDXDPMI.EXE"), "--fixtures", str(work),
                    "--work", str(work / "QEMU"), "--profile", args.profile, "--timeout", str(args.timeout)]
         for name in cases:
             command += ["--case", name]
@@ -121,11 +123,11 @@ def main():
         ENV["config"](work, args.profile, False)
         conf = work / "DOSBOX.CON"
         ENV["write"](conf, re.sub(r"(?m)^core\s*=.*$", "core = " + args.core, conf.read_text()))
-        lines = ["@echo off", "HOST.COM > BEFORE.LOG", "ZRXDPMI HOST.COM > INSIDE.LOG"]
+        lines = ["@echo off", "HOST.COM > BEFORE.LOG", "ZRDXDPMI HOST.COM > INSIDE.LOG"]
         for number, name in enumerate(cases):
             for suffix in (".LOG", ".STS"):
                 (work / (name + suffix)).unlink(missing_ok=True)
-            lines += ["ZRXDPMI " + name + ".COM > " + name + ".LOG",
+            lines += ["ZRDXDPMI " + name + ".COM > " + name + ".LOG",
                       "if errorlevel 1 goto fail" + str(number), "echo 0 > " + name + ".STS",
                       "goto done" + str(number), ":fail" + str(number), "echo 1 > " + name + ".STS", ":done" + str(number)]
         lines += ["HOST.COM > AFTER.LOG", "echo OK > STATUS.LOG"]
@@ -140,7 +142,7 @@ def main():
                 failures.append(name + ": incorrect provider lifetime")
     manifest = {"profile": args.profile, "core": args.core if not args.qemu else "qemu-tcg", "build_only": args.build_only, "cases": cases,
                 "failures": failures, "source": source_digest.hexdigest(),
-                "host": hashlib.sha256((work / "ZRXDPMI.EXE").read_bytes()).hexdigest(),
+                "host": hashlib.sha256((work / "ZRDXDPMI.EXE").read_bytes()).hexdigest(),
                 "clients": {name: hashlib.sha256((work / (name + ".COM")).read_bytes()).hexdigest() for name in cases}}
     ENV["write"](work / "NATIVE.JSN", json.dumps(manifest, indent=2) + "\n")
     for failure in failures:

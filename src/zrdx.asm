@@ -14,10 +14,9 @@ cpu 386
 %include "vcpiemu.asm"
 %include "dpmifunc.asm"
 %include "mem.asm"
-%ifdef VMM
-%include "vmm.asm"
-%else
 %include "smm.asm"
+%ifdef SWAP
+%include "swapmm.asm"
 %endif
 %include "prothand.asm"
 %include "leldr.asm"
@@ -27,6 +26,7 @@ cpu 386
         ESEG DBText
 %endif
 %include "extender.asm"
+%include "vendor.asm"
 %include "realinit.asm"
 %include "closerec.asm"
 %include "segend.asm"

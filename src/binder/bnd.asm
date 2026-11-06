@@ -26,6 +26,7 @@ le_found: db 0
 header_count: dw 0
 StubLeName: db 'stub-le.exe', 0
 StubPeName: db 'stub-pe.exe', 0
+StubPmxName: db 'stub-pmx.exe', 0
 StubRdfName: db 'stub-rdf.exe', 0
 SuccMsg: db 'Binding complete', 13, 10, 0
 UserTermMsg: db 13, 10, 'Terminated by user answer', 0
@@ -46,14 +47,14 @@ BadHeadErrMsg: db 'Bad or unsupported header in "', 1, '"', 0
 DiskFullMsg: db ', disk full ?'
 EmptyMsg: db 0
 HelpMsg: db "Usage:", 13, 10
-db "  zrxbind -r [-y][-n] <target file> [backup file]", 13, 10
+db "  zrdxbind -r [-y][-n] <target file> [backup file]", 13, 10
 db "     replace stub in the target file and make a backup copy to backup file", 13, 10
 db "     (target name with .bak extention is default)", 13, 10
 db "     -n option: don't make backup", 13, 10
 db "     -y option: assume yes on all questions(never prompt for overwrite)", 13, 10
-db "  zrxbind [-c] [-y] <old file> <new file>", 13, 10
+db "  zrdxbind [-c] [-y] <old file> <new file>", 13, 10
 db "     copy <old file> with new stub to <new file>", 13, 10
-db "  zrxbind -w [-y] [target file]", 13, 10
+db "  zrdxbind -w [-y] [target file]", 13, 10
 db "     write zrdx stub to the target file(zrdx.exe is default)"
 CrLfMsg: db 13, 10, 0
 YesMsg: db 'Yes', 13, 10, 0
@@ -204,7 +205,7 @@ start:
         mov ah, 9
 section .data
 IntroMsg: db 'Zurenava DOS extender bind utility ver.0.52OSE. (C) 1998-1999, Sergey Belyakov', 13, 10, '(C) 2026, Viacheslav Komenda', 13, 10, '$'
-CfgTrailer: db 'ZRXC'
+CfgTrailer: db 'ZRDX'
         dw 0
         dw 400h
         dd 0FFFFFFFFh
@@ -468,12 +469,9 @@ main_cicle:
           _ifnot jne
             cmp word [header_count], 40h
             jb BadHeader
-            cmp _msize_h, word [buffer + 40h - 2]
-            _ifnot jb
-              _toendif ja
-              cmp _msize_l, word [buffer + 40h - 4]
-              _toendif ja
-            _else
+            mov _t_l, word [buffer + 40h - 4]   ;e_lfanew wins even
+            or _t_l, word [buffer + 40h - 2]    ;inside the MZ image
+            _ifnot jz
               mov _msize_h, word [buffer + 40h - 2]
               mov _msize_l, word [buffer + 40h - 4]
             _endif
@@ -759,8 +757,24 @@ lwrite:
 write_le_stub:
         mov dx, StubLeName
         jmp short write_stub_file
+; buffer = PE header. stub-pmx.exe when the DLL flag is set or
+; the import directory is non-empty, else stub-pe.exe.
 write_pe_stub:
         mov dx, StubPeName
+        cmp word [header_count], 136
+        jb write_stub_file
+        test byte [buffer + 23], 20h
+        jnz .pmx
+        cmp word [buffer + 118], 0
+        jne .dirs
+        cmp word [buffer + 116], 2
+        jb write_stub_file
+.dirs:  mov ax, [buffer + 128]
+        or ax, [buffer + 130]
+        or ax, [buffer + 132]
+        or ax, [buffer + 134]
+        jz write_stub_file
+.pmx:   mov dx, StubPmxName
         jmp short write_stub_file
 write_rdf_stub:
         mov dx, StubRdfName

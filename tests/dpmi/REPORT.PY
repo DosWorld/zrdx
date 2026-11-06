@@ -57,7 +57,8 @@ def validate(row, data, tools):
         for case in cases:
             require(any(case + ext in data["inputs"] for ext in (".COM", ".EXE")), "case input missing: " + case)
         if kind == "native":
-            require("ZRXDPMI.EXE" in data["inputs"], "missing host identity")
+            require("ZRDXDPMI.EXE" in data["inputs"] or (
+            stage == "historical" and "ZRXDPMI.EXE" in data["inputs"]), "missing host identity")
     elif kind == "dosbox":
         require(data.get("build_only") is False and hashes(data.get("clients")), "incomplete DOSBox result")
         require(hashes({"source": data.get("source"), "host": data.get("host")}), "missing DOSBox identity")
@@ -75,10 +76,11 @@ def validate(row, data, tools):
     require(data.get("completed") is True, "campaign not completed")
     require(data.get("source") == tools["source_sha256"], "stale source identity")
     if kind == "native":
-        require(data["inputs"]["ZRXDPMI.EXE"] == tools["tools"]["zrxdpmi.exe"], "stale native host")
+        require(data["inputs"]["ZRDXDPMI.EXE"] == tools["tools"]["zrdxdpmi.exe"], "stale native host")
     else:
-        wanted = {k: v for k, v in tools["tools"].items() if k != "zrxdpmi.exe"}
-        require(data.get("tools") == wanted, "stale bound tools")
+        wanted = {k: v for k, v in tools["tools"].items() if k != "zrdxdpmi.exe"}
+        have = {k: v for k, v in (data.get("tools") or {}).items() if k != "zrdxdpmi.exe"}
+        require(have == wanted, "stale bound tools")
     if kind == "legacy":
         require(row["cases"] == "" and data.get("ok_lines") == 99 and data.get("lfn_passes") == 2, "incomplete legacy coverage")
         require(data.get("lfn") == "true", "LFN gate missing")

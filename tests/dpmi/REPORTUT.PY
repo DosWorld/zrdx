@@ -12,7 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 R = runpy.run_path(str(ROOT / "tests/dpmi/REPORT.PY"))
 H = "a" * 64
-TOOLS = {"source_sha256": H, "tools": {"zrxdpmi.exe": H, "stub-le.exe": H}}
+TOOLS = {"source_sha256": H, "tools": {"zrdxdpmi.exe": H, "stub-le.exe": H}}
 
 
 def fixture():
@@ -22,7 +22,7 @@ def fixture():
             "timed_out": False, "failures": [], "cases": names,
             "provider": "External DPMI 1687: absent\nVCPI DE00: absent\nXMS 4300: absent",
             "inputs": {n + ".COM": H for n in names}}
-    data["inputs"]["ZRXDPMI.EXE"] = H
+    data["inputs"]["ZRDXDPMI.EXE"] = H
     row = {"run": "test", "kind": "native", "profile": "raw", "stage": "current", "cases": ','.join(names), "notes": ""}
     return row, data
 
@@ -51,7 +51,7 @@ class Evidence(unittest.TestCase):
             changed[key] = value
             with self.subTest(key=key), self.assertRaises(ValueError):
                 R["validate"](row, changed, TOOLS)
-        data["inputs"]["ZRXDPMI.EXE"] = "b"*64
+        data["inputs"]["ZRDXDPMI.EXE"] = "b"*64
         with self.assertRaises(ValueError):
             R["validate"](row, data, TOOLS)
 
@@ -126,7 +126,7 @@ class Timing(unittest.TestCase):
         manifest = dict(completed=True, failures=[], timed_out=False,
                         cases=['HOST', 'LATENC'], icount=True, icount_shift=3,
                         profile='raw', qemu='QEMU test', provider='raw',
-                        inputs={'LATENC.COM': H, 'ZRXDPMI.EXE': H})
+                        inputs={'LATENC.COM': H, 'ZRDXDPMI.EXE': H})
         record = dict(manifest=manifest, samples=samples,
                       sample_sha256=hashlib.sha256(struct.pack('<15Q', *samples)).hexdigest())
         self.data = dict(schema='latency-1', iterations=10000,

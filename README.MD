@@ -34,7 +34,7 @@ executable. The program starts, the stub switches the PC to protected mode, load
 the main module and hands it a flat 32-bit world — exactly what DOS/4G(W) does,
 but small, free and hackable. No `DOS4GW.EXE` next to your program. 🎉
 
-It is also a **standalone DPMI 0.9 host** (`zrxdpmi.exe`) for 16-bit and 32-bit clients.
+It is also a **standalone DPMI 0.9 host** (`zrdxdpmi.exe`) for 16-bit and 32-bit clients.
 
 | | |
 |---|---|
@@ -59,15 +59,15 @@ Everything you need is in [`bin/`](bin):
 
 | File | What it is |
 |---|---|
-| `zrxbind.com` | binds a ZRDX stub to your program (a 2 KB `.COM`) |
+| `zrdxbind.com` | binds a ZRDX stub to your program (a 2 KB `.COM`) |
 | `stub-le.exe` | the stub for **LE** programs (DOS4G/W style) |
 | `stub-pe.exe` | the stub for **PE** programs |
 | `stub-rdf.exe` | the stub for **RDOFF2** (`.rdf`) programs |
-| `zrxsetup.exe` | changes the settings of a bound program |
-| `zrxdpmi.exe` | standalone **DPMI 0.9 host** (RAW / XMS / VCPI): `zrxdpmi PROGRAM.COM` |
+| `zrdxconf.exe` | changes the settings of a bound program |
+| `zrdxdpmi.exe` | standalone **DPMI 0.9 host** (RAW / XMS / VCPI) with the PE loader: `zrdxdpmi PROGRAM.COM`, `zrdxdpmi PROGRAM.EXE` (PE + DLLs) |
 
-> ⚠️ `zrxbind.com` takes the stubs **only from its own directory** (found via the DOS
-> environment block, DOS 3.0+) — keep `zrxbind.com` and the `stub-*.exe` files together.
+> ⚠️ `zrdxbind.com` takes the stubs **only from its own directory** (found via the DOS
+> environment block, DOS 3.0+) — keep `zrdxbind.com` and the `stub-*.exe` files together.
 > The stub is chosen by the format of the input file; you do not pick it.
 
 ```bat
@@ -75,7 +75,7 @@ Everything you need is in [`bin/`](bin):
 wcl386 -l=dos4g -bt=dos hello.c
 
 :: 2. bind ZRDX to it
-zrxbind -c hello.exe hellz.exe
+zrdxbind -c hello.exe hellz.exe
 
 :: 3. run it - no DOS4GW.EXE needed
 hellz.exe
@@ -90,29 +90,29 @@ hello from 32-bit
 Want a DPMI host for a separate DPMI client instead of binding? Run it through the host:
 
 ```bat
-zrxdpmi myclient.com      :: the host owns discovery (1687h) for this command only
+zrdxdpmi myclient.com      :: the host owns discovery (1687h) for this command only
 ```
 
 The first client fixes the bitness of the VM — do not mix 16-bit and 32-bit clients in one run.
 
 ---
 
-## 🔗 Binding: `zrxbind`
+## 🔗 Binding: `zrdxbind`
 
-The stub is **bound to the start of the executable**. `zrxbind` looks at the
+The stub is **bound to the start of the executable**. `zrdxbind` looks at the
 input file and picks the stub: `LE` → `stub-le.exe`, `PE` → `stub-pe.exe`,
 `RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`:
 
 | Command | What it does |
 |---|---|
-| `zrxbind -r prog.exe` | **r**eplaces the old stub with ZRDX and makes a backup copy |
-| `zrxbind -r -n prog.exe` | the same, **n**o backup copy |
-| `zrxbind -c prog.exe out.exe` | **c**opies the program to a new file and binds ZRDX to it; the original stays untouched |
-| `zrxbind -w zrdx.exe` | **w**rites the **LE** stub itself to a file (a copy of `stub-le.exe`) |
+| `zrdxbind -r prog.exe` | **r**eplaces the old stub with ZRDX and makes a backup copy |
+| `zrdxbind -r -n prog.exe` | the same, **n**o backup copy |
+| `zrdxbind -c prog.exe out.exe` | **c**opies the program to a new file and binds ZRDX to it; the original stays untouched |
+| `zrdxbind -w zrdx.exe` | **w**rites the **LE** stub itself to a file (a copy of `stub-le.exe`) |
 
 ```bat
-zrxbind -r -n doom.exe              :: bind to doom.exe, no backup
-zrxbind -c doom.exe doomz.exe       :: doomz.exe = doom.exe + ZRDX
+zrdxbind -r -n doom.exe              :: bind to doom.exe, no backup
+zrdxbind -c doom.exe doomz.exe       :: doomz.exe = doom.exe + ZRDX
 ```
 
 ### 📚 The formats
@@ -126,13 +126,13 @@ zrxbind -c doom.exe doomz.exe       :: doomz.exe = doom.exe + ZRDX
 ```bat
 nasm -f rdf hello.asm -o hello.o        :: 32-bit code, global start
 rlink rdf /o=hello.rdf hello.o          :: see the RTools project
-zrxbind -c hello.rdf hello.exe          :: stub-rdf.exe is used
+zrdxbind -c hello.rdf hello.exe          :: stub-rdf.exe is used
 ```
 
 Want ZRDX bound at **link time**? Extract the stub and give it to `wlink`:
 
 ```bat
-zrxbind -w zrdx.exe
+zrdxbind -w zrdx.exe
 wlink ... option stub=zrdx.exe
 ```
 
@@ -153,18 +153,18 @@ qualification: **55 native cases** and **17 bound API cases** on each of RAW, XM
 99 loader results and 11 tooling tests. Details, limits and evidence: [`docs/D09COV.MD`](docs/D09COV.MD),
 [`docs/D09WORK.MD`](docs/D09WORK.MD), [`docs/D09ABI.MD`](docs/D09ABI.MD).
 
-> Honest note: memory is **not swapped to disk**. A deferred plan exists
-> ([`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD)); the dormant `src/vmm.asm` is not qualified.
+> Honest note: memory is **not swapped to disk** in release builds.
+> An experimental SWAP build (off by default, QEMU RAW/XMS only) pages client memory to a file; its size is set per program with `zrdxconf /S<hex MB>` (0 = off): [`docs/SWAPDES.MD`](docs/SWAPDES.MD).
 
 ---
 
-## 🎛️ Settings: `zrxsetup`
+## 🎛️ Settings: `zrdxconf`
 
 ```bat
-zrxsetup [options] <filename>
+zrdxconf [options] <filename>
 ```
 
-`<filename>` is a program bound with `zrxbind`. Without switches `zrxsetup`
+`<filename>` is a program bound with `zrdxbind`. Without switches `zrdxconf`
 prints the current configuration; with switches it prints what changes and
 writes the new values.
 
@@ -213,16 +213,16 @@ The settings are the **last 14 bytes of the bound program**:
 ```
  offset  size  field
  ------  ----  -----------------------------------------------
-  -14      4   signature "ZRXC"
+  -14      4   signature "ZRDX"
   -10      2   flags: bit 0 = banner off, bit 1 = VCPI before DPMI
    -8      2   transfer buffer size (paragraphs)
    -6      4   max. XMS/RAW memory (KB)
    -2      2   low memory to leave free (paragraphs)
 ```
 
-`zrxbind` writes the default block; the stub reads it at start (it opens its own
+`zrdxbind` writes the default block; the stub reads it at start (it opens its own
 file anyway). Because it does not depend on the stub code, **the stub can be
-UPX-packed** and still be configured. Programs bound by an older `zrxbind` have
+UPX-packed** and still be configured. Programs bound by an older `zrdxbind` have
 no such block — bind them again.
 
 ### 🧩 Why so few switches?
@@ -250,14 +250,14 @@ Only **free tools**. No Borland C, no TASM, no TLINK, no MS link.
 |---|---|---|
 | [**NASM**](https://nasm.us/) | 3.01 on the host, 0.98.39 in DOS | the whole stub and the binder |
 | [**Open Watcom**](https://github.com/open-watcom/open-watcom-v2) | `wmake`, `wlink`, `wcl` | linking and the C tools |
-| [**UPX**](https://upx.github.io/) | 5.x (tested with 5.1.0) | packing the stubs, `zrxbind.com` and `zrxsetup` |
+| [**UPX**](https://upx.github.io/) | 5.x (tested with 5.1.0) | packing the stubs, `zrdxbind.com` and `zrdxconf` |
 
 Set the `WATCOM` environment variable, put the tools in `PATH` and run, in `src/`:
 
 ```bat
-wmake                 :: zrxbind.com, zrxsetup.exe and the stubs (stub-le/pe/rdf.exe) in binder\
+wmake                 :: zrdxbind.com, zrdxconf.exe and the stubs (stub-le/pe/rdf.exe) in binder\
 wmake STUB=zrdx.exe PESTUB=zrdxpe.exe RDFSTUB=zrdxrdf.exe   :: unpacked stubs
-wmake install         :: copy zrxbind.com, zrxsetup.exe and the stubs to ..\bin
+wmake install         :: copy zrdxbind.com, zrdxconf.exe and the stubs to ..\bin
 wmake clean
 ```
 
@@ -265,7 +265,7 @@ wmake clean
 reproducible build and check, which runs everything under DOSBox-X, is one command:
 
 ```sh
-python3 tests/CHECK.PY --work /tmp/ZRXWORK
+python3 tests/CHECK.PY --work /tmp/ZRDXWORK
 ```
 
 The runner needs `ZRDX_DOSCONF` (a dosbox-x config), `ZRDX_DRIVE_C` (DOS tools) and
@@ -292,25 +292,23 @@ DOS file I/O larger than the transfer buffer, LFN and clipboard translation.
 
 `tests/mem` has a small Watcom C program (it prints the largest block one `malloc` can return) and batch files that build `memd.exe` (DOS/4GW), `memc.exe` (CauseWay) and `memz.exe` (ZRDX); see [`docs/MEMTEST.MD`](docs/MEMTEST.MD). In DOSBox-X with 3000 MB of RAM ZRDX gave one block of 2995 MB, DOS/4GW only 62 MB; CauseWay gave about 1 GB through its swap file (old measurement, recorded in [`docs/HISTORY.MD`](docs/HISTORY.MD)).
 
-### 🔬 Experimental: VMM
+### 🔬 Experimental: SWAP
 
-`src/vmm.asm` is a dormant virtual memory manager. It is **not** part of any release build
-and is not qualified. To try it, comment out `%assign Release 1` and uncomment
-`%assign VMM 1` in `segdefs.asm`. Known problems: pages are not freed under VCPI (use RAW/XMS),
-page unlocking is missing, and the swap file is reopened after each resize and not deleted on exit.
-Plan: [`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD).
+The old dormant `vmm.asm` was removed (task 132). Paging to a file
+now lives in `src/swapmm.asm`, built only with `%assign SWAP 1`;
+see [`docs/SWAPDES.MD`](docs/SWAPDES.MD).
 
 ---
 
 ## 🗂️ Repository
 
 ```
-bin/        prebuilt: zrxbind.com, zrxsetup.exe, stub-le.exe, stub-pe.exe,
-            stub-rdf.exe, zrxdpmi.exe (standalone DPMI host)
+bin/        prebuilt: zrdxbind.com, zrdxconf.exe, stub-le.exe, stub-pe.exe,
+            stub-rdf.exe, zrdxdpmi.exe (standalone DPMI host)
 src/        the sources (NASM) and the makefile
   zrdx.asm      main file, includes everything (builds stub-le.exe)
   zrdxpe.asm    PE stub root     zrdxrdf.asm  RDOFF2 stub root
-  zrxdpmi.asm   standalone DPMI host (with nathost.asm)
+  zrdxdpmi.asm   host-only root; zrdxnp.asm = product zrdxdpmi.exe
   gmacros.asm   macros of virtual segments and labels
   segdefs.asm   segment layout and sizes
   extender.asm  DOS/BIOS call translation tables and handlers
@@ -319,9 +317,9 @@ src/        the sources (NASM) and the makefile
   prothand.asm, realhand.asm  interrupts and mode switches
   mem.asm, smm.asm            memory services (smm = active backend)
   leldr.asm / peldr.asm / rdfldr.asm   LE, PE32, RDOFF2 loaders
-  binder/       zrxbind.com source (bnd.asm, a .COM program)
+  binder/       zrdxbind.com source (bnd.asm, a .COM program)
   aligner/      stub aligner
-  zrxsetup.c    the settings utility
+  zrdxconf.c    the settings utility
 tests/      CHECK.PY and the suites above
 docs/       BUILD.MD, D09COV.MD (DPMI coverage), backlog.txt, HISTORY.MD, plans
 history.txt changes by version
@@ -335,9 +333,9 @@ Start with [`docs/README.MD`](docs/README.MD) — the project guide.
 ## 📜 History
 
 Version **0.52OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
-to the end of the bound file, `zrxsetup` was rewritten, `zrxbind` became a `.COM` that reads the
+to the end of the bound file, `zrdxconf` was rewritten, `zrdxbind` became a `.COM` that reads the
 stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix39**: DPMI 0.9
-hardening and the native `zrxdpmi.exe` host, 14 336-byte packed stubs. See
+hardening and the native `zrdxdpmi.exe` host, 14 336-byte packed stubs. See
 [`docs/HISTORY.MD`](docs/HISTORY.MD), the plans in [`docs/backlog.txt`](docs/backlog.txt) and
 [`history.txt`](history.txt).
 
@@ -345,7 +343,7 @@ hardening and the native `zrxdpmi.exe` host, 14 336-byte packed stubs. See
 
 ## ⚠️ Notes and limitations
 
-- **Memory is not swapped to disk.** Swap-file paging is only a deferred plan ([`docs/SWAPPLAN.MD`](docs/SWAPPLAN.MD)).
+- **Memory is not swapped to disk** in release builds. Swap-file paging exists only as an experimental build (`%assign SWAP 1`, tested on QEMU RAW/XMS, not on VCPI); see [`docs/SWAPDES.MD`](docs/SWAPDES.MD). DPMI 0600h/0601h count page locks there and are no-ops otherwise.
 - **DPMI:** 0.9 only; DPMI 1.0 is not implemented and not planned. There are no vendor extensions (0A00h answers `CF=1`).
 - **PE:** one EXE, no imports, DLLs, delay imports or TLS. DLL loading is a deferred plan ([`docs/PEPLAN.MD`](docs/PEPLAN.MD)).
 - **How it was verified:** the full campaign (55 native, 17 bound, 99 loader results) was recorded on the
@@ -359,7 +357,6 @@ hardening and the native `zrxdpmi.exe` host, 14 336-byte packed stubs. See
   afterwards but a rebuild gives byte-identical binaries.
 - **Specifications in `docs/`** (`DPMI09.HTM`, `DPMI10.TXT`, `VCPI.TXT`) are third-party documents kept for
   reference. Their copyright stays with the original owners; the CC0 license applies to the ZRDX sources only.
-- **`src/vmm.asm` is experimental** and not part of any release build.
 
 ---
 

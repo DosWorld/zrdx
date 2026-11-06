@@ -1,0 +1,3 @@
+system nt_dll
+name MSVCRT.DLL
+@CRTCOM.LNK

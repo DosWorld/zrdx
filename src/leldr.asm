@@ -544,7 +544,7 @@ BeginFixup:
 
 CreateSelector01:
         call CreateSelForObject
-        jz ErrAllocSel
+        jc ErrEXE@129
 CreateSelector1:
         movzx ebx, word [eax*8 + edx + LOTSelector]
         or ebx, ebx
@@ -600,7 +600,7 @@ FixSeg1:
         _ifnot jnz
         mov eax, _objindexreg
         call CreateSelForObject
-        ;XXX need Error handler!!
+        jc ErrEXE@129
         jmp FixSeg1
         _endif
         mov [ecx], _srctagwreg

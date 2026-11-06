@@ -160,6 +160,10 @@ Int10:
         dw p_esbp, r_ptr
         jmp CallMethod1
 Int2F:
+%ifdef VENDORON
+        cmp ax, 168Ah
+        je near Vendor168A
+%endif
         cmp ax, 1686h
         jne Int2FClipboard
         mov word [ebp + DC_EAX], 0
@@ -1826,6 +1830,10 @@ PrintFStr:
 
         LLabel Starter
         int 31h
+%ifdef PEMAX
+        push ds                         ;Win32: ES = DS (not the PSP)
+        pop es
+%endif
         mov eax, ebx
         mov esi, ebx
         mov edi, ebx

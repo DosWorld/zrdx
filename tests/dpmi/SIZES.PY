@@ -43,7 +43,7 @@ def main():
 %warning ZRCTX memory-bitmap ProbeContext""")
     path.write_bytes(text.replace("\n", "\r\n").encode("ascii"))
     rows = ["profile\titem\tused\tbudget\tnote"]
-    for name, root in (("native", "zrxdpmi"), ("le", "zrdx"), ("pe", "zrdxpe"), ("rdf", "zrdxrdf")):
+    for name, root in (("native", "zrdxdpmi"), ("le", "zrdx"), ("pe", "zrdxpe"), ("rdf", "zrdxrdf")):
         result = subprocess.run([shutil.which("nasm"), "-O9", "-f", "obj", "-l", str(work / (name + ".LST")),
             root + ".asm", "-o", str(work / (name + ".OBJ"))], cwd=src, text=True, capture_output=True, check=True)
         (work / (name + ".LOG")).write_text(result.stderr)
@@ -69,7 +69,7 @@ def main():
                 for field, value in zip(("page-directory", "kernel-page-table", "last-initialized", "mcb-vector", "client-linear-base"), struct.unpack("<5I", data)):
                     rows.append("\t".join((name, field, str(value), "", "linear address")))
     for profile, folder in (("native", args.native), ("ordinary", args.ordinary)):
-        names = ("ZRXDPMI.EXE",) if profile == "native" else ("src/zrdx0.exe", "src/zrdxpe0.exe", "src/zrdxrdf0.exe", "bin/stub-le.exe", "bin/stub-pe.exe", "bin/stub-rdf.exe", "src/zrdxu.exe", "src/zrdxpu.exe", "src/zrdxru.exe")
+        names = ("ZRDXDPMI.EXE",) if profile == "native" else ("src/zrdx0.exe", "src/zrdxpe0.exe", "src/zrdxrdf0.exe", "bin/stub-le.exe", "bin/stub-pe.exe", "bin/stub-rdf.exe", "src/zrdxu.exe", "src/zrdxpu.exe", "src/zrdxru.exe")
         for name in names:
             path = folder / name
             if not path.exists():

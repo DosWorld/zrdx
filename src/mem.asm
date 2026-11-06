@@ -150,7 +150,6 @@ _err equ MemErrHandle
           push eax        ;reserve space for @@GCount
           lea edx, [esp - 8]
           _do
-%ifndef VMM
             push edi             ;allocate space for phisical address
             mov edi, esp        ;set pointer to it
             xor ecx, ecx
@@ -159,11 +158,6 @@ _err equ MemErrHandle
             call XAllocPages     ;allocate 1 page
             pop esi
             jz NoTempPage@18
-%else
-            call alloc_page
-            jc FreeAndErr@18
-            push eax
-%endif
           cmp esp, edx        ;test for end
           _enddo jne
 %define _msize edi
@@ -181,23 +175,17 @@ _err equ MemErrHandle
             push 1
             call AllocPages
             _toendif jnc
-%ifndef VMM
             jmp short FreeAndErr@18
 NoTempPage@18:
             pop esi              ;discard the unwritten physical-page slot
-%endif
 FreeAndErr@18:
             add edx, 8
             _do jmp
-%ifndef VMM
               mov esi, esp
               xor ecx, ecx
               inc ecx
               call XFreePages
               pop esi
-%else
-              call free_page
-%endif
             _while
             cmp esp, edx
             _enddo jne
@@ -284,15 +272,11 @@ FreeAndErr@18:
 
           ;add  edx, 8
           _do jmp
-%ifndef VMM
             mov esi, esp
             xor ecx, ecx
             inc ecx
             call XFreePages
             pop esi
-%else
-            call free_page
-%endif
           _while
           cmp esp, edx
           _enddo jne

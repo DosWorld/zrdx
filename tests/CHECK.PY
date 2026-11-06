@@ -14,7 +14,8 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 CFG = runpy.run_path(str(ROOT / "tests/dpmi/ZRCFG.PY"))
-TOOLS = ("zrxbind.com", "zrxsetup.exe", "stub-le.exe", "stub-pe.exe", "stub-rdf.exe")
+WIN32_CASES = ("T1", "W", "TAPI", "WB", "TPROC", "TMEM", "TFS", "TTXT", "TCRT", "TIO", "TFILE", "TFMT", "TSCAN", "TLIB", "TMATH", "TWCS", "TUCRT")
+TOOLS = ("zrdxbind.com", "zrdxconf.exe", "stub-le.exe", "stub-pe.exe", "stub-pmx.exe", "stub-rdf.exe", "zrdxdpmi.exe")
 
 
 def write(path, text):
@@ -39,7 +40,7 @@ def fingerprint():
     return digest.hexdigest()
 
 
-def config(work, profile, real_clip, lfn="true", core="auto"):
+def config(work, profile, real_clip, lfn="true", core="auto", hdpmi=False):
     original = CFG["require"]("ZRDX_DOSCONF").read_text()
     write(work / "USER.CON", original)
     base = re.split(r"(?m)^\[autoexec\]\s*$", original)[0]
@@ -60,10 +61,11 @@ set WATCOM=D:\WATCOM
 set INCLUDE=D:\WATCOM\H
 set EDPATH=D:\WATCOM\EDDAT
 set PATH=C:\BIN;D:\WATCOM\BINW;Z:\;Z:\SYSTEM;Z:\BIN
+HDPMILINE
 R:
 call AUDIT.BAT
 exit
-""".replace("WORKDIR", str(work)).replace("DRIVEC", str(CFG["require"]("ZRDX_DRIVE_C"))).replace("DRIVED", str(CFG["require"]("ZRDX_DRIVE_D")))
+""".replace("HDPMILINE", r"C:\HX\BIN\HDPMI32.EXE" if hdpmi else "rem built-in host").replace("WORKDIR", str(work)).replace("DRIVEC", str(CFG["require"]("ZRDX_DRIVE_C"))).replace("DRIVED", str(CFG["require"]("ZRDX_DRIVE_D")))
     write(work / "DOSBOX.CON", base + auto)
 
 
@@ -102,9 +104,11 @@ def main():
     parser.add_argument("--supplied", action="store_true", help="diagnose supplied binaries instead of rebuilding")
     parser.add_argument("--bugs-only", action="store_true", help="skip the long existing regression campaign")
     parser.add_argument("--real-clip", action="store_true", help="use the DOSBox host clipboard instead of the fixture")
+    parser.add_argument("--hdpmi", action="store_true",
+                        help="run only the PE fixtures with HDPMI32 as external DPMI host")
     parser.add_argument("--timeout", type=int, default=900)
     args = parser.parse_args()
-    work = (args.work or Path(tempfile.mkdtemp(prefix="ZRX", dir=CFG["scratch"]()))).resolve()
+    work = (args.work or Path(tempfile.mkdtemp(prefix="ZRDX", dir=CFG["scratch"]()))).resolve()
     if work == ROOT or ROOT in work.parents:
         raise RuntimeError("work must be outside the checkout")
     work.mkdir(parents=True, exist_ok=True)
@@ -114,14 +118,14 @@ def main():
         if (work / "BUILD.ID").read_text().strip() != fingerprint():
             raise RuntimeError("source changed since scratch build; rebuild first")
     else:
-        for name in ("src", "bin"):
+        for name in ("src", "bin", "sdk", "win32"):
             shutil.copytree(ROOT / name, work / name, dirs_exist_ok=True)
     shutil.copytree(ROOT / "tests", work / "tests", dirs_exist_ok=True)
     config(work, "xms", False, lfn=args.lfn, core=args.core)
     nasm = shutil.which("nasm")
     print(command([nasm, "-v"], ROOT), flush=True)
     if not args.skip_build and not args.supplied:
-        for stem in ("zrdx", "zrdxpe", "zrdxrdf"):
+        for stem in ("zrdx", "zrdxpe", "zrdxpm", "zrdxrdf", "zrdxnp"):
             target = work / "src" / (stem + ".obj")
             temporary = work / "src/NASM.NEW"
             command([nasm, "-O9", "-f", "obj", stem + ".asm", "-o", temporary.name], work / "src")
@@ -130,16 +134,18 @@ def main():
             else:
                 temporary.unlink()
                 target.touch()  # copied headers must not trigger DOS reassembly
-        command([nasm, "-O9", "-f", "bin", "binder/bnd.asm", "-o", "binder/zrxbind.com"], work / "src")
+        command([nasm, "-O9", "-f", "bin", "binder/bnd.asm", "-o", "binder/zrdxbind.com"], work / "src")
         dos(work, r"""@echo off
 cd src
 wmake all > BUILD.LOG
 if errorlevel 1 goto bad
-upx -9 --8086 binder\zrxbind.com >> BUILD.LOG
+upx -9 --8086 binder\zrdxbind.com >> BUILD.LOG
 if errorlevel 1 goto bad
 wmake install >> BUILD.LOG
 if errorlevel 1 goto bad
-cd ..
+cd ..\tests\pe\c
+call BUILD.BAT
+cd ..\..\..
 echo OK > STATUS.LOG
 goto end
 :bad
@@ -157,11 +163,14 @@ echo FAILED > STATUS.LOG
     for out, base in (("RELOC", "0x401000"), ("RELOC2", "0x501000"), ("RELOCH", "0x10001000")):
         command([nasm, "-f", "bin", "-DBASE=" + base, "RELOC.ASM", "-o", out + ".BIN"], work / "tests/pe")
     pe_gen = runpy.run_path(str(work / "tests/pe/GEN.PY"))
+    for stem, src, defs in pe_gen["JOBS"]:
+        for extra, out in (((), stem + ".BIN"), (("-DBASE=0x501000",), stem + "2.BIN")):
+            command([nasm, "-f", "bin", *defs, *extra, src, "-o", out], work / "tests/pe")
     pe_cases = pe_gen["generate"](work / "tests/pe")
     if (work / "tests/mz/GEN.PY").exists():
         runpy.run_path(str(work / "tests/mz/GEN.PY"))["generate"](work / "tests/mz")
     bind_cases = runpy.run_path(str(work / "tests/bind/GEN.PY"))["generate"](work / "tests/bind")
-    config(work, args.profile, args.real_clip, lfn=args.lfn, core=args.core)
+    config(work, args.profile, args.real_clip, lfn=args.lfn, core=args.core, hdpmi=args.hdpmi)
     batch = r"""@echo off
 cd tests\dpmi
 nasm -s -f bin HOST.ASM -o HOST.COM > BUILD.LOG
@@ -177,8 +186,19 @@ call BUILD.BAT > BUILD.LOG
 cd ..\dpmi
 call PROBE.BAT > BUILD.LOG
 cd ..\pe
-call RUN.BAT > SCREEN.LOG
+call RUN.BAT P1 > SCREEN.LOG
+copy RESULT.LOG RESULT.PE
+copy R:\BIN\stub-pe.exe R:\BIN\stub-pe.sav
+copy R:\BIN\stub-pmx.exe R:\BIN\stub-pe.exe
+call RUN.BAT P2 > SCREEN2.LOG
+copy RESULT.LOG RESULT.PMX
+copy R:\BIN\stub-pe.sav R:\BIN\stub-pe.exe
+call UNB.BAT > SCREEN3.LOG
+copy RESULT.LOG RESULT.UNB
+UNBNLINE
+UNBHLINE
 MZLINE
+WINLINE
 cd R:\
 echo OK > STATUS.LOG
 goto end
@@ -189,22 +209,58 @@ echo FAILED > STATUS.LOG
 """.replace("MOCKLINE", "rem host clipboard" if args.real_clip else "MOCK.COM")
     batch = batch.replace("MZLINE", "cd ..\\mz\ncall RUN.BAT > SCREEN.LOG" if (work / "tests/mz/RUN.BAT").exists() else "rem no MZ fixtures")
     batch = batch.replace("echo OK > STATUS.LOG", "cd tests\\bind\ncall RUN.BAT > SCREEN.LOG\ncd ..\\..\necho OK > STATUS.LOG")
+    batch = batch.replace("WINLINE", "cd ..\\win32\ncall RUN.BAT > SCREEN.LOG")
     if args.bugs_only:
         batch = batch.replace("call BUILD.BAT > BUILD.LOG", "rem skip legacy build")
+    batch = batch.replace("UNBHLINE", "rem host role needs the own host" if args.hdpmi else "call UNBH.BAT > SCREEN5.LOG\ncopy RESULT.LOG RESULT.UNH")
+    batch = batch.replace("UNBNLINE", "call UNBN.BAT > SCREEN4.LOG\ncopy RESULT.LOG RESULT.UNN" if args.hdpmi else "rem client role needs an external host")
+    if args.hdpmi:
+        batch = batch.replace("call PROBE.BAT > BUILD.LOG", "rem own DPMI probes do not apply")
     dos(work, batch, args.timeout)
     errors = []
-    for name in ("PROBE", "UNSUP", "CBACK", "PHYSMAP", "MAPEXIT", "CBEXIT"):
+    for name in (() if args.hdpmi else ("PROBE", "UNSUP", "CBACK", "PHYSMAP", "MAPEXIT", "CBEXIT")):
         text = (work / "tests/dpmi" / (name + ".LOG")).read_text(errors="replace")
         good = text.count("PASS") == 3 if name == "PROBE" else ": ok" in text
         if not good or "FAIL" in text:
             errors.append(name + " failed: " + text.strip())
-    pe = (work / "tests/pe/RESULT.LOG").read_text(errors="replace")
-    for name in pe_cases:
-        if name + " OK" not in pe or name + " FAILED" in pe or name + " BIND_FAILED" in pe:
-            errors.append("PE " + name + " failed")
-    if (pe.count("ZRDX loader error:") != len(pe_cases) - len(pe_gen["VALID"])
-            or "PE single module: ok" not in pe or pe.count("PE reloc: ok") != 2):
-        errors.append("PE expected loader diagnostics missing")
+    for tag, label in (("PE", "PE"), ("PMX", "PMX"), ("UNB", "UNB")) + ((("UNN", "UNN"),) if args.hdpmi else (("UNH", "UNH"),)):
+        pe = (work / "tests/pe" / ("RESULT." + tag)).read_text(errors="replace")
+        cases = [n for n in pe_cases if tag != "PE" or n not in pe_gen["PMXONLY"]]
+        valid = [n for n in pe_gen["VALID"] if n in cases]
+        for name in cases:
+            if name + " OK" not in pe or name + " FAILED" in pe or name + " BIND_FAILED" in pe:
+                errors.append(label + " " + name + " failed")
+        block = []
+        for line in pe.splitlines():
+            word = line.split()
+            if len(word) == 2 and word[1] in ("OK", "FAILED") and word[0] in cases:
+                want = pe_gen["EXPECT"].get(word[0])
+                for part in ((want,) if isinstance(want, str) else want or ()):
+                    if not any(part in text for text in block):
+                        errors.append(label + " " + word[0] + " text missing: " + part)
+                block = []
+            else:
+                block.append(line)
+        if (pe.count("ZRDX loader error:") != len(cases) - len(valid)
+                or "PE single module: ok" not in pe or pe.count("PE reloc: ok") != 2
+                or (tag != "PE" and ("PE modules: ok" not in pe
+                                   or "PE exports: ok" not in pe
+                                   or "PE exports bad: ok" not in pe))
+                or pe.count("PE import graph: ok") != len(pe_gen["GRAPH"])
+                or pe.count("PE init: ok") != len(pe_gen["INITS"])
+                or pe.count("PE runtime: ok") != len(pe_gen["RUNTIME"])
+                or pe.count("PE unload: ok") != len(pe_gen["UNLOAD"])
+                or pe.count("PE low memory: ok") != len(pe_gen["LOWMEMS"])):
+            errors.append(label + " expected loader diagnostics missing")
+    stubs = {n: (work / "bin" / n).read_bytes()[:4096] for n in ("stub-pe.exe", "stub-pmx.exe")}
+    if stubs["stub-pe.exe"] == stubs["stub-pmx.exe"]:
+        errors.append("PE stubs are not distinguishable")
+    for name in [n for n in pe_cases if n not in pe_gen["PMXONLY"]]:
+        data = (work / "tests/pe" / (name + ".PE")).read_bytes()
+        want = "stub-pmx.exe" if pe_gen["wants_pmx"](data) else "stub-pe.exe"
+        bound = (work / "tests/pe" / (name + ".P1")).read_bytes()[:4096]
+        if bound != stubs[want]:
+            errors.append("PE " + name + " bound with the wrong stub, want " + want)
     mz = work / "tests/mz/RESULT.LOG"
     if mz.exists() and "FAILED" in mz.read_text():
         errors.append("MZ aligner fixtures failed")
@@ -213,6 +269,27 @@ echo FAILED > STATUS.LOG
             runpy.run_path(str(work / "tests/mz/GEN.PY"))["verify"](work / "tests/mz")
         except RuntimeError as exc:
             errors.append(str(exc))
+    win = (work / "tests/win32/RESULT.LOG").read_text(errors="replace")
+    for name in WIN32_CASES:
+        if name + " OK" not in win or name + " FAILED" in win:
+            errors.append("win32 " + name + " failed")
+    for log, want in (("W.LOG", "hello"), ("WB.LOG", "hello"), ("TAPI.LOG", "API: ok"),
+                      ("TPROC.LOG", "PROC: ok"),
+                      ("TMEM.LOG", "MEM: ok"),
+                      ("TFS.LOG", "FS: ok"),
+                      ("TTXT.LOG", "TXT: ok"),
+                      ("TCRT.LOG", "CRT: ok\r\nC\r\nB\r\nA"),
+                      ("TIO.LOG", "IO: ok"),
+                      ("TFILE.LOG", "puts-line\r\nP\r\n"),
+                      ("TFILE.LOG", "FILE: ok"),
+                      ("TFMT.LOG", "FMT: ok"),
+                      ("TSCAN.LOG", "SCAN: ok"),
+                      ("TLIB.LOG", "LIB: ok"),
+                      ("TMATH.LOG", "MATH: ok"),
+                      ("TWCS.LOG", "WCS: ok"),
+                      ("TUCRT.LOG", "UCRT: ok")):
+        if want not in (work / "tests/win32" / log).read_text(errors="replace"):
+            errors.append("win32 " + log + " lacks " + want)
     bind = (work / "tests/bind/RESULT.LOG").read_text()
     for name in bind_cases:
         if name + " OK" not in bind or name + " FAILED" in bind:

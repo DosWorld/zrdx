@@ -19,9 +19,23 @@ SegRTNum equ 0
 %assign PLShift 1100h
 %endif
 %assign Release 1
-;%assign VMM 1
+;%assign SWAP 1
+;%assign SWAPFAIL 1
+;%assign VENDOR 1
+
+%ifdef NativeHost
+%ifndef NATIVEPE
+%define NATIVEONLY
+%endif
+%endif
 
 %define zcat3(a,b,c) a %+ b %+ c
+
+%ifdef FAKELACK
+%assign FLX 64                  ;test build only (task 169)
+%else
+%assign FLX 0
+%endif
 
 %assign XCurSegBase 0
 %assign XCurSegBaseR 0
@@ -117,7 +131,13 @@ group DGROUP Text Data
 segment Text16
 DPMIHOSTMaxLowData equ XCurSegBaseR
 %ifdef NativeHost
+%ifdef SWAP
+        SetupRTSeg 1200, 1200, Text16, EText16
+%else
         SetupRTSeg 1136, 1136, Text16, EText16
+%endif
+%elifdef SWAP
+        SetupRTSeg 912, 912, Text16, EText16
 %else
         SetupRTSeg 864, 864, Text16, EText16
 %endif
@@ -129,13 +149,25 @@ segment Data16
 segment RelocR0
         SetupSeg 88 , 98, RelocR0
 segment IText16
-%ifdef NativeHost
-        SetupRTSeg 1424, 1424, IText16, RelocR0
+%ifdef NATIVEPE
+        SetupRTSeg 2640, 3600, IText16, RelocR0
+%elifdef NativeHost
+%ifdef SWAP
+        SetupRTSeg 1488, 1488, IText16, RelocR0
+%else
+        SetupRTSeg 1370, 1370, IText16, RelocR0
+%endif
+%elifdef SWAP
+        SetupRTSeg 2160, 2400, IText16, RelocR0
+%elifdef PEMAX
+        SetupRTSeg 2350, 2400, IText16, RelocR0
 %else
         SetupRTSeg 2200, 2400, IText16, RelocR0
 %endif
 segment IData16
-%ifdef NativeHost
+%ifdef NATIVEPE
+        SetupSeg 560, 800, IData16, IText16
+%elifdef NativeHost
         SetupSeg 496, 600, IData16, IText16
 %else
         SetupSeg 480, 600, IData16, IText16
@@ -144,14 +176,18 @@ segment EText
 ExtenderStart equ XCurSegBaseR
 %assign TXCurSegBase XCurSegBase
 %assign XCurSegBase 0
-%ifdef NativeHost
+%ifdef NATIVEONLY
         SetupSeg 0, 0, EText, IData16
+%elifdef PEMAX
+        SetupSeg 10144 + FLX, 10300, EText, IData16
 %else
         SetupSeg 3552, 3900, EText, IData16
 %endif
 segment EData
-%ifdef NativeHost
+%ifdef NATIVEONLY
         SetupSeg 0, 0, EData, EText
+%elifdef PEMAX
+        SetupSeg 1648 + FLX, 1750, EData, EText
 %else
         SetupSeg 1520, 1600, EData, EText
 %endif
@@ -167,20 +203,22 @@ segment IEText
 LoaderStart equ XCurSegBaseR
 %assign TXCurSegBase TXCurSegBase + XCurSegBase
 %assign XCurSegBase 0
-%ifdef NativeHost
+%ifdef NATIVEONLY
         SetupSeg 0, 0, IEText, EData
 %elifdef PELDR
-        SetupSeg 1408, 2600, IEText, EData
+        SetupSeg 1745, 2600, IEText, EData
 %elifdef RDFLDR
         SetupSeg 2048, 2600, IEText, EData
 %else
         SetupSeg 1712, 2000, IEText, EData
 %endif
 segment IEData
-%ifdef NativeHost
+%ifdef NATIVEONLY
         SetupSeg 0, 0, IEData, IEText
+%elifdef PEMAX
+        SetupSeg 419, 600, IEData, IEText
 %elifdef PELDR
-        SetupSeg 256, 600, IEData, IEText
+        SetupSeg 259, 600, IEData, IEText
 %elifdef RDFLDR
         SetupSeg 256, 600, IEData, IEText
 %else
@@ -195,15 +233,27 @@ LoaderFullSize equ LoaderSize+3000
 segment Text
 %assign OffProtectedStart XCurSegBaseR
 %assign XCurSegBase KernelBase
+%ifdef SWAP
 %ifdef NativeHost
-        SetupRTSeg 15456, 15456, Text, IEData
+        SetupRTSeg 17956, 17956, Text, IEData
+%else
+        SetupRTSeg 10340, 10340, Text, IEData
+%endif
+%elifdef NativeHost
+        SetupRTSeg 15510, 15510, Text, IEData
+%elifdef VENDOR
+        SetupRTSeg 7846, 9000, Text, IEData
 %else
         SetupRTSeg 7840, 9000, Text, IEData
 %endif
 segment IText
         SetupSeg 0000, 000, IText, Text
 segment Data
+%ifdef SWAP
+        SetupSeg 400, 600, Data, IText
+%else
         SetupSeg 364, 600, Data, IText
+%endif
         VSegment BSS, 9F00h, 9F00h
 LastRelocR equ 0
 LastReloc equ 0

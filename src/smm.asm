@@ -45,6 +45,19 @@ PageSize equ 1000h
             inc _xsize
             call XAllocPages
             jz Fail@32
+%ifdef SWAP
+            ;a fresh table must be empty: the pool pages are
+            ;not zeroed and SwapEvict scans every entry
+            mov _t, dword [OffPageDir + (_pagesubdirindex * 4)]
+            mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
+            InvalidateTLB
+            mov _xdir, OffPageTableWin
+            mov _xsize, 400h
+            push eax
+            xor eax, eax
+            rep stosd
+            pop eax
+%endif
           _endif
           mov _t, dword [OffPageDir + (_pagesubdirindex * 4)]
           mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
@@ -57,7 +70,20 @@ PageSize equ 1000h
             mov _xsize, _size
           _endif
           lea _xdir, [OffPageTableWin + (_xdir * 4)]
+%ifdef SWAP
+          push _xdir
+%endif
           call XAllocPages
+%ifdef SWAP
+          pop _xdir
+          jz NoMark@32
+          cmp byte [esp + 4 + (8 * 4) + 4], 0
+          je Marked@32
+          call SwapMarkPages
+Marked@32:
+          or _xsize, _xsize
+NoMark@32:
+%endif
           _ifnot jnz
             cmp dword [OffnEntriesInTable + (_pagesubdirindex * 4)], 0
             _ifnot jne
@@ -119,6 +145,9 @@ XAllocPages:
 ;VCPIAlloc:
           push eax
           push edx
+%ifdef SWAP
+          mov ebp, ecx
+%endif
           xor _xsize, _xsize
           call Alloc1Page
           _ifnot jnc
@@ -127,6 +156,15 @@ XAllocPages:
           _endif
           pop edx
           pop eax
+%ifdef SWAP
+          or _xsize, _xsize
+          jnz .got
+          call SwapEvict
+          jc .got
+          mov ecx, ebp
+          jmp XAllocPages
+.got:
+%endif
         _endif
 ;@@Ret2:
         InvalidateTLB
@@ -192,7 +230,11 @@ XAllocPages:
           lea _xdir, [OffPageTableWin + (_xdir * 4)]
           test byte [esp + 4 + (8 * 4)], 2
           jnz UnmapDevices@32
+%ifdef SWAP
+          call SwapXFree
+%else
           call XFreePages
+%endif
           jmp short PagesRemoved@32
 UnmapDevices@32:
           push eax

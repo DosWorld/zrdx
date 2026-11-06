@@ -113,7 +113,7 @@ expected: times 8 dd 0
 actual: times 8 dd 0
 armed: db 0
 failed: db 0
-host: db 'ZRXDPMI.EXE',0
+host: db 'ZRDXDPMI.EXE',0
 tail: db 10, ' BAS32.COM',13
 tail2: db 11, ' NEST32.COM',13
 block: dw 0, tail, 0, 5Ch, 0, 6Ch, 0

@@ -529,7 +529,7 @@ DosPCall:
         add ebp, VMI_EAX
         mov [edi + VMI_ESP], ebp
         mov [edi + VMI_ES], esi     ;es
-%ifdef VMM
+%ifdef SWAP
           mov [edi + VMI_DS], esi     ;es
 %endif
         mov [edi + VMI_EAX], eax
@@ -543,6 +543,9 @@ DosPCall:
         mov [edi + VMI_Flags], ax
         mov [edi + VMI_EndFlags], ax
         mov [OffTSS + TSS_ESP1], esp
+%ifdef SWAP
+        xor esi, esi               ;SI = 0 for the LFN calls
+%endif
         mov eax, edi
         jmp SwitcherToVM
 
@@ -845,15 +848,48 @@ VIFRead@10:
         DPMIFn 6, 4
         xor bx, bx
         mov cx, 1000h
-%ifndef VMM
+%ifdef SWAP
+        DPMIFn 6, 2
+%else
   DPMIFn 6, 0
-%endif
         DPMIFn 6, 1
         DPMIFn 6, 2
+%endif
         DPMIFn 6, 3
         DPMIFn 7, 2
         DPMIFn 7, 3
         FnRet
+%ifdef SWAP
+
+        DPMIFn 6, 0
+        push edx
+        xor edx, edx
+        jmp short SwapLockCom
+        DPMIFn 6, 1
+        push edx
+        xor edx, edx
+        inc edx
+SwapLockCom:
+        push ebx
+        push ecx
+        push esi
+        push edi
+        shl ebx, 16
+        mov bx, cx
+        mov esi, ebx
+        mov ebx, [esp + 20 + DPMIFrame_ESI]
+        shl ebx, 16
+        mov bx, di
+        mov edi, ebx
+        call SwapLockRange
+        pop edi
+        pop esi
+        pop ecx
+        pop ebx
+        pop edx
+        jc DPMIError1
+        FnRet
+%endif
 
         DPMIFn 5, 0
         pushad
@@ -863,9 +899,6 @@ VIFRead@10:
         cld
         rep stosd
         xor edx, edx
-%ifdef VMM
-        mov [es:edi - 30h + 20h], edx ;swap file size
-%endif
         mov ax, 0DE03h      ;get VCPI free pages
         cmp [OffVCPIMemAvailable], dl
         _ifnot je
@@ -874,36 +907,6 @@ VIFRead@10:
         add edx, [OffnFreePages] ;add free pages in my pool
         add edx, [OffFreeXMSCount]
         RRT
-%ifdef VMM
-        mov eax, [OffTotalVCPIPages]
-        add eax, [OffTotalXMSPages]
-        RRT
-%ifndef Release
-          ;mov eax, 3300
-          ;mov edx, 3300
-          ;add  eax, 10000
-          ;add  edx, 10000
-%endif
-        mov [es:edi - 30h + 18h], eax
-        mov [es:edi - 30h + 0Ch], eax
-        mov [es:edi - 30h + 4], edx ;maximum unlocked page allocation
-        mov [es:edi - 30h + 8], edx ;maximum locked page allocation(same)
-        mov [es:edi - 30h + 10h], edx
-        mov [es:edi - 30h + 14h], edx
-        mov [es:edi - 30h + 1Ch], edx
-%endif
-%ifdef VMM
-        mov eax, edx
-        shr eax, 10
-        inc eax
-        inc eax
-        sub edx, eax
-        _ifnot ja
-          xor edx, edx
-        _endif
-        shl edx, 12         ;convert pages to bytes
-        mov [es:edi - 30h], edx  ;maximum free block
-%else
         ; Metadata occupies the permanently mapped kernel directory.
         ; Only a new MCB page consumes another physical page.
         cmp dword [OffFMemRover], 0
@@ -965,7 +968,6 @@ VIFRead@10:
         jmp .store
 .empty: xor ebx, ebx
 .store: mov [es:edi - 30h], ebx
-%endif
         popad
         FnRet
 
@@ -974,6 +976,12 @@ VIFRead@10:
         DPMIFn 4, 0
         mov ax, 005Ah          ;minor 0.90, decimal 90 (DPMI 1.0 Appendix C)
         mov bx, 1              ;32-bit clients supported
+%ifdef SWAP
+        cmp dword [OffSwapIdx], 0
+        _ifnot je
+          or bl, 4               ;virtual memory supported
+        _endif
+%endif
         cmp word [OffVCPICallDesc + 2], VCPISelector + 8
         jne .v86                 ;VCPI remains active even when out of free pages
         or bl, 2               ;host uses real mode outside VCPI
@@ -1244,22 +1252,12 @@ MapRound@12: ;zero denotes an exclusive physical end of 4 GB
 MapTables@12:
         push _firstdi               ;first newly owned directory for rollback
         _do jmp
-%ifndef VMM
           lea edi, [OffPageDir + (_firstdi * 4)]
           mov ecx, _lastdi
           sub ecx, _firstdi
           call XAllocPages
           jz Recover@12
           add _firstdi, ecx
-%else
-          push eax
-          call alloc_page
-          xchg edi, eax
-          pop eax
-          jc Recover@12
-          mov [OffPageDir + (_firstdi * 4)], edi
-          inc _firstdi
-%endif
         _while
         cmp _lastdi, _firstdi
         _enddo jne
@@ -1288,9 +1286,7 @@ MapDirectory@12:
         movzx edx, si
         and dh, 3
 MapEntries@12:
-%ifndef VMM
         inc dword [edi]
-%endif
         mov [OffPageTableWin + _t*4], _mapregionstart
         add _mapregionstart, 1000h
         inc _tmappedpage
@@ -1324,30 +1320,18 @@ Err@12:
 ;ebx - first page
 ;edx(@@LastDI) - last page
 FreeHMPages:
-%ifdef VMM
-        shr ebx, 22
-.loop:  cmp ebx, edx
-        jae .done
-        push dword [OffPageDir + ebx*4]
-        call free_page
-        inc ebx
-        jmp .loop
-.done:  ret
-%else
         mov eax, ebx
         shr eax, 12
         shl edx, 10
         push 2                     ;shared page walker, no physical release/IRQ
         call FreePagesN
         ret
-%endif
 
 ; New mapping tables have no installed entries yet; rollback frees only
 ; directories allocated by this call, excluding an existing boundary.
 FreeNewMapTables:
 .loop:  cmp ebx, edx
         jae .done
-%ifndef VMM
         push ebx
         push edx
         lea esi, [OffPageDir + ebx*4]
@@ -1355,10 +1339,6 @@ FreeNewMapTables:
         call XFreePages
         pop edx
         pop ebx
-%else
-        push dword [OffPageDir + ebx*4]
-        call free_page
-%endif
         inc ebx
         jmp .loop
 .done:  ret

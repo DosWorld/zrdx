@@ -1,0 +1,37 @@
+system nt
+name TMATH.EXE
+file TMATH.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import _sqrt MSVCRT.sqrt
+import _sin MSVCRT.sin
+import _cos MSVCRT.cos
+import _tan MSVCRT.tan
+import _atan MSVCRT.atan
+import _asin MSVCRT.asin
+import _acos MSVCRT.acos
+import _exp MSVCRT.exp
+import _log MSVCRT.log
+import _log10 MSVCRT.log10
+import _floor MSVCRT.floor
+import _ceil MSVCRT.ceil
+import _fabs MSVCRT.fabs
+import _sinh MSVCRT.sinh
+import _cosh MSVCRT.cosh
+import _tanh MSVCRT.tanh
+import _atan2 MSVCRT.atan2
+import _pow MSVCRT.pow
+import _fmod MSVCRT.fmod
+import _ldexp MSVCRT.ldexp
+import _frexp MSVCRT.frexp
+import _modf MSVCRT.modf
+import __finite MSVCRT._finite
+import __isnan MSVCRT._isnan
+import __copysign MSVCRT._copysign
+import __chgsign MSVCRT._chgsign
+import __clearfp MSVCRT._clearfp
+import __statusfp MSVCRT._statusfp
+import _exit MSVCRT.exit
+import _printf MSVCRT.printf
+import __ftol MSVCRT._ftol
+import __CIsqrt MSVCRT._CIsqrt

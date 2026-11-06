@@ -89,6 +89,32 @@ ExceptionWOCodeHL:
 ExceptionWithCodeHL:
 ExceptionWithCodeH@84:
         push ebp
+%ifdef SWAP
+        cmp dword [esp + 4], 0Eh
+        jne .noswap
+        push ds
+        push es
+        push ss
+        pop ds
+        push ss
+        pop es
+        call SwapCheck
+        jc .nosw2
+        cmp esp, OffKernelStack - 10 * 4
+        jne .inplace
+        pop es
+        pop ds
+        jmp SwapToPL1
+.inplace:
+        call SwapService
+.nosw2: pop es
+        pop ds
+        jc .noswap
+        pop ebp
+        add esp, 8
+        iretd
+.noswap:
+%endif
         cmp esp, OffKernelStack - 8 * 4
         jne ExceptionFrom0
 ExceptionFromNot0:
@@ -379,36 +405,11 @@ InterruptFromNot0:
         jz HIntFrom01@84          ;Interrupt from PL1, not from 2 or 3
         push ds
 %assign F F + 4 ;shift of interrupt frame
-%ifdef VMM
-        cmp byte [ss:OffLockedMode], 0
-        _ifnot jne
-          mov ebp, Data3Selector   ;selector of locked stack
-          mov ds, ebp
-          sub dword [OffTSS + TSS_ESP1], 20     ;reserve space for current iret frame
-          mov byte [OffLockedMode], 1
-          mov ebp, [OffTSS + TSS_ESP1]
-          mov [ebp + IFrCS], eax
-          mov eax, [esp + F + IFrEIP]
-          mov [ebp + IFrEIP], eax
-          mov eax, [esp + F + IFrSS]
-          mov [ebp + IFrSS], eax
-          mov eax, [esp + F + IFrESP]
-          mov [ebp + IFrESP], eax
-          ;we don't need to transfer eflags, because it will be transferred
-          ;during IretTrapH
-          mov eax, OffLockedStackBottom - 12 ;
-          mov dword [eax + IFrCS], Trap3Selector
-          mov ebp, OffIretPLTrap3
-        _else jmp
-%endif
           sub dword [esp + F + IFrESP], 12
           mov ebp, eax
           lds eax, [esp + F + IFrESP]  ;client ss
           mov [eax + IFrCS], ebp            ;client cs
           mov ebp, [esp + F + IFrEIP]            ;
-%ifdef VMM
-        _endif
-%endif
         mov [eax + IFrEIP], ebp         ;
         mov ebp, [esp + F + IFrFlags] ;
         mov [eax + 8], ebp       ;
@@ -456,16 +457,6 @@ HIntFrom01@84:
 ;--------------------------- jmp to client vector --------------------------
         and ah, ~(43h)  ;IFBitMask;return to client with server flags and IF=0
         mov [ss:OffTSS + TSS_ESP1], esp        ;new frame started from there
-%ifdef VMM
-        cmp byte [ss:OffLockedMode], 0
-        _ifnot jne
-          mov ebx, Data3Selector
-          mov ds, ebx
-          mov byte [ss:OffLockedMode], 1
-          mov ebx, OffLockedStackBottom - 12
-          mov dword [ebx], OffIret2KernelAsincLTrap3 ;address of trap
-        _else jmp
-%endif
 %ifdef NativeHost
           cmp byte [ss:OffNativeMode], 1
           ja .ordinary_stack
@@ -500,9 +491,6 @@ HIntFrom01@84:
 %ifdef NativeHost
 .trampoline_done:
 %endif ;address of trap
-%ifdef VMM
-        _endif
-%endif
         ;Log
         push ds          ;new client ss
         push ebx         ;new client esp
@@ -532,10 +520,6 @@ HIntFrom01@84:
         push dword [ss:ecx*8 + OffClientIDT]
         iretd
 
-%ifdef VMM
-        LLabel Iret2KernelAsincLTrapH
-        mov byte [ss:OffLockedMode], 0 ;disable locked mode
-%endif
 ;PL1 handler
 ;return to interrupted by hardware int place of server PL1 code
         DPROC Iret2KernelAsincTrapH
@@ -560,17 +544,6 @@ HIntFrom01@84:
         iretd                   ;from PL1 to PL1
 
 
-%ifdef VMM
-        DPROC IretPLTrapH
-        pushfd                       ;transfer current eflags to old frame
-        cli
-        pop dword [esp + 16 + IFrFlags]
-        add esp, 16                 ;drop current return frame and switch to prev frame
-        mov byte [ss:OffLockedMode], 0        ;disable locked mode
-        add dword [ss:OffTSS + TSS_ESP1], 20     ;free frame in kernel stack1
-        iretd
-
-%endif
 
 ;prepare RM stack and switch to
 ;rewrite return address to client stack
@@ -1019,7 +992,6 @@ AbsSet@105:
 ;free all pages, allocated by DPMI 800h
         mov ebx, [OffRootMCB + MCB_StartOffset]
         mov edx, 3FFh
-%ifndef VMM
         call FreeHMPages
         call CleanMemVector
         movzx eax, word [OffLDTLimit]
@@ -1032,7 +1004,6 @@ AbsSet@105:
           call FreePages
         _endif
         call ReturnFreePool
-%endif
 ;only for PL0
         mov esp, ROffExitStackEnd - NExitPages * 4 - TSFrameSize
         RRT
@@ -1139,12 +1110,7 @@ SimpleSwitchToVM:
         mov ds, eax
         mov es, eax
         mov ss, eax
-%ifndef VMM
           mov esp, OffKernelStack
-%else
-          mov esp, OffKernelStack - 4
-          push eax                   ;push Data0Selector
-%endif
         mov eax, [OffPMCR0]
         RRT
         mov cr0, eax
@@ -1238,22 +1204,6 @@ SimpleSwitchToVM:
 
 
         DPROC RMCallbackHandler
-%ifdef VMM
-        cmp byte [OffLockedMode], 0
-        _ifnot jne
-          mov byte [OffLockedMode], 1
-          mov esi, [OffPMStack]
-          RRT
-          mov [OffSavedPMStack], esi
-          mov esi, [OffPMStack + 4]
-          RRT
-          mov [OffSavedPMStack + 4], esi
-          mov esi, Data3Selector
-          mov es, esi
-          mov esi, OffLockedStackBottom - 12
-          mov dword [esi + IFrEIP], OffPMCallbackIretLTrap3
-        _else jmp
-%endif
 %ifdef NativeHost
           cmp byte [OffNativeMode], 1
           ja .ordinary_stack
@@ -1271,9 +1221,6 @@ SimpleSwitchToVM:
 .stack_ready:
 %endif
           mov dword [es:esi + IFrEIP], OffPMCallbackIretTrap3
-%ifdef VMM
-        _endif
-%endif
 %ifdef NativeHost
         cmp byte [ss:OffNativeMode], 0
         jne .wide_trampoline
@@ -1341,15 +1288,6 @@ S equ MaxSystemSwitchCode * 3
         iretd
 
 
-%ifdef VMM
-        LLabel PMCallbackIretLTrapH
-        mov ebp, OffSavedPMStack
-        mov eax, [ebp + 0]
-        mov edx, [ebp + 4]
-        ;mov ss:LockedMode, 0
-        mov byte [ebp + OffLockedMode - OffSavedPMStack], 0
-        jmp PMCallbackIretTrapE
-%endif
 
         DPROC PMCallbackIretTrapH
 %ifdef NativeHost
@@ -1461,22 +1399,6 @@ PMCallbackIretTrapE:
         DPROC PassupIntHandler
         sub word [OffRMStack], 10      ;save on RM stack all RM segment registers
         RRT 1
-%ifdef VMM
-        cmp byte [OffLockedMode], 0
-        _ifnot jne
-          mov byte [OffLockedMode], 1
-          mov esi, [OffPMStack]
-          RRT
-          mov [OffSavedPMStack], esi
-          mov esi, [OffPMStack + 4]
-          RRT
-          mov [OffSavedPMStack + 4], esi
-          mov esi, Data3Selector
-          mov es, esi
-          mov esi, OffLockedStackBottom - 12
-          mov dword [esi + IFrEIP], OffPassupIretLTrap3
-        _else jmp
-%endif
 %ifdef NativeHost
           cmp byte [OffNativeMode], 1
           ja .ordinary_stack
@@ -1494,9 +1416,6 @@ PMCallbackIretTrapE:
 .stack_ready:
 %endif
           mov dword [es:esi + IFrEIP], OffPassupIretTrap3
-%ifdef VMM
-        _endif
-%endif
         push es
         push esi
         pushfd
@@ -1553,22 +1472,6 @@ PMCallbackIretTrapE:
         mov ebp, [ebp + RMS_EBP]
         iretd
 
-%ifdef VMM
-        LLabel PassupIretLTrapH
-        push ebp
-        mov ebp, OffPMStack
-        RRT
-        pushfd
-        cli
-        push ss
-        pop ds
-        push eax
-        mov eax, [OffSavedPMStack]
-        mov [ebp], eax
-        mov eax, [OffSavedPMStack + 4]
-        mov byte [OffLockedMode], 0
-        jmp short PassupIretTrapE
-%endif
         DPROC PassupIretTrapH
         push ebp
         mov ebp, OffPMStack

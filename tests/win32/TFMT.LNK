@@ -1,0 +1,8 @@
+system nt
+name TFMT.EXE
+file TFMT.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import _sprintf MSVCRT.sprintf
+import __snprintf MSVCRT._snprintf
+import _exit MSVCRT.exit

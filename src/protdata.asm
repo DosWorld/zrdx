@@ -30,9 +30,6 @@ Traps3SetupTable:
         GDescr OffInvalidateTLBHandler, Code0Selector, 0A0h + SS_GATE_PROC3
         GDescr OffPageMoveHandler, Code0Selector, 0A0h + SS_GATE_PROC3
         GDescr OffLoadLDTHandler, Code0Selector, 0A0h + SS_GATE_PROC3
-%ifdef VMM
-          GDescr OffSwitchTo00, Code0Selector, 0A0h + SS_GATE_PROC3
-%endif
         Descr OffFirstTrap3, NTrapsP3 * 4 + 2, 40FBh       ;Trap3 descriptor
         dd 0, 0
         ;Descr OffLockedStackStart, LockedStackSize-1, 40F3h ;Locked stack
@@ -69,18 +66,29 @@ Traps3SetupTable:
         db 0 ;last page alloc call was succeful
         LByte NExtraRPages
         db 0
-%ifdef VMM
-        LByte LockedMode
-        db 0, 0
-        LDWord swap_file_handle
-        dd 0
-        LDWord sw_pti
-        dd OffClientPages >> 12
-%else
         db 0, 0 ;padding
-%endif
         LDWord TotalVCPIPages
         dd 0
+%ifdef SWAP
+        LDWord SwapHand
+        dd 0
+        LDWord SwapIdx
+        dd 0
+        LDWord SwapMax
+        dd 0
+%ifdef SWAPFAIL
+        LDWord SwapFailCnt
+        dd 0
+%endif
+        LDWord SwapCR2
+        dd 0
+        LDWord SwapBufLin
+        dd 0
+        LByte SwapBusy
+        db 0
+        LByte SwapIO
+        db 0, 0, 0
+%endif
         LByte RootMCB, MCBStruct_size
         dd OffRootMCB
         dd OffRootMCB

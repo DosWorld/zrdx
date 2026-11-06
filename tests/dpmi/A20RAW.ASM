@@ -74,7 +74,7 @@ done:   mov ax, 4C00h
         mov al, bl
         int 21h
 port92: db 0
-host: db 'ZRXDPMI.EXE',0
+host: db 'ZRDXDPMI.EXE',0
 tail: db 10,' A20RM.COM',13
 tail2: db 11,' NATL16.COM',13
 block: dw 0,tail,0,5Ch,0,6Ch,0

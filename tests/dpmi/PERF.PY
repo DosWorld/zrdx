@@ -33,6 +33,10 @@ def capture(before, after):
             'before': records[0], 'after': records[1]}
 
 
+# The archived timing record predates the zrx -> zrdx rename.
+HOSTS = ('ZRDXDPMI.EXE', 'ZRXDPMI.EXE')
+
+
 def render(data):
     if data.get('schema') != 'latency-1' or data.get('functions') != list(FUNCTIONS) or data.get('iterations') != 10000:
         raise ValueError('unknown timing schema')
@@ -52,7 +56,7 @@ def render(data):
             raise ValueError('invalid timing samples')
         if hashlib.sha256(struct.pack('<15Q', *samples)).hexdigest() != record['sample_sha256']:
             raise ValueError('timing sample hash mismatch')
-    inputs = [{k: v for k, v in m['inputs'].items() if k != 'ZRXDPMI.EXE'} for m in (a, b)]
+    inputs = [{k: v for k, v in m['inputs'].items() if k not in HOSTS} for m in (a, b)]
     if inputs[0] != inputs[1]:
         raise ValueError('timing clients or DOS inputs differ')
     lines = ['function\titerations\tbefore_median\tafter_median\tratio\tunit']
@@ -61,8 +65,9 @@ def render(data):
         lines.append('\t'.join((function, '10000', f'{x:.4f}', f'{y:.4f}', f'{y/x:.6f}',
                                 'virtual TSC ticks per iteration; icount shift=3; includes loop overhead')))
     for label, m in (('before', a), ('after', b)):
-        for name in ('ZRXDPMI.EXE', 'LATENC.COM'):
-            lines.append('\t'.join((label, name, m['inputs'][name])))
+        for name in ('ZRDXDPMI.EXE', 'LATENC.COM'):
+            key = next((h for h in HOSTS if h in m['inputs']), name) if name in HOSTS else name
+            lines.append('\t'.join((label, name, m['inputs'][key])))
     return '\r\n'.join(lines) + '\r\n'
 
 

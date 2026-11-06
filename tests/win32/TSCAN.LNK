@@ -1,0 +1,19 @@
+system nt
+name TSCAN.EXE
+file TSCAN.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import _strtod MSVCRT.strtod
+import _atof MSVCRT.atof
+import _strtol MSVCRT.strtol
+import _strtoul MSVCRT.strtoul
+import _atoi MSVCRT.atoi
+import _atol MSVCRT.atol
+import _sscanf MSVCRT.sscanf
+import _fscanf MSVCRT.fscanf
+import _fopen MSVCRT.fopen
+import _fclose MSVCRT.fclose
+import _fputs MSVCRT.fputs
+import _remove MSVCRT.remove
+import __errno MSVCRT._errno
+import _exit MSVCRT.exit
