@@ -19,7 +19,8 @@
 ;raw mode switch from RM                     RMRawSwitchHand
 ;comments:
 ;   int 31h hooked in module DPMI
-;   software interrupts traps points immediately to ring 3 and not hooked
+; software interrupts traps points immediately to ring 3 and not
+; hooked
 
         SEGM Text
 ;assume cs:DGroup, ss:DGroup, ds:DGroup, es:nothing
@@ -43,7 +44,8 @@
         mov [esp + 8], ebp
         pop ebp
         add esp, 4
-        movzx ebp, byte [ebp + OffFirstTrap3 + 3 - 7] ;load redirected int number
+        ; load redirected int number
+        movzx ebp, byte [ebp + OffFirstTrap3 + 3 - 7]
         and ebp, 0Fh
         mov [esp + 4], ebp    ;save error code on the stack
 %ifdef NativeHost
@@ -60,8 +62,10 @@
 %endif
 ExceptionReturnFrame:
         add esp, 3 * 4    ;drop return address and errcode
-        ; A client-supplied context must never select an inner privilege
-        ; or request a hardware task/VM86 return from this CPL0 gate.
+        ; A client-supplied context must never select an inner
+        ; privilege
+        ; or request a hardware task/VM86 return from this CPL0
+        ; gate.
         or byte [esp + 4], 3
         or byte [esp + 16], 3
         and dword [esp + 8], ~24000h
@@ -81,11 +85,14 @@ ExceptionReturnFrame:
               ;saved ebp
         DPROC PMHIntHandX
 
-        LLabel ExceptionWOCodeH              ;the entry for exceptions without error code
+        ; the entry for exceptions without error code
+        LLabel ExceptionWOCodeH
 ExceptionWOCodeHL:
         push dword [esp]      ;push exception number again
-        and dword [esp + 4], 0 ;store 0 as error code for common format
-        LLabel ExceptionWithCodeH            ;the entry for exceptions without error code
+        ; store 0 as error code for common format
+        and dword [esp + 4], 0
+        ; the entry for exceptions without error code
+        LLabel ExceptionWithCodeH
 ExceptionWithCodeHL:
 ExceptionWithCodeH@84:
         push ebp
@@ -139,7 +146,8 @@ ExceptionFromNot0:
 .system_default:
         cmp dx, [ss:OffNativeThunkSel]
         jne .client_handler
-        cmp dword [ss:eax*8 + OffClientExc], NativeFatalStub - NativeInt16
+        cmp dword [ss:eax*8 + OffClientExc], NativeFatalStub \
+                - NativeInt16
         jne .client_handler
 .default:
         pop edx
@@ -168,25 +176,30 @@ ExceptionFromNot0:
         movsd      ;move exception frame to the client stack
 %endrep
         cld
-        mov dword [es:edi], Trap3Selector   ;store to the client stack
+        ; store to the client stack
+        mov dword [es:edi], Trap3Selector
         sub edi, 4                    ;return address
         mov dword [es:edi], OffRetFromExcTrap3
         pop ds
         pop esi
         push es
         push edi
-        imul edi, [esp + (4 * 4) + 4], 8       ;Exception number * 4
+        ; Exception number * 4
+        imul edi, [esp + (4 * 4) + 4], 8
         push dword [ss:edi + OffClientExc + 4]
         push dword [ss:edi + OffClientExc]
-        les edi, [esp + (4 * 4)]    ;restore original es:edi from kernel stack
-        retf                      ;switch to client excepyion handler
+        ; restore original es:edi from kernel stack
+        les edi, [esp + (4 * 4)]
+        ; switch to client excepyion handler
+        retf
 ExceptionFrom0: ;XXX
 FatalExc:
 %ifdef NativeHost
         cmp dword [ss:esp + 12], OffExceptionReturnIret
         jne .ordinary
         cmp word [ss:esp + 16], Code1Selector
-        je NativeFatalClient       ;invalid user return must spare the parent
+        ; invalid user return must spare the parent
+        je NativeFatalClient
 .ordinary:
 %endif
         cmp byte [esp + 4], 1
@@ -298,7 +311,8 @@ L098:
         call NativeSoftwareGP
 %endif
 %assign F 8
-        ;test [esp+F].IFrCS, 2         ;exception from kernel(CPL < 2)?
+        ; test [esp+F].IFrCS, 2         ;exception from
+        ; kernel(CPL < 2)?
         ;jz   @@ExceptionWithCodeH
         shr byte [ss:OffException0DFlag], 1
         _ifnot jc
@@ -310,7 +324,8 @@ L098:
         push ds
         lds esi, [esp + F + 8 + IFrEIP]         ;cs:eip
         push eax
-        ; Do not let the decoder's own memory access fault on a valid
+        ; Do not let the decoder's own memory access fault on a
+        ; valid
         ; client #GP at the end of its code segment.
         lsl eax, word [esp + 24]
         jnz ToCommonTrap@84
@@ -319,7 +334,8 @@ L098:
         cmp esi, eax
         ja ToCommonTrap@84
         ; Preserve the old EAX-only FPU/CR2 compatibility without
-        ; executing arbitrary client CR/DR instructions on the host stack.
+        ; executing arbitrary client CR/DR instructions on the
+        ; host stack.
         mov ax, [esi]
         cmp ax, 200Fh
         je ReadClientCR@84
@@ -351,7 +367,8 @@ ClientCRDone@84:
         pop ds
         pop esi
         add dword [esp + F + IFrEIP], 3
-        add esp, 8                  ;drop exception number and error code
+        ; drop exception number and error code
+        add esp, 8
         mov byte [ss:OffException0DFlag], 1
         iretd
 ToCommonTrap@84:
@@ -361,10 +378,12 @@ ToCommonTrap@84:
         mov byte [ss:OffException0DFlag], 1
         jmp ExceptionWithCodeH@84
 
-        LLabel ExceptionOrInterruptH     ;the entry for exceptions/interrupts in range 8-F
+        ; the entry for exceptions/interrupts in range 8-F
+        LLabel ExceptionOrInterruptH
         cmp esp, OffKernelStack - 6 * 4
         jne ExceptionWithCodeH@84
-        LLabel InterruptH                ;the entry for interrupts
+        ; the entry for interrupts
+        LLabel InterruptH
 InterruptHL:
 InterruptH@84:
 %ifdef NativeHost
@@ -374,7 +393,8 @@ InterruptH@84:
         je .ordinary
         test byte [esp + 4 + IFrCS], 2
         jz .ordinary
-        push dword [esp]           ;vector, then synthetic error code
+        ; vector, then synthetic error code
+        push dword [esp]
         mov dword [esp + 4], 0
         push ebp
         mov ebp, 1
@@ -402,7 +422,8 @@ InterruptFromNot0:
         ;  jmp @@ExceptionWithCodeH
         ;$endif
         ;ENDIF
-        jz HIntFrom01@84          ;Interrupt from PL1, not from 2 or 3
+        ; Interrupt from PL1, not from 2 or 3
+        jz HIntFrom01@84
         push ds
 %assign F F + 4 ;shift of interrupt frame
           sub dword [esp + F + IFrESP], 12
@@ -428,12 +449,15 @@ InterruptFromNot0:
 
 ;interrupt from level 1
 HIntFrom01@84:
-;----------------- save all registers in kernel stack ---------------------
+; ----------------- save all registers in kernel stack
+; ---------------------
         ;Log
         mov ebp, OffKernelStack
         mov esp, [ebp - 8]         ;get esp for level 1
-                      ;exceptions & interrupts not allowed there !
-        mov eax, [ebp - 12]      ;eflags for interrupted server code
+                      ; exceptions & interrupts not allowed there
+                      ; !
+        ; eflags for interrupted server code
+        mov eax, [ebp - 12]
         push eax
         push dword [ebp - 20]  ;eip,
         push edi
@@ -448,15 +472,19 @@ HIntFrom01@84:
         push es        ;because stack0 is dropped
         push fs        ;because stack0 is dropped
         push gs        ;because stack0 is dropped
-                                ;push cs not needed, cs == Code1Selector
+                                ; push cs not needed, cs ==
+                                ; Code1Selector
         movzx ecx, byte [ebp - 24] ;get interrupt number
         mov ebp, [ss:OffTSS + TSS_ESP1]
         push ebp           ;save stack1 frame
         ;cmp  esp, XXX     ;test for stack overflow
         ;jb   KernelStack1Overflow
-;--------------------------- jmp to client vector --------------------------
-        and ah, ~(43h)  ;IFBitMask;return to client with server flags and IF=0
-        mov [ss:OffTSS + TSS_ESP1], esp        ;new frame started from there
+; --------------------------- jmp to client vector
+; --------------------------
+        ; IFBitMask;return to client with server flags and IF=0
+        and ah, ~(43h)
+        ; new frame started from there
+        mov [ss:OffTSS + TSS_ESP1], esp
 %ifdef NativeHost
           cmp byte [ss:OffNativeMode], 1
           ja .ordinary_stack
@@ -526,7 +554,8 @@ HIntFrom01@84:
         cli
         ;Log
         add esp, 16         ;drop call gate stack frame
-        pop dword [ss:OffTSS + TSS_ESP1] ;restore level 1 stack pointer in the TSS
+        ; restore level 1 stack pointer in the TSS
+        pop dword [ss:OffTSS + TSS_ESP1]
         pop gs
         pop fs
         pop es
@@ -539,7 +568,8 @@ HIntFrom01@84:
         pop esi
         pop edi
         push dword [esp]         ;push eip again
-        mov dword [esp + 4], Code1Selector ;replace it with CS to complete simple iret frame
+        ; replace it with CS to complete simple iret frame
+        mov dword [esp + 4], Code1Selector
         ;Log
         iretd                   ;from PL1 to PL1
 
@@ -622,23 +652,30 @@ DefaultReflect@84:
         mov [eax + VMI_EndFlags], bp  ;flags to real iret frame
         mov [eax + VMI_DS], ebx
         mov [eax + VMI_ES], ebx
-        mov ebp, [esp + F + CFrEIP]   ;assume call from Trap3 segment
+        ; assume call from Trap3 segment
+        mov ebp, [esp + F + CFrEIP]
         mov [eax + VMI_FS], ebx
         mov [eax + VMI_GS], ebx
         db 0C7h, 40h, VMI_EndIP
         dw RMIretSwitchCode, DGROUP16
 
-        movzx ebx, byte [ebp + OffFirstTrap3 + OffDefIntTrap3 + 3 - 7] ;load redirected int number
+        ; load redirected int number
+        movzx ebx, byte [ebp + OffFirstTrap3 + OffDefIntTrap3 \
+                + 3 - 7]
         bt dword [OffRIntFlags], ebx
         _ifnot jc
-        mov ebx, [ebx*4]       ;CS:IP from current real mode vector
+        ; CS:IP from current real mode vector
+        mov ebx, [ebx*4]
         _else jmp
-        mov ebx, [ebx*4 + OffSavedRealVectors]  ;CS:IP from saved real vector
+        ; CS:IP from saved real vector
+        mov ebx, [ebx*4 + OffSavedRealVectors]
         _endif
         mov [eax + VMI_IP], ebx
-        pop dword [eax + VMI_EAX] ;write eax for restoring after mode switch
+        ; write eax for restoring after mode switch
+        pop dword [eax + VMI_EAX]
         pop ebx
-        and bh, ~(43h)   ;clear IF and TF and NT for initial flags
+        ; clear IF and TF and NT for initial flags
+        and bh, ~(43h)
         pop ebp
         mov [eax + VMI_Flags], bx ;write flags for restoring
         pop ebx
@@ -719,7 +756,8 @@ SwitcherToVM:
         mov [ebp + VMI_IP], di
         mov [ebp + VMI_ESP], ebx
         mov [ebp + VMI_ES], ecx
-        xor edx, edx             ;EAX must retain the switch-frame address
+        ; EAX must retain the switch-frame address
+        xor edx, edx
         mov [ebp + VMI_FS], edx
         mov [ebp + VMI_GS], edx
         pop ebp
@@ -740,7 +778,8 @@ SwitcherToVM:
         mov eax, 0DE0Ch
         db PushWCode
         dd pop_eax_iret
-        mov byte [OffGDT + TSSSelector + 5], 80h + SS_FREE_TSS3 ;mark current TSS as FREE
+        ; mark current TSS as FREE
+        mov byte [OffGDT + TSSSelector + 5], 80h + SS_FREE_TSS3
         call far [OffVCPICall]
 
         DPROC VCPITrapHandler
@@ -771,8 +810,10 @@ SwitcherToVM:
 %endif
         retf
 
-        ;Interrupts are disabled on entry. MOV DR uses a stack-local
-        ;instruction, following the existing MOV CR emulation convention.
+        ; Interrupts are disabled on entry. MOV DR uses a
+        ; stack-local
+        ; instruction, following the existing MOV CR emulation
+        ; convention.
 DebugService:
         pushad
         mov edi, [OffDebugUsed]
@@ -832,7 +873,8 @@ DebugService:
         mov dr6, eax
         mov ebx, ecx
         shl ebx, 3
-        push 0C3C0230Fh       ;MOV DRn,EAX; RET, confined to this stack
+        ; MOV DRn,EAX; RET, confined to this stack
+        push 0C3C0230Fh
         or [esp + 2], bl
         mov eax, ebp
         call esp
@@ -856,10 +898,12 @@ DebugService:
         or esi, eax
         sub ecx, 16
         shr ecx, 1
-        mov eax, 2           ;global enable survives VCPI task switches
+        ; global enable survives VCPI task switches
+        mov eax, 2
         shl eax, cl
         or esi, eax
-        or esi, 700h          ;reserved one + exact data traps on 386 (LE/GE)
+        ; reserved one + exact data traps on 386 (LE/GE)
+        or esi, 700h
         mov dr7, esi
         jmp short DebugOK
 DebugHandle:
@@ -954,9 +998,12 @@ RestoreDebug:
         retf
         LLabel TerminateHandler1
 %ifdef NativeHost
-        ; No client remains. Reuse the kernel dummy only during final
-        ; cleanup, after its separately allocated root anchor can be freed.
-        or byte [OffPage2 + (((OffKernelStack - 1) & ~0FFFh) - KernelBase) / 1024], 4
+        ; No client remains. Reuse the kernel dummy only during
+        ; final
+        ; cleanup, after its separately allocated root anchor can
+        ; be freed.
+        or byte [OffPage2 + (((OffKernelStack - 1) & ~0FFFh) \
+                - KernelBase) / 1024], 4
         InvalidateTLB
 %endif
         push Data3Selector     ;save sp for interrup handler
@@ -964,9 +1011,11 @@ RestoreDebug:
         db 0C7h, 05h
         dd OffRMStack
         RRT
-        dw ROffExitStackEnd - TSFrameSize ;mov RealStack, dgroup16<<16+ROffExitStackEnd
+        ; mov RealStack, dgroup16<<16+ROffExitStackEnd
+        dw ROffExitStackEnd - TSFrameSize
         dw DGROUP16
-;-------------------restore all RM vectors hooked by server --------------------
+; -------------------restore all RM vectors hooked by server
+; --------------------
 ; and RM vectors hooked by client
         xor ecx, ecx
         mov edi, ecx
@@ -1029,7 +1078,9 @@ SimpleSwitchToVM:
         push eax  ;fs gs es ds ss
         push eax  ;fs gs es ds ss
         push eax  ;fs gs es ds ss
-        push (ROffExitStackEnd - NExitPages * 4 - TSFrameSize - 10) ;esp
+        ; esp
+        push (ROffExitStackEnd - NExitPages * 4 - TSFrameSize \
+                - 10)
         push eax                   ;skip eflags
         mov eax, esp
         jmp SwitcherToVM
@@ -1049,7 +1100,8 @@ SimpleSwitchToVM:
 
 %macro PrintByte 0
 %ifdef Release
-        stosb                    ;release diagnostics always use the RM buffer
+        ; release diagnostics always use the RM buffer
+        stosb
 %else
         call PrintByteP
 %endif
@@ -1103,438 +1155,4 @@ SimpleSwitchToVM:
         ret 8
 
 
-;PM handler for VM->PM   VCPI switch
-        DPROC RMS_PMHandler
-        mov eax, Data0Selector
-        movzx esi, bp
-        mov ds, eax
-        mov es, eax
-        mov ss, eax
-          mov esp, OffKernelStack
-        mov eax, [OffPMCR0]
-        RRT
-        mov cr0, eax
-        ;Real DOS may clear IOPL. Ring-1 cleanup uses CLI/STI as well.
-        pushfd
-        or byte [esp + 1], 30h
-        popfd
-        add bp, RMSStruct_size    ;ajust RM sp to top of normal RM stack
-        mov [OffRMStack], ebp
-        RRT
-        shr ebp, 12
-        and ebp, ~(1111b)
-        add ebp, esi              ;ebp->LA of RMS
-        movzx eax, word [ebp + RMS_SwitchCode]
-        sub eax, OffFirstSwitchCode + 3
-        cmp eax, FirstPassupSwitchCode
-        jae near PassupIntHandler
-        cmp eax, MaxSystemSwitchCode
-        jae RMCallbackHandler
-        jmp [eax + OffRMS_JmpTable]
-
-        align 4
-        LDWord RMS_JmpTable
-        dd OffRMIretHandler
-        dd OffDos1CallRet
-        dd OffRMIERetHandler
-        dd OffTerminateHandler
-        dd OffRMRawSwitchHandler
-
-        DPROC RMIretHandler
-        lds esi, [OffPMStack]
-        RRT
-        lea eax, [esi + PMIStruct_size]
-        push ds
-        push eax
-        mov eax, [esi + PMI_EFlags]
-        mov ax, [ebp + RMS_Flags]     ;load transferred flags
-        or ah, 30h                 ;force IOPL=3
-        and ah, ~(40h)             ;and NT = 0
-        push eax
-        push dword [esi + PMI_CS]
-        push dword [esi + PMI_EIP]
-        mov fs, [esi + PMI_FS]      ;restore segment registers from client stack
-        mov gs, [esi + PMI_GS]
-        mov es, [esi + PMI_ES]
-        mov ds, [esi + PMI_DS]
-        mov eax, [ebp + RMS_EAX]    ;and transfer RON from RM stack
-        mov esi, [ebp + RMS_ESI]
-        mov ebp, [ebp + RMS_EBP]
-%ifdef NativeHost
-        call NativeFinishIret
-%endif
-        iretd
-
-
-        DPROC RMRawSwitchHandler
-%ifdef NativeHost
-        cmp byte [OffNativePending], 0
-        RRT 1
-        je .client
-        mov al, 1
-        call NativeKernelStack
-        push Data1Selector
-        push OffKernelStack1End
-        push Code1Selector
-        push OffNativeResume
-        retf
-.client:
-        call NativeRestoreAlias
-        cmp byte [ss:OffNativeMode], 0
-        jne .wide_target
-        movzx ebx, bx
-        movzx edi, di
-.wide_target:
-%endif
-        movzx edx, dx
-        push edx
-        push ebx
-        pushfd
-        movzx eax, word [ebp + RMS_ESI]
-        or byte [esp + 1], 30h     ;set iopl==3
-        push eax
-        push edi
-        xor eax, eax
-        mov fs, eax
-        mov gs, eax
-        mov es, ecx
-        mov ds, [ebp + RMS_EAX]
-        mov ebp, [ebp + RMS_EBP]
-        iretd
-
-
-        DPROC RMCallbackHandler
-%ifdef NativeHost
-          cmp byte [OffNativeMode], 1
-          ja .ordinary_stack
-          cmp dword [OffNativeCurrent], 0
-          je .ordinary_stack
-          call NativeLockedBridge
-          jmp short .stack_ready
-.ordinary_stack:
-%endif
-          sub dword [OffPMStack], 12
-          RRT 1
-          les esi, [OffPMStack]
-          RRT
-%ifdef NativeHost
-.stack_ready:
-%endif
-          mov dword [es:esi + IFrEIP], OffPMCallbackIretTrap3
-%ifdef NativeHost
-        cmp byte [ss:OffNativeMode], 0
-        jne .wide_trampoline
-        push eax
-        pushfd
-        pop eax
-        mov word [es:esi + 2], Trap3Selector
-        mov [es:esi + 4], ax
-        pop eax
-        jmp short .trampoline_ready
-.wide_trampoline:
-%endif
-        mov dword [es:esi + IFrCS], Trap3Selector
-        pushfd
-        pop dword [es:esi + IFrFlags] ;, eax
-%ifdef NativeHost
-.trampoline_ready:
-%endif
-        push es
-        push esi
-        pushfd
-        or byte [esp + 1], 30h
-S equ MaxSystemSwitchCode * 3
-        lea eax, [eax + eax*2 + OffCallbacksTable - S]
-        movzx esi, word [eax + CBT_CS]
-        push esi
-        push dword [eax + CBT_EIP]
-        lds esi, [eax + CBT_SPtrOff]
-;        @@DC equ ds:[esi]
-        mov [esi + DC_EBX], ebx
-        mov [esi + DC_ECX], ecx
-        mov [esi + DC_EDX], edx
-        mov [esi + DC_EDI], edi
-        mov ecx, [ebp + RMS_EAX]
-        mov [esi + DC_EAX], ecx
-        mov ecx, [ebp + RMS_ESI]
-        mov [esi + DC_ESI], ecx
-        mov ecx, [ebp + RMS_EBP]
-        mov [esi + DC_EBP], ecx
-        mov ecx, [ebp + RMS_ES]
-        mov [esi + DC_ES], ecx
-        mov ecx, [ebp + RMS_FS]
-        mov [esi + DC_FS], ecx
-        mov cx, [ebp + RMS_DS]
-        mov [esi + DC_DS], cx
-        mov cx, [ebp + RMS_GS]
-        mov [esi + DC_GS], cx
-        mov cx, [ebp + RMS_Flags]
-        mov [esi + DC_Flags], cx
-        mov ecx, [ss:OffRMStack]
-        RRT
-        mov [esi + DC_SP], ecx
-        mov eax, Data3Selector
-        push ds
-        mov ds, eax
-        mov edi, esi
-        mov al, 0 ; Data3selector
-        pop es
-        mov fs, eax
-        mov gs, eax
-        lea esi, [ebp + RMSStruct_size]
-%ifdef NativeHost
-        call NativeCallbackSegments16
-%endif
-        iretd
-
-
-
-        DPROC PMCallbackIretTrapH
-%ifdef NativeHost
-        cmp byte [ss:OffNativeMode], 1
-        ja .ordinary_stack
-        cmp dword [ss:OffNativeCurrent], 0
-        je .ordinary_stack
-        call NativeLockedBridgeLeave
-        cmp byte [ss:OffNativeMode], 0
-        jne PMCallbackIretTrapE
-        movzx edi, di
-        jmp short PMCallbackIretTrapE
-.ordinary_stack:
-%endif
-        mov eax, [esp + CFrESP]
-        mov edx, [esp + CFrSS]
-PMCallbackIretTrapE:
-        cli
-        push es
-        pop ds
-        mov ebp, OffPMStack
-        RRT
-        mov [ebp + 0], eax
-        mov [ebp + 4], edx
-        movzx eax, word [edi + DC_SP]
-        movzx ebp, word [edi + DC_SS]
-        push ebp
-        shl ebp, 4
-        dec ax
-        sub eax, VMIStruct_size - 6 - 1
-        ;jb @@RStackOverflow
-        add ebp, eax
-        pop dword [ebp + VMI_SS]
-        add eax, VMI_EAX
-        mov [ebp + VMI_ESP], eax
-        mov ax, [edi + DC_Flags]
-        mov [ebp + VMI_Flags], ax
-        mov edx, [edi + DC_IP]
-        jmp SwitchToVMWithTransfer
-
-
-
-;VMS  - struct for switch from VM to PM
-;PMI  - client stack frame for interrupts, executed in PM
-;RMIE - client stack frame for real mode interrupt emulation (DPMI service 30X)
-
-        DPROC RMIERetHandler
-        les eax, [OffPMStack]
-        RRT
-        lds esi, [es:eax + RMIE_EDI]
-;        @@DC equ ds:[esi]
-        mov [esi + DC_EBX], ebx
-        mov [esi + DC_ECX], ecx
-        mov [esi + DC_EDX], edx
-        mov ecx, [ebp + RMS_EAX]
-        mov [esi + DC_EDI], edi
-        mov edx, [ebp + RMS_ESI]
-        mov [esi + DC_EAX], ecx
-        mov ebx, [ebp + RMS_EBP]
-        mov [esi + DC_ESI], edx
-        mov ecx, [ebp + RMS_ES]
-        mov [esi + DC_EBP], ebx
-        mov edx, [ebp + RMS_FS]
-        mov [esi + DC_ES], ecx
-        mov bx, [ebp + RMS_Flags]
-        mov [esi + DC_FS], edx
-        mov [esi + DC_Flags], bx
-
-
-        push es                        ;client SS
-        push es
-        add eax, RMIEStruct_size
-        pop ds
-        push eax                       ;new esp
-        pushfd
-;        @@CS equ ds:[eax-size RMIEStruct]
-        mov dl, [eax - RMIEStruct_size + RMIE_CS + 2]
-        mov [ss:OffA20Reset], dl
-        RRT
-        mov edx, [eax - RMIEStruct_size + RMIE_RealStack]
-        mov ecx, [eax - RMIEStruct_size + RMIE_EFlags]
-        ;or   ch, 30h                  ;set iopl = 3
-        and cl, ~(1h)                ;set CF = 0
-        mov [ss:OffRMStack], edx
-        RRT
-        mov [esp], ecx                ;restore the protected caller's full flags
-        push dword [eax - RMIEStruct_size + RMIE_CS]
-        push dword [eax - RMIEStruct_size + RMIE_EIP]
-        mov fs, [eax - RMIEStruct_size + RMIE_FS]
-        mov gs, [eax - RMIEStruct_size + RMIE_GS]
-        mov es, [eax - RMIEStruct_size + RMIE_ES]
-%ifdef NativeHost
-        mov edi, [eax - RMIEStruct_size + RMIE_OriginalDI]
-%else
-        mov edi, esi                  ;@@CS.RMIE_EDI
-%endif
-        mov esi, [eax - RMIEStruct_size + RMIE_ESI]
-        mov ebx, [eax - RMIEStruct_size + RMIE_EBX]
-        mov ecx, [eax - RMIEStruct_size + RMIE_ECX]
-        mov edx, [eax - RMIEStruct_size + RMIE_EDX]
-        mov ebp, [eax - RMIEStruct_size + RMIE_EBP]
-        lds eax, [eax - RMIEStruct_size + RMIE_EAX]
-%ifdef NativeHost
-        call NativeFinishIret
-%endif
-        iretd
-
-
-        DPROC PassupIntHandler
-        sub word [OffRMStack], 10      ;save on RM stack all RM segment registers
-        RRT 1
-%ifdef NativeHost
-          cmp byte [OffNativeMode], 1
-          ja .ordinary_stack
-          cmp dword [OffNativeCurrent], 0
-          je .ordinary_stack
-          call NativeLockedBridge
-          jmp short .stack_ready
-.ordinary_stack:
-%endif
-          sub dword [OffPMStack], 12
-          RRT 1
-          les esi, [OffPMStack]
-          RRT
-%ifdef NativeHost
-.stack_ready:
-%endif
-          mov dword [es:esi + IFrEIP], OffPassupIretTrap3
-        push es
-        push esi
-        pushfd
-%ifdef NativeHost
-        cmp dword [OffNativeCurrent], 0
-        jne .active_vector
-        push Trap3Selector
-        lea eax, [eax*4 + OffDefIntTrap3 - FirstPassupSwitchCode*4]
-        push eax
-        jmp short .vector_ready
-.active_vector:
-%endif
-        push dword [eax*8 + OffClientIDT - ((FirstPassupSwitchCode) * 8) + 4]
-        push dword [eax*8 + OffClientIDT - ((FirstPassupSwitchCode) * 8) + 0]
-%ifdef NativeHost
-.vector_ready:
-%endif
-        mov eax, [esp + 8]               ;load default EFlags
-%ifdef NativeHost
-        cmp byte [ss:OffNativeMode], 0
-        jne .wide_cs
-        mov word [es:esi + 2], Trap3Selector
-        jmp short .cs_ready
-.wide_cs:
-%endif
-        mov dword [es:esi + IFrCS], Trap3Selector
-%ifdef NativeHost
-.cs_ready:
-%endif
-        mov ax, [ebp + RMS_Flags]
-        and ah, ~(40h)                ;start client with NT = 0 and IOPL = 3
-        or ah, 30h
-        mov [esp + 8], eax
-                                       ;replace flags
-        mov ax, [ebp + RMSStruct_size + 4] ;with flags from RM int stack frame
-%ifdef NativeHost
-        cmp byte [ss:OffNativeMode], 0
-        jne .wide_flags
-        mov [es:esi + 4], ax
-        jmp short .flags_ready
-.wide_flags:
-%endif
-        mov [es:esi + IFrFlags], eax
-%ifdef NativeHost
-.flags_ready:
-%endif
-        xor eax, eax
-        mov esi, [ebp + RMS_ESI]
-        ;mov  ds, eax
-        ;mov  es, eax
-        mov fs, eax
-        mov gs, eax
-        mov eax, [ebp + RMS_EAX]
-        mov ebp, [ebp + RMS_EBP]
-        iretd
-
-        DPROC PassupIretTrapH
-        push ebp
-        mov ebp, OffPMStack
-        RRT
-        pushfd
-        cli
-        push eax
-                                   ;set client PMStack from PL1 stack bottom
-%assign F 3 * 4
-%ifdef NativeHost
-        cmp byte [ss:OffNativeMode], 1
-        ja .ordinary_stack
-        cmp dword [ss:OffNativeCurrent], 0
-        je .ordinary_stack
-        push edx
-        call NativeLockedBridgeLeave
-        mov [ss:ebp], eax
-        mov eax, edx
-        pop edx
-        jmp short .stack_ready
-.ordinary_stack:
-%endif
-        mov eax, [esp + F + CFrESP]
-        mov [ebp], eax
-        mov eax, [esp + F + CFrSS]
-%ifdef NativeHost
-.stack_ready:
-%endif
-        push ss
-        pop ds
-PassupIretTrapE:
-        mov [ebp + 4], eax
-        mov eax, [OffRMStack]
-        RRT
-        movzx ebp, ax
-        dec bp
-        sub ebp, VMIStruct_size - 12 - 1 - 10
-        ;jc RMStackFault
-        shr eax, 16
-        push eax
-        shl eax, 4
-        add eax, ebp
-        pop dword [eax + VMI_SS]
-        add ebp, VMI_EAX
-        mov [eax + VMI_ESP], ebp
-        movzx ebp, word [eax + VMI_IP - RMSStruct_size + RMS_ES]
-        mov [eax + VMI_ES], ebp
-        mov bp, [eax + VMI_IP - RMSStruct_size + RMS_DS]
-        mov [eax + VMI_DS], ebp
-        mov bp, [eax + VMI_IP - RMSStruct_size + RMS_FS]
-        mov [eax + VMI_FS], ebp
-        mov bp, [eax + VMI_IP - RMSStruct_size + RMS_GS]
-        mov [eax + VMI_GS], ebp
-        pop dword [eax + VMI_EAX]
-        pop ebp                  ;restore EFlags
-        mov [eax + VMI_Flags], bp
-        pop ebp
-;        add  esp, 8               ;drop return address
-;        pop  PMStack              ;retore client stack base
-;        RRT
-;        pop  PMStack[4]
-;        RRT
-        VCPICallTrap
-
-
-        ESEG Text
+%include "prothan2.asm"

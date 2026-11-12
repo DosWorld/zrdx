@@ -178,7 +178,7 @@ extern BOOL W WriteConsoleW(HANDLE, const unsigned short *,
                             DWORD *, void *);
 extern int W WideCharToMultiByte(unsigned, DWORD,
                                  const unsigned short *, int,
-                                     char *,
+                                 char *,
                                  int, const char *, BOOL *);
 extern BOOL W GetStringTypeW(DWORD, const unsigned short *, int,
                              unsigned short *);

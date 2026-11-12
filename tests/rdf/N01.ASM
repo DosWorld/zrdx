@@ -1,4 +1,5 @@
-; negative: unresolved import (not linked) must be rejected by the loader
+; negative: unresolved import (not linked) must be rejected by
+; the loader
 bits 32
 global start
 extern foo

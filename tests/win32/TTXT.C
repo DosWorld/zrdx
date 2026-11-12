@@ -60,7 +60,7 @@ static void console_tests(void)
     CHECK(GetConsoleMode(in, &mode) && (mode & 2));
     CHECK(SetConsoleCP(437) && GetConsoleCP() == 437);
     CHECK(SetConsoleOutputCP(850)
-        && GetConsoleOutputCP() == 850);
+          && GetConsoleOutputCP() == 850);
     CHECK(!SetConsoleOutputCP(99999) && GetLastError() == 87);
     CHECK(CloseHandle(in) && CloseHandle(out));
 }
@@ -74,30 +74,30 @@ static void convert_tests(void)
     smile[0] = 0xD83D;
     smile[1] = 0xDE00;
     CHECK(WideCharToMultiByte(65001, 0, &e9, 1, b, 8, 0,
-        0) == 2);
+                              0) == 2);
     CHECK((unsigned char)b[0] == 0xC3 &&
           (unsigned char)b[1] == 0xA9);
     CHECK(WideCharToMultiByte(65001, 0, &euro, 1, b, 8, 0,
-        0) == 3);
+                              0) == 3);
     CHECK((unsigned char)b[0] == 0xE2 &&
           (unsigned char)b[2] == 0xAC);
     CHECK(WideCharToMultiByte(65001, 0, smile, 2, b, 8, 0,
-        0) == 4);
+                              0) == 4);
     CHECK((unsigned char)b[0] == 0xF0 &&
           (unsigned char)b[3] == 0x80);
     CHECK(WideCharToMultiByte(437, 0, &e9, 1, b, 8, 0,
-        &used) == 1);
+                              &used) == 1);
     CHECK((unsigned char)b[0] == 0x82 && !used);
     CHECK(WideCharToMultiByte(437, 0, &euro, 1, b, 8, 0,
                               &used) == 1);
     CHECK(b[0] == '?' && used);
     CHECK(WideCharToMultiByte(1252, 0, &euro, 1, b, 8, 0,
-        0) == 1);
+                              0) == 1);
     CHECK((unsigned char)b[0] == 0x80);
     CHECK(WideCharToMultiByte(1252, 0, smile, 2, b, 0, 0,
-        0) == 1);
+                              0) == 1);
     CHECK(WideCharToMultiByte(65001, 0, &euro, 1, b, 2, 0,
-        0) == 0);
+                              0) == 0);
     CHECK(GetLastError() == 122);
     CHECK(MultiByteToWideChar(437, 0, "\x82", 1, w, 8) == 1 &&
           w[0] == 0xE9);
@@ -155,7 +155,7 @@ static void map_tests(void)
     CHECK(LCMapStringW(0, 0x200, &yd, 1, o, 8) == 1 &&
           o[0] == 0x178);
     CHECK(LCMapStringW(0, 0x100, o, 1, w, 8) == 1
-        && w[0] == 0xFF);
+          && w[0] == 0xFF);
     CHECK(!LCMapStringW(0, 0x300, w, 1, o, 8));
     s[0] = 'a';
     s[1] = (char)0xE9;
@@ -163,7 +163,7 @@ static void map_tests(void)
     CHECK(LCMapStringA(0, 0x200, s, 3, r, 8) == 3);
     CHECK(r[0] == 'A' && (unsigned char)r[1] == 0xC9);
     CHECK(LCMapStringA(0, 0x100, r, 3, r, 8) == 3
-        && r[0] == 'a');
+          && r[0] == 'a');
 }
 
 static void compare_tests(void)
@@ -192,7 +192,7 @@ static void compare_tests(void)
     lstrcpynA(d, "123456", 4);
     CHECK(lstrlenA(d) == 3 && d[2] == '3');
     CHECK(lstrcmpiA("ABC", "abc") == 0 && lstrcmpiA("a",
-        "B") < 0);
+            "B") < 0);
     CHECK(lstrcmpW(a, b) > 0 && lstrcmpiW(a, b) == 0);
     lstrcpyW(b, a);
     CHECK(b[0] == 'a' && b[1] == 0);
@@ -219,7 +219,7 @@ static void user_tests(void)
     CHECK(CharLowerW(w) == w && w[0] == 0x430);
     CHECK((DWORD)CharUpperW((W16 *) 0x61) == 0x41);
     CHECK(CharUpperBuffA(s, 3) == 3 && CharLowerBuffA(s,
-        3) == 3);
+            3) == 3);
     CHECK(CharUpperBuffW(w, 2) == 2 && w[1] == 'Z');
     CHECK(CharLowerBuffW(w, 2) == 2 && w[1] == 'z');
     CHECK(CharUpperBuffA(s, 0) == 0);

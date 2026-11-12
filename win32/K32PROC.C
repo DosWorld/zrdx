@@ -8,16 +8,14 @@
 
 extern void WINAPI ExitProcess(UINT code);
 
-typedef struct SysInfo
-{
+typedef struct SysInfo {
     WORD arch, reserved;
     DWORD pagesize, minaddr, maxaddr, mask, cpus, type;
     DWORD granularity;
     WORD level, revision;
 } SysInfo;
 
-typedef struct MemStatus
-{
+typedef struct MemStatus {
     DWORD length, load, totalphys, availphys, totalpage;
     DWORD availpage, totalvirt, availvirt;
 } MemStatus;
@@ -42,8 +40,7 @@ DWORD WINAPI GetCurrentProcessId(void)
 BOOL WINAPI TerminateProcess(HANDLE h, UINT code)
 {
     W32T("TerminateProcess");
-    if (h != (HANDLE) - 1L)
-    {
+    if (h != (HANDLE) - 1L) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }

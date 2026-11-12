@@ -336,7 +336,7 @@ static const Case cases[] =
     {0, 0, 0}
 };
 
-/* what the compiler expects of a floating point run-time */
+/* floating point run-time support */
 int fltused_;
 char _8087 = 3;
 

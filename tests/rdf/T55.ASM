@@ -1,4 +1,5 @@
-; DPMI 0503h: resize in place, resize with move, shrink, resize into a freed neighbour
+; DPMI 0503h: resize in place, resize with move, shrink, resize
+; into a freed neighbour
 %include "t.inc"
 bits 32
 global start

@@ -1,4 +1,5 @@
-; selectors: DS = SS, code is readable through CS and sees the same flat memory
+; selectors: DS = SS, code is readable through CS and sees the
+; same flat memory
 %include "t.inc"
 bits 32
 global start

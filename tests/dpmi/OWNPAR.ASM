@@ -35,7 +35,8 @@ start:
         mov [regs+36], ax
         mov [regs+44], ax
         mov ax, [2Ch]
-        mov [block], ax             ;real environment, not the converted PSP word
+        ; real environment, not the converted PSP word
+        mov [block], ax
         movzx eax, word [rmseg]
         shl eax, 4
         add eax, watched
@@ -141,23 +142,26 @@ start:
         mov eax, 205h
         int 31h
         jc near bad
+        mov byte [hooked], 1
 %endif
 .child:
 %if IRQEXEC
-        mov word [attempts], 256
+        mov word [attempts], 2048
         mov byte [irqdone], 0
         mov byte [irqbusy], 1
 .allocate:
         sti
         mov ebx, 80h
-        xor ecx, ecx             ;8 MB: IRQ may interrupt the existing allocator
+        ; 8 MB: IRQ may interrupt the existing allocator
+        xor ecx, ecx
         mov eax, 501h
         int 31h
         jc near bad
         shl ebx, 16
         mov bx, cx
         mov ecx, 2048
-.touch: mov dword [fs:ebx], 0ABCD1234h ;all recycled pages must be user accessible
+; all recycled pages must be user accessible
+.touch: mov dword [fs:ebx], 0ABCD1234h
         add ebx, 4096
         loop .touch
         mov eax, 502h            ;SI:DI is the returned handle
@@ -167,7 +171,7 @@ start:
         jne .completed
         dec word [attempts]
         jnz .allocate
-        jmp near bad
+        jmp near nohit
 .completed:
         cmp byte [irqdone], 1
         jne near bad
@@ -211,7 +215,8 @@ start:
         cmp dword [fs:ebx], 12345678h
         jne near bad
         mov ebx, [mapped]
-        mov eax, [fs:ebx]            ;parent mapping must still be present
+        ; parent mapping must still be present
+        mov eax, [fs:ebx]
         mov bx, [debug]
         mov eax, 0B02h
         int 31h
@@ -230,23 +235,25 @@ start:
         dec word [runs]
         jnz .child
 %if IRQEXEC
-        mov bx, 8
-%if CLIENT32
-        mov edx, [oldirq]
-        mov cx, [oldirq+4]
-%else
-        movzx edx, word [oldirq]
-        mov cx, [oldirq+2]
-%endif
-        mov eax, 205h
-        int 31h
+        call unhook
         jc near bad
 %endif
         mov si, ok
         xor bx, bx
         jmp short print
-bad:    mov si, fail
+bad:
+%if IRQEXEC
+        ; the IRQ must not reach a dead handler
+        call unhook
+%endif
+        mov si, fail
         mov bx, 1
+        jmp short print
+%if IRQEXEC
+nohit:  call unhook
+        mov si, nohitm              ;no timer IRQ hit the window
+        mov bx, 1
+%endif
 print:  lodsb
         test al, al
         jz done
@@ -276,8 +283,10 @@ callback:
         iret
 %endif
 %if IRQEXEC
-; Launch only when the timer interrupted CPL1, identified by the actual
-; asynchronous kernel-return trampoline. A user-mode IRQ does not count.
+; Launch only when the timer interrupted CPL1, identified by the
+; actual
+; asynchronous kernel-return trampoline. A user-mode IRQ does not
+; count.
 irqexec:
         pushad
         push ds
@@ -295,7 +304,8 @@ irqexec:
         jne .chain
         mov byte [irqbusy], 0
         mov edi, regs
-        xor ebx, ebx             ;no reserved flags or A20-reset request
+        ; no reserved flags or A20-reset request
+        xor ebx, ebx
         xor ecx, ecx
         mov eax, 301h
         int 31h
@@ -315,6 +325,27 @@ irqexec:
 %else
         jmp far [cs:oldirq]
 %endif
+; Give INT 8 back (once). CF set if the call failed.
+unhook:
+        cmp byte [hooked], 0
+        je .done
+        mov byte [hooked], 0
+        pushad
+        mov bx, 8
+%if CLIENT32
+        mov edx, [oldirq]
+        mov cx, [oldirq+4]
+%else
+        movzx edx, word [oldirq]
+        mov cx, [oldirq+2]
+%endif
+        mov eax, 205h
+        int 31h
+        popad
+        ret
+.done:  clc
+        ret
+hooked: db 0
 irqdata: dw 0
 attempts: dw 0
 irqdone: db 0
@@ -374,6 +405,8 @@ fail:   db 'FEX16 fatal cleanup: FAIL', 13, 10, 0
 child:  db 'OWNC32.COM', 0
 %if IRQEXEC
 ok:     db 'IRQ32 suspended kernel EXEC: ok', 13, 10, 0
+nohitm: db 'IRQ32 timer missed the kernel window: FAIL', 13, \
+        10, 0
 %else
 ok:     db 'NEST32 owned cleanup: ok', 13, 10, 0
 %endif
@@ -382,6 +415,8 @@ fail:   db 'NEST32 owned cleanup: FAIL', 13, 10, 0
 child:  db 'OWNC16.COM', 0
 %if IRQEXEC
 ok:     db 'IRQ16 suspended kernel EXEC: ok', 13, 10, 0
+nohitm: db 'IRQ16 timer missed the kernel window: FAIL', 13, \
+        10, 0
 %else
 ok:     db 'NEST16 owned cleanup: ok', 13, 10, 0
 %endif

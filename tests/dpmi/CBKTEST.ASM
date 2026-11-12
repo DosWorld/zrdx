@@ -1,5 +1,7 @@
-; S11.4 permits an alternate return packet and requires at least 16 slots.
-; ZRDX policy: exactly 20 slots, reusable after exhaustion and invalid frees.
+; S11.4 permits an alternate return packet and requires at least
+; 16 slots.
+; ZRDX policy: exactly 20 slots, reusable after exhaustion and
+; invalid frees.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -57,7 +59,8 @@ start:  cld
         jne bad
         cmp edx, 23456789h
         jne bad
-        cmp word [count], 16     ;normative minimum, exact count below is policy
+        ; normative minimum, exact count below is policy
+        cmp word [count], 16
         jb bad
         cmp word [count], 20
         jne bad
@@ -134,10 +137,13 @@ handler:
 %endif
 copy_packet:
 %if !CLIENT32
-        movzx edi, di           ;S1 ignores high pointer words for word clients
+        ; S1 ignores high pointer words for word clients
+        movzx edi, di
 %endif
-        ; Callback entry registers are undefined except specified pointers.
-        ; Copy through ES so the real-stack alias in DS is never reused.
+        ; Callback entry registers are undefined except specified
+        ; pointers.
+        ; Copy through ES so the real-stack alias in DS is never
+        ; reused.
         xor ebx, ebx
 .copy:  mov al, [es:edi+ebx]
         mov [es:alternate+ebx], al

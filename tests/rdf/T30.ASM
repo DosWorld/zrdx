@@ -1,4 +1,5 @@
-; 40000 byte file: written and read back with single DOS calls (larger than the transfer buffer)
+; 40000 byte file: written and read back with single DOS calls
+; (larger than the transfer buffer)
 %include "t.inc"
 bits 32
 global start

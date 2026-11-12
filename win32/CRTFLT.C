@@ -22,14 +22,12 @@ static void mulsmall(char *d, int *n, DWORD f)
     DWORD carry = 0, v;
     int i;
 
-    for (i = 0; i < *n; i++)
-    {
+    for (i = 0; i < *n; i++) {
         v = (DWORD)(unsigned char)d[i] * f + carry;
         d[i] = (char)(v % 10);
         carry = v / 10;
     }
-    while (carry)
-    {
+    while (carry) {
         d[(*n)++] = (char)(carry % 10);
         carry /= 10;
     }
@@ -49,38 +47,30 @@ static int exact_digits(DWORD lo, DWORD hi, char *out,
     l[1] = lo >> 16;
     l[2] = hi & 0xFFFF;
     l[3] = (hi >> 16) & 0xF;
-    if (expo)
-    {
+    if (expo) {
         l[3] |= 0x10;
         e2 = expo - 1075;
-    }
-    else
+    } else
         e2 = -1074;
-    while (l[0] | l[1] | l[2] | l[3])
-    {
+    while (l[0] | l[1] | l[2] | l[3]) {
         rem = 0;
-        for (i = 3; i >= 0; i--)
-        {
+        for (i = 3; i >= 0; i--) {
             cur = (rem << 16) | l[i];
             l[i] = cur / 10;
             rem = cur % 10;
         }
         dig[n++] = (char)rem;
     }
-    if (e2 >= 0)
-    {
+    if (e2 >= 0) {
         for (k = e2; k >= 15; k -= 15)
             mulsmall(dig, &n, 32768UL);
         if (k)
             mulsmall(dig, &n, 1UL << k);
         *decpt = n;
-    }
-    else
-    {
+    } else {
         for (k = -e2; k >= 6; k -= 6)
             mulsmall(dig, &n, 15625UL);
-        if (k)
-        {
+        if (k) {
             DWORD p = 1;
 
             while (k--)
@@ -100,8 +90,7 @@ int crt_cvt(DWORD lo, DWORD hi, int mode, int ndig, char *out,
     static char s[MAXDIG];
     int len, need, i, up, d0;
 
-    if (((hi & 0x7FFFFFFFUL) | lo) == 0)
-    {
+    if (((hi & 0x7FFFFFFFUL) | lo) == 0) {
         *decpt = 1;
         need = mode ? ndig + 1 : ndig;
         for (i = 0; i < need; i++)
@@ -113,15 +102,13 @@ int crt_cvt(DWORD lo, DWORD hi, int mode, int ndig, char *out,
     need = mode ? d0 + ndig : ndig;
     if (need < 0)
         return 0;
-    if (need >= len)
-    {
+    if (need >= len) {
         for (i = 0; i < need; i++)
             out[i] = i < len ? s[i] : '0';
         return need;
     }
     up = s[need] > '5';
-    if (s[need] == '5')
-    {
+    if (s[need] == '5') {
         for (i = need + 1; i < len && s[i] == '0'; i++)
             ;
         up = i < len || (need > 0 && ((s[need - 1] - '0') & 1));
@@ -132,8 +119,7 @@ int crt_cvt(DWORD lo, DWORD hi, int mode, int ndig, char *out,
         return need;
     for (i = need - 1; i >= 0 && out[i] == '9'; i--)
         out[i] = '0';
-    if (i >= 0)
-    {
+    if (i >= 0) {
         out[i]++;
         return need;
     }
@@ -150,8 +136,7 @@ int crt_cvt(DWORD lo, DWORD hi, int mode, int ndig, char *out,
 
 /* ---- text to double: big numbers of 16 bit limbs ---- */
 
-typedef struct Big
-{
+typedef struct Big {
     DWORD l[MAXLIMB];
     int n;
 } Big;
@@ -161,14 +146,12 @@ static void big_mul(Big * b, DWORD f, DWORD add)
     DWORD carry = add, v;
     int i;
 
-    for (i = 0; i < b->n; i++)
-    {
+    for (i = 0; i < b->n; i++) {
         v = b->l[i] * f + carry;
         b->l[i] = v & 0xFFFF;
         carry = v >> 16;
     }
-    while (carry && b->n < MAXLIMB)
-    {
+    while (carry && b->n < MAXLIMB) {
         b->l[b->n++] = carry & 0xFFFF;
         carry >>= 16;
     }
@@ -180,8 +163,7 @@ static DWORD big_div(Big * b, DWORD f)
     DWORD rem = 0, cur;
     int i;
 
-    for (i = b->n - 1; i >= 0; i--)
-    {
+    for (i = b->n - 1; i >= 0; i--) {
         cur = (rem << 16) | b->l[i];
         b->l[i] = cur / f;
         rem = cur % f;
@@ -198,10 +180,8 @@ static void big_shl(Big * b, int bits)
 
     if (b->n == 0)
         return;
-    if (s)
-    {
-        for (i = 0; i < b->n; i++)
-        {
+    if (s) {
+        for (i = 0; i < b->n; i++) {
             v = (b->l[i] << s) | carry;
             b->l[i] = v & 0xFFFF;
             carry = v >> 16;
@@ -209,8 +189,7 @@ static void big_shl(Big * b, int bits)
         if (carry)
             b->l[b->n++] = carry;
     }
-    if (w)
-    {
+    if (w) {
         for (i = b->n - 1; i >= 0; i--)
             b->l[i + w] = b->l[i];
         for (i = 0; i < w; i++)
@@ -246,45 +225,36 @@ static void pack(const Big * b, int e2, int sticky, DWORD *lo,
     int len = big_bits(b), exp, keep, i, up;
     DWORD m_lo = 0, m_hi = 0, rb, st;
 
-    if (len == 0)
-    {
+    if (len == 0) {
         *lo = 0;
         *hi = 0;
         return;
     }
     exp = len - 1 + e2;
-    if (exp > 1023)
-    {
+    if (exp > 1023) {
         *lo = 0;
         *hi = 0x7FF00000UL;
         return;
     }
     keep = exp >= -1022 ? 53 : 53 - (-1022 - exp);
-    if (keep <= 0)
-    {
-        if (keep == 0 && (len > 1 || sticky))
-        {
+    if (keep <= 0) {
+        if (keep == 0 && (len > 1 || sticky)) {
             *lo = 1;
             *hi = 0;
-        }
-        else
-        {
+        } else {
             *lo = 0;
             *hi = 0;
         }
         return;
     }
     st = (DWORD)sticky;
-    if (len > keep)
-    {
+    if (len > keep) {
         for (i = 0; i < len - keep - 1; i++)
             st |= big_bit(b, i);
         rb = big_bit(b, len - keep - 1);
-    }
-    else
+    } else
         rb = 0;
-    for (i = 0; i < keep; i++)
-    {
+    for (i = 0; i < keep; i++) {
         int src = len - 1 - i;
         DWORD bit = src >= 0 ? big_bit(b, src) : 0;
 
@@ -294,25 +264,20 @@ static void pack(const Big * b, int e2, int sticky, DWORD *lo,
     up = rb && (st || (m_lo & 1));
     if (up && ++m_lo == 0)
         m_hi++;
-    if (keep == 53 && (m_hi >> 21))
-    {
+    if (keep == 53 && (m_hi >> 21)) {
         m_lo = (m_lo >> 1) | (m_hi << 31);
         m_hi >>= 1;
         exp++;
-        if (exp > 1023)
-        {
+        if (exp > 1023) {
             *lo = 0;
             *hi = 0x7FF00000UL;
             return;
         }
     }
-    if (exp >= -1022 && keep == 53)
-    {
+    if (exp >= -1022 && keep == 53) {
         *lo = m_lo;
         *hi = ((DWORD)(exp + 1023) << 20) | (m_hi & 0xFFFFF);
-    }
-    else
-    {
+    } else {
         *lo = m_lo;
         *hi = m_hi;
         if (keep < 53 && (m_hi >> 20))
@@ -327,7 +292,7 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
     Big *b;
     const char *p = s;
     int neg = 0, nd = 0, point = 0, seen = 0, dropped = 0,
-        nz = 0;
+                                              nz = 0;
     int frac = 0, ex, e10, sticky = 0, i, shift;
     DWORD rem;
 
@@ -337,10 +302,8 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
         p++;
     if (*p == '-' || *p == '+')
         neg = *p++ == '-';
-    for (;; p++)
-    {
-        if (*p >= '0' && *p <= '9')
-        {
+    for (;; p++) {
+        if (*p >= '0' && *p <= '9') {
             seen = 1;
             if (point)
                 frac++;
@@ -348,19 +311,16 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
                 continue;
             if (nd < STRTOD_DIGITS)
                 dig[nd++] = *p;
-            else
-            {
+            else {
                 dropped++;
                 nz |= *p != '0';
             }
-        }
-        else if (*p == '.' && !point)
+        } else if (*p == '.' && !point)
             point = 1;
         else
             break;
     }
-    if (!seen)
-    {
+    if (!seen) {
         if (end)
             *end = (char *)s;
         return;
@@ -369,15 +329,13 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
     if ((*p == 'e' || *p == 'E') &&
             ((p[1] >= '0' && p[1] <= '9') ||
              ((p[1] == '-' || p[1] == '+') &&
-              p[2] >= '0' && p[2] <= '9')))
-    {
+              p[2] >= '0' && p[2] <= '9'))) {
         int eneg = 0, v = 0;
 
         p++;
         if (*p == '-' || *p == '+')
             eneg = *p++ == '-';
-        while (*p >= '0' && *p <= '9')
-        {
+        while (*p >= '0' && *p <= '9') {
             if (v < 100000)
                 v = v * 10 + (*p - '0');
             p++;
@@ -390,8 +348,7 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
         *hi = 0x80000000UL;
     if (nd == 0)
         return;
-    if (nd + ex > 310)
-    {
+    if (nd + ex > 310) {
         *hi |= 0x7FF00000UL;
         return;
     }
@@ -404,16 +361,13 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
     for (i = 0; i < nd; i++)
         big_mul(b, 10, (DWORD)(dig[i] - '0'));
     e10 = ex;
-    if (e10 >= 0)
-    {
+    if (e10 >= 0) {
         for (; e10 >= 4; e10 -= 4)
             big_mul(b, 10000, 0);
         for (; e10 > 0; e10--)
             big_mul(b, 10, 0);
         pack(b, 0, sticky, lo, hi);
-    }
-    else
-    {
+    } else {
         int k = -e10, steps;
 
         shift = 70 + (k * 233) / 100 - big_bits(b);
@@ -423,8 +377,7 @@ void crt_strtod_bits(const char *s, char **end, DWORD *lo,
             shift = 0;
         for (steps = k; steps >= 6; steps -= 6)
             sticky |= big_div(b, 15625UL) != 0;
-        if (steps)
-        {
+        if (steps) {
             DWORD p5 = 1;
 
             for (i = 0; i < steps; i++)

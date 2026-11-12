@@ -1,4 +1,5 @@
-; Leave resources owned by this native child for host termination cleanup.
+; Leave resources owned by this native child for host termination
+; cleanup.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -83,7 +84,8 @@ start:
         int 31h
         jc bad
         int3
-        jmp bad                 ;an invalid return must never resume this child
+        ; an invalid return must never resume this child
+        jmp bad
 %elif FATAL
         ud2
 %else
@@ -100,7 +102,8 @@ callback:
 badreturn:
         mov bx, sp
 %if CLIENT32
-        mov word [ss:bx+16], 20h ;inner-ring code selector, forced RPL3 faults
+        ; inner-ring code selector, forced RPL3 faults
+        mov word [ss:bx+16], 20h
         o32 retf
 %else
         mov word [ss:bx+8], 20h

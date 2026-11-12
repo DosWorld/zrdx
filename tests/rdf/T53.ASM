@@ -1,4 +1,5 @@
-; DPMI 0501h: handles and addresses of live blocks must be different
+; DPMI 0501h: handles and addresses of live blocks must be
+; different
 %include "t.inc"
 bits 32
 global start

@@ -1,4 +1,5 @@
-; Real-mode XMS proxy: host A20 references must balance across child runs.
+; Real-mode XMS proxy: host A20 references must balance across
+; child runs.
 bits 16
 org 100h
 start:  cld
@@ -19,7 +20,8 @@ start:  cld
         int 2Fh
         mov [xms], bx
         mov [xms+2], es
-        mov ah, 5              ;an upstream reference must survive the host
+        ; an upstream reference must survive the host
+        mov ah, 5
         call far [xms]
         cmp ax, 1
         jne bad
@@ -62,7 +64,8 @@ start:  cld
         call far [xms]
         test ax, ax
         jnz .released
-        cmp bl, 94h             ;reference released; another owner keeps A20 on
+        ; reference released; another owner keeps A20 on
+        cmp bl, 94h
         jne bad
 .released:
         cmp byte [failed], 0

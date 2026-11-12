@@ -23,8 +23,7 @@ extern void *__cdecl memcpy(void *d, const void *s, DWORD n);
 
 static unsigned long seed = 1;
 
-typedef struct EnvCache
-{
+typedef struct EnvCache {
     struct EnvCache *next;
     char text[1];
 } EnvCache;
@@ -35,8 +34,7 @@ void crt_lib_free(void)
 {
     EnvCache *c;
 
-    while ((c = envcache) != NULL)
-    {
+    while ((c = envcache) != NULL) {
         envcache = c->next;
         free(c);
     }
@@ -46,8 +44,7 @@ static void swap(char *a, char *b, DWORD size)
 {
     char t;
 
-    while (size--)
-    {
+    while (size--) {
         t = *a;
         *a++ = *b;
         *b++ = t;
@@ -60,8 +57,7 @@ static void sift(char *base, DWORD size, DWORD root, DWORD n,
 {
     DWORD child;
 
-    for (;;)
-    {
+    for (;;) {
         child = 2 * root + 1;
         if (child >= n)
             return;
@@ -84,8 +80,7 @@ void __cdecl qsort(void *base, DWORD n, DWORD size, CmpFn cmp)
         return;
     for (i = n / 2; i > 0; i--)
         sift(b, size, i - 1, n, cmp);
-    for (i = n - 1; i > 0; i--)
-    {
+    for (i = n - 1; i > 0; i--) {
         swap(b, b + i * size, size);
         sift(b, size, 0, i, cmp);
     }
@@ -97,8 +92,7 @@ void *__cdecl bsearch(const void *key, const void *base, DWORD n,
     DWORD lo = 0, hi = n, mid;
     int r;
 
-    while (lo < hi)
-    {
+    while (lo < hi) {
         mid = lo + (hi - lo) / 2;
         r = cmp(key, (const char *)base + mid * size);
         if (r == 0)
@@ -154,8 +148,7 @@ int __cdecl _putenv(const char *s)
     char name[64];
     DWORD n = 0;
 
-    while (s[n] && s[n] != '=' && n < 63)
-    {
+    while (s[n] && s[n] != '=' && n < 63) {
         name[n] = s[n];
         n++;
     }
@@ -184,17 +177,14 @@ static char *utoa_base(unsigned long v, char *buf, int radix,
     char tmp[34];
     int n = 0, i = 0;
 
-    if (radix < 2 || radix > 36)
-    {
+    if (radix < 2 || radix > 36) {
         buf[0] = 0;
         return buf;
     }
-    do
-    {
+    do {
         tmp[n++] = digits[v % radix];
         v /= radix;
-    }
-    while (v);
+    } while (v);
     if (neg)
         buf[i++] = '-';
     while (n)
@@ -229,8 +219,7 @@ char *__cdecl _fullpath(char *buf, const char *path, DWORD size)
         return NULL;
     if (buf == NULL)
         buf = malloc(n + 1 > size ? n + 1 : size);
-    else if (n >= size)
-    {
+    else if (n >= size) {
         crt_errno = CRT_ERANGE;
         return NULL;
     }
@@ -247,10 +236,8 @@ void __cdecl _splitpath(const char *path, char *drive, char *dir,
 
     if (drive)
         drive[0] = 0;
-    if (p[0] && p[1] == ':')
-    {
-        if (drive)
-        {
+    if (p[0] && p[1] == ':') {
+        if (drive) {
             drive[0] = p[0];
             drive[1] = ':';
             drive[2] = 0;
@@ -262,16 +249,14 @@ void __cdecl _splitpath(const char *path, char *drive, char *dir,
     if (dot > slash)
         slash = dot;
     n = slash ? (DWORD)(slash + 1 - p) : 0;
-    if (dir)
-    {
+    if (dir) {
         crt_copy(dir, p, n);
         dir[n] = 0;
     }
     p += n;
     dot = strrchr(p, '.');
     n = dot ? (DWORD)(dot - p) : strlen(p);
-    if (fname)
-    {
+    if (fname) {
         crt_copy(fname, p, n);
         fname[n] = 0;
     }
@@ -286,27 +271,23 @@ void __cdecl _makepath(char *path, const char *drive,
     DWORD n = 0, k;
 
     path[0] = 0;
-    if (drive && drive[0])
-    {
+    if (drive && drive[0]) {
         path[n++] = drive[0];
         path[n++] = ':';
     }
-    if (dir && dir[0])
-    {
+    if (dir && dir[0]) {
         k = strlen(dir);
         crt_copy(path + n, dir, k);
         n += k;
         if (path[n - 1] != '\\' && path[n - 1] != '/')
             path[n++] = '\\';
     }
-    if (fname)
-    {
+    if (fname) {
         k = strlen(fname);
         crt_copy(path + n, fname, k);
         n += k;
     }
-    if (ext && ext[0])
-    {
+    if (ext && ext[0]) {
         if (ext[0] != '.')
             path[n++] = '.';
         k = strlen(ext);

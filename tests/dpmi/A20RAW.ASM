@@ -1,4 +1,5 @@
-; Real-mode harness forces a physically disabled A20 before native startup.
+; Real-mode harness forces a physically disabled A20 before
+; native startup.
 bits 16
 org 100h
 start:  cld

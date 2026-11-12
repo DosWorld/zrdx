@@ -51,3 +51,8 @@ import __snwprintf MSVCRT._snwprintf
 import __scwprintf MSVCRT._scwprintf
 import _wprintf MSVCRT.wprintf
 import _fputws MSVCRT.fputws
+import _swscanf MSVCRT.swscanf
+import _fgetws MSVCRT.fgetws
+import __wfopen MSVCRT._wfopen
+import _fclose MSVCRT.fclose
+import ___wgetmainargs MSVCRT.__wgetmainargs

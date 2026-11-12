@@ -1,0 +1,26 @@
+system nt
+name TAMS.EXE
+file TUCRT.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import ___stdio_common_vfprintf api-ms-win-crt-stdio-l1-1-0.__stdio_common_vfprintf
+import ___stdio_common_vsprintf api-ms-win-crt-stdio-l1-1-0.__stdio_common_vsprintf
+import ___stdio_common_vsprintf_s api-ms-win-crt-stdio-l1-1-0.__stdio_common_vsprintf_s
+import ___stdio_common_vfscanf api-ms-win-crt-stdio-l1-1-0.__stdio_common_vfscanf
+import ___stdio_common_vsscanf api-ms-win-crt-stdio-l1-1-0.__stdio_common_vsscanf
+import ___acrt_iob_func api-ms-win-crt-stdio-l1-1-0.__acrt_iob_func
+import __configure_narrow_argv api-ms-win-crt-runtime-l1-1-0._configure_narrow_argv
+import __get_initial_narrow_environment api-ms-win-crt-runtime-l1-1-0._get_initial_narrow_environment
+import __crt_atexit api-ms-win-crt-runtime-l1-1-0._crt_atexit
+import __initialize_onexit_table api-ms-win-crt-runtime-l1-1-0._initialize_onexit_table
+import __register_onexit_function api-ms-win-crt-runtime-l1-1-0._register_onexit_function
+import __execute_onexit_table api-ms-win-crt-runtime-l1-1-0._execute_onexit_table
+import __controlfp_s api-ms-win-crt-runtime-l1-1-0._controlfp_s
+import __set_fmode api-ms-win-crt-runtime-l1-1-0._set_fmode
+import __get_fmode api-ms-win-crt-runtime-l1-1-0._get_fmode
+import ___p___argc api-ms-win-crt-runtime-l1-1-0.__p___argc
+import ___p___argv api-ms-win-crt-runtime-l1-1-0.__p___argv
+import ___p__acmdln api-ms-win-crt-runtime-l1-1-0.__p__acmdln
+import _exit api-ms-win-crt-runtime-l1-1-0.exit
+import __strdup api-ms-win-crt-runtime-l1-1-0._strdup
+import _free api-ms-win-crt-runtime-l1-1-0.free

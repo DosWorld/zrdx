@@ -1,4 +1,6 @@
-"""Generate malformed MZ inputs which the binder must reject promptly."""
+"""Generate malformed MZ inputs which the binder must reject
+promptly.
+"""
 from pathlib import Path
 import struct
 
@@ -19,9 +21,14 @@ def generate(folder):
     lines = ["@echo off", "if exist RESULT.LOG del RESULT.LOG"]
     for name, data in cases.items():
         (folder / (name + ".BAD")).write_bytes(data)
-        lines += [r"R:\BIN\ZRDXBIND -y " + name + ".BAD " + name + ".EXE",
-                  "if errorlevel 1 if not errorlevel 2 echo " + name + " OK >> RESULT.LOG",
-                  "if not errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
-                  "if errorlevel 2 echo " + name + " FAILED >> RESULT.LOG"]
-    (folder / "RUN.BAT").write_bytes(("\r\n".join(lines) + "\r\n").encode("ascii"))
+        lines += [r"R:\BIN\ZRDXBIND -y " + name + ".BAD "
+                  + name + ".EXE",
+                  "if errorlevel 1 if not errorlevel 2 echo "
+                  + name + " OK >> RESULT.LOG",
+                  "if not errorlevel 1 echo " + name
+                  + " FAILED >> RESULT.LOG",
+                  "if errorlevel 2 echo " + name
+                  + " FAILED >> RESULT.LOG"]
+    (folder / "RUN.BAT").write_bytes(("\r\n".join(lines)
+                                      + "\r\n").encode("ascii"))
     return tuple(cases)

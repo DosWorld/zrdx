@@ -1,4 +1,5 @@
-; Native 16/32-bit DPMI contract fixture. No intermediate execution.
+; Native 16/32-bit DPMI contract fixture. No intermediate
+; execution.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -65,7 +66,8 @@ start:  cld
 %ifndef PORTABLE
         mov byte [step], 2
         mov ecx, 10h
-        xor edx, edx             ;100000h cannot be expressed exactly
+        ; 100000h cannot be expressed exactly
+        xor edx, edx
         mov eax, 8
         int 31h
         jnc bad
@@ -105,7 +107,8 @@ start:  cld
         jne bad
         cmp dx, 3450h
         jne bad
-        mov eax, 0Ah            ;the 0.9 errata explicitly permit data aliases
+        ; the 0.9 errata explicitly permit data aliases
+        mov eax, 0Ah
         int 31h
         jc bad
         push bx
@@ -124,11 +127,13 @@ start:  cld
         mov eax, 9
         int 31h
         jnc bad
-        mov cx, 0070h            ;absent DPL3/S=1: type restrictions relaxed
+        ; absent DPL3/S=1: type restrictions relaxed
+        mov cx, 0070h
         mov eax, 9
         int 31h
         jc bad
-        mov cx, 2070h            ;extended reserved bit is invalid even P=0
+        ; extended reserved bit is invalid even P=0
+        mov cx, 2070h
         mov eax, 9
         int 31h
         jnc bad
@@ -140,7 +145,8 @@ start:  cld
         int 31h
         jc bad
         mov byte [step], 5
-        mov bx, 4                ;reserved LDT entry 0, ignoring RPL
+        ; reserved LDT entry 0, ignoring RPL
+        mov bx, 4
         mov eax, 0Dh
         int 31h
         jc bad

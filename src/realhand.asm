@@ -26,7 +26,8 @@ InitFlags: dw 0
         _endif
         retf
         LLabel MouseRHandlerEnd
-MouseRHandlerPSize equ (ROffMouseRHandlerEnd - ROffMouseRHandler + 15) / 16
+MouseRHandlerPSize equ (ROffMouseRHandlerEnd \
+        - ROffMouseRHandler + 15) / 16
 MouseRHandlerSize equ MouseRHandlerPSize * 16
         LWord OldInt22
       dw 0, 0
@@ -157,7 +158,8 @@ Int15Unsupp:
           _ifnot jnz
             mov ah, 0Ah
             mov dx, [ROffXMHandle]
-            call XMSICall@1         ;free not succefully locked block
+            ; free not succefully locked block
+            call XMSICall@1
 NoXMS@1:
             xor ebp, ebp
           _endif
@@ -234,12 +236,14 @@ TSFrameSize equ 8 * 4 + 4 * 2
         push fs
         push gs
         pushad
-        push TerminateSwitchCode + 3 ;push switch code for RMS handler
+        ; push switch code for RMS handler
+        push TerminateSwitchCode + 3
         jmp RMS_RMHandlerL        ;go to PM terminate handler
 ;continued after DPMI host are cleaned
 TerminateRHandler2:
 
-        _do     ;free VCPI pages with DPMI host internal code&data
+        ; free VCPI pages with DPMI host internal code&data
+        _do
           pop edx
           test dh, VCPIPageBit
           _ifnot jz
@@ -253,13 +257,15 @@ ExitXMS:
         mov dx, [ROffXMHandle]
         or dx, dx
         _ifnot jz
-          call far [ROffXMC]               ;unlock and free XMS if handle is not null
+          ; unlock and free XMS if handle is not null
+          call far [ROffXMC]
           mov ah, 0Ah            ;free
           mov dx, [ROffXMHandle]
           call far [ROffXMC]
         _endif
         xor al, al
-        call HostA20              ;release exactly the host's A20 reference
+        ; release exactly the host's A20 reference
+        call HostA20
 %ifdef SWAP
         call SwapRDelete
 %endif
@@ -332,7 +338,8 @@ UnexpectedPMError:
         pop si
         retf
 
-;emulator of switch to VM86, really switch to RM with same stack frame
+; emulator of switch to VM86, really switch to RM with same stack
+; frame
 ;ESeg Text
 ;Segm Text16
 ;assume cs:Text16
@@ -341,7 +348,9 @@ UnexpectedPMError:
         push eax
         mov ax, VCPISelector + 16
         mov ds, ax
-        mov byte [ss:dword OffGDT + TSSSelector + 5], 80h + SS_FREE_TSS3 ;mark current TSS as FREE
+        ; mark current TSS as FREE
+        mov byte [ss:dword OffGDT + TSSSelector + 5], 80h \
+                + SS_FREE_TSS3
         mov es, ax
         mov gs, ax
         mov [ROffRStackStart], ebx
@@ -377,7 +386,8 @@ UnexpectedPMError:
         mov gs, [bx + F + VMI_GS]
         mov ds, [bx + F + VMI_DS]
         mov ebx, [cs:ROffRStackStart]
-;this code always entered after PM to VM VCPI switch to restore eax, flags
+; this code always entered after PM to VM VCPI switch to restore
+; eax, flags
 ;and jump to entry point
 pop_eax_iret:
         pop eax
@@ -386,7 +396,8 @@ pop_eax_iret:
 
 nPassups equ 20
         LLabel AutoPassupRJmps
-        times 5 * nPassups db 0 ;reserve space for DPMI autopassup traps
+        ; reserve space for DPMI autopassup traps
+        times 5 * nPassups db 0
 
 ;RM handler for switch from VM to PM
 ;must be placed on bottom of
@@ -414,8 +425,10 @@ PatchPoint:
 ;raw switcher to PM from RM with same format, as VCPI
 RawSwitcherToPM:
         mov al, 1
-        call HostA20              ;a flagged RM call may have released A20
-;-------------------------- load system tables ------------------------------
+        ; a flagged RM call may have released A20
+        call HostA20
+; -------------------------- load system tables
+; ------------------------------
         push cs
         mov si, ROffSwitchTable + 12
         pop ds
@@ -439,14 +452,17 @@ RawSwitcherToPM:
         lldt [si]
         ltr [si + 2]
         jmp dword far [si + 4]
-; State 0 needs no action (VCPI or already-enabled RAW). States 5/6
-; name the paired XMS local enable/disable operations. AL=1 enables.
+; State 0 needs no action (VCPI or already-enabled RAW). States
+; 5/6
+; name the paired XMS local enable/disable operations. AL=1
+; enables.
         LByte A20State
         db 0
         LByte A20Reset
         db 0
 ; Private callers keep their real EAX/flags in the switch frame.
-; Leave the common already-enabled path without a register snapshot.
+; Leave the common already-enabled path without a register
+; snapshot.
 HostA20:
         mov ah, 6
         sub ah, al
@@ -463,8 +479,10 @@ HostA20:
         pop ds
         popad
 .done:  ret
-; Private RAW replacements for the two XMS A20 operations only. Init
-; selects the same port-92 or keyboard-controller method that succeeded.
+; Private RAW replacements for the two XMS A20 operations only.
+; Init
+; selects the same port-92 or keyboard-controller method that
+; succeeded.
         DPROC A20Port
         and ah, 1
         shl ah, 1

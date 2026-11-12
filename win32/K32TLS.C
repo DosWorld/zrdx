@@ -10,8 +10,7 @@
 #define TLS_SLOTS 1088UL
 #define TLS_OUT 0xFFFFFFFFUL
 
-typedef struct CritSect
-{
+typedef struct CritSect {
     void *debug;
     long lockcount;
     long recursion;
@@ -20,20 +19,41 @@ typedef struct CritSect
     DWORD spin;
 } CritSect;
 
+/* TEB: slots 0-63 at E10h, a pointer to the others at F94h,
+   the static TLS pointer (2Ch) is set by the loader table */
+#define TEB_SLOTS (0xE10 / 4)
+#define TEB_EXPAND (0xF94 / 4)
+#define TEB_DIRECT 64
+
+/* "used" marks of all slots, then the values of slots 64.. */
 static DWORD *tls;
 static DWORD tlshandle;
 
 static int tls_init(void)
 {
-    if (tls == NULL)
+    DWORD *teb = w32_tebp();
+
+    if (tls == NULL && teb != NULL) {
         tls = w32_pages(2 * TLS_SLOTS * sizeof(DWORD),
                         &tlshandle);
+        if (tls)
+            teb[TEB_EXPAND] = (DWORD)(tls + TLS_SLOTS);
+    }
     if (tls == NULL)
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
     return tls != NULL;
 }
 
-/* slot i: value at tls[i], "used" mark at tls[TLS_SLOTS + i] */
+/* the value of slot i (the slot is in use) */
+static DWORD *value(DWORD i)
+{
+    DWORD *teb = w32_tebp();
+
+    return i < TEB_DIRECT ? teb + TEB_SLOTS + i :
+           (DWORD *)teb[TEB_EXPAND] + (i - TEB_DIRECT);
+}
+
+/* mark of slot i at tls[i] */
 DWORD WINAPI TlsAlloc(void)
 {
     DWORD i;
@@ -42,10 +62,9 @@ DWORD WINAPI TlsAlloc(void)
     if (!tls_init())
         return TLS_OUT;
     for (i = 0; i < TLS_SLOTS; i++)
-        if (!tls[TLS_SLOTS + i])
-        {
-            tls[TLS_SLOTS + i] = 1;
-            tls[i] = 0;
+        if (!tls[i]) {
+            tls[i] = 1;
+            *value(i) = 0;
             return i;
         }
     w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
@@ -54,8 +73,7 @@ DWORD WINAPI TlsAlloc(void)
 
 static int slot_ok(DWORD i)
 {
-    if (i >= TLS_SLOTS || !tls_init() || !tls[TLS_SLOTS + i])
-    {
+    if (i >= TLS_SLOTS || !tls_init() || !tls[i]) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -67,8 +85,8 @@ BOOL WINAPI TlsFree(DWORD i)
     W32T("TlsFree");
     if (!slot_ok(i))
         return FALSE;
-    tls[TLS_SLOTS + i] = 0;
     tls[i] = 0;
+    *value(i) = 0;
     return TRUE;
 }
 
@@ -78,15 +96,15 @@ void *WINAPI TlsGetValue(DWORD i)
     if (!slot_ok(i))
         return NULL;
     w32_seterr(0);
-    return (void *)tls[i];
+    return (void *)*value(i);
 }
 
-BOOL WINAPI TlsSetValue(DWORD i, void *value)
+BOOL WINAPI TlsSetValue(DWORD i, void *v)
 {
     W32T("TlsSetValue");
     if (!slot_ok(i))
         return FALSE;
-    tls[i] = (DWORD)value;
+    *value(i) = (DWORD)v;
     return TRUE;
 }
 

@@ -21,6 +21,15 @@ struct config {
 
 static unsigned char trailer[14];
 
+static void defaults(struct config *c)
+{
+    c->flags = 0;
+    c->swap = 0;
+    c->tbuf = 0x400;
+    c->xms = 0xFFFFFFFFUL;
+    c->lowmem = 0xF000;
+}
+
 static void unpack(struct config *c)
 {
     c->flags = trailer[4];
@@ -96,8 +105,12 @@ static int number(const char *s, int opt, unsigned long min,
         printf("bad parameter syntax\n");
         return 1;
     }
-    *v = strtoul(s, &end, 16);
-    if (*end != 0) {
+    for (end = (char *)s; isxdigit((unsigned char)*end); end++)
+        ;
+    if (*end == 0 && end - s > 8)
+        end = (char *)s;
+    *v = strtoul(s, NULL, 16);
+    if (*end != 0 || end == s) {
         printf("bad parameter syntax:\"%s\"\n", s);
         return 1;
     }
@@ -115,7 +128,7 @@ int main(int argc, char *argv[])
     struct config cfg, old;
     const char *name = NULL, *arg;
     FILE *f;
-    int i, changed = 0;
+    int i, changed = 0, append = 0;
     unsigned long v;
     char opt;
 
@@ -148,17 +161,14 @@ int main(int argc, char *argv[])
         return 1;
     }
     if (fseek(f, -TRAILER_SIZE, SEEK_END) != 0 ||
-            fread(trailer, 1, sizeof(trailer), f) != TSZ) {
-        printf("Can't read file \"%s\"\n", name);
-        fclose(f);
-        return 1;
+            fread(trailer, 1, sizeof(trailer), f) != TSZ ||
+            memcmp(trailer, SIG, 4) != 0) {
+        puts("zrdx header not found, creating it");
+        append = changed = 1;
+        defaults(&cfg);
+    } else {
+        unpack(&cfg);
     }
-    if (memcmp(trailer, SIG, 4) != 0) {
-        printf("zrdx header not detected\n");
-        fclose(f);
-        return 1;
-    }
-    unpack(&cfg);
     old = cfg;
 
     for (i = 1; i < argc; i++) {
@@ -218,7 +228,7 @@ int main(int argc, char *argv[])
         printf("Can't write file \"%s\"\n", name);
         return 1;
     }
-    if (fseek(f, -TRAILER_SIZE, SEEK_END) != 0 ||
+    if (fseek(f, append ? 0L : -TRAILER_SIZE, SEEK_END) != 0 ||
             fwrite(trailer, 1, sizeof(trailer), f) != TSZ) {
         printf("Can't write file \"%s\"\n", name);
         fclose(f);

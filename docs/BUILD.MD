@@ -25,6 +25,7 @@ is hard-coded. Missing required settings stop the run with a message.
 | ZRDX_DOSBOX | dosbox-x executable | dosbox-x from PATH |
 | ZRDX_SCRATCH | root of all scratch trees; --work must be inside | /tmp |
 | ZRDX_DISK | FreeDOS FAT16 seed image for QEMU (QCHECK.PY --image) | none |
+| ZRDX_CCDIR | folder with CC32W.EXE, LINK32W.EXE, LIB32W.EXE, include\, lib\ (task 184) | cases skipped |
 
 ```sh
 export ZRDX_DOSCONF=$HOME/dosbox-x/dosbox.conf
@@ -159,7 +160,8 @@ UPX -9 --8086 -> aligner yields the default 14336-byte packed stubs.
 Watcom WCL builds zrdxconf.exe and aligner.exe; binder/bnd.asm -> NASM
 binary -> UPX yields zrdxbind.com. The user explicitly approved increasing
 PSTUBSZ from 13312 to 14336 on 2026-10-18 (HISTORY.MD task 094).
-stub-pmx.exe alone uses PMXSZ = 18432 (approved 2026-11-05). Runtime
+stub-pmx.exe alone uses PMXSZ = 18944 (18432 approved 2026-11-05,
+18944 on 2026-11-11). Runtime
 resource capacities and initialized code totals are unchanged.
 
 The unpacked 29184-byte forms remain available. Select them consistently
@@ -176,6 +178,13 @@ is verified by dry run; the unpacked binaries
 retain their prior 99-result qualification. Do not mix format stubs from
 different builds. The installed bin/ set uses the qualified packed forms;
 D09WORK.MD/TOOLS.JSN identify hashes, tests and retained CPU-profile limits.
+
+Source files over 1300 lines are split into two parts that
+assemble as one text: nathost.asm, extender.asm, prothand.asm,
+realinit.asm and dpmifunc.asm %include nathost2.asm,
+extende2.asm, prothan2.asm, realini2.asm and dpmifun2.asm at
+their end (task 150). Docs name the first part; the objects are
+byte-identical to the unsplit ones.
 
 ## Installation and use
 
@@ -306,6 +315,10 @@ from potentially edited sources after a long run.
 
 ## Complete current release matrix
 
+One command (task 202): `python3 tests/dpmi/MATRIX.PY --qemu
+PATH --image SEED.IMG --work DIR` runs everything below with its
+own work dirs; the commands that follow are the same steps by hand.
+
 Run from the checkout with fresh private work directories. Build the native
 host once with --build-only before invoking QCHECK.PY: this makes its build
 manifest available for source identity checks. Merely selecting --native-host
@@ -413,11 +426,19 @@ The swap size of bound programs is set with zrdxconf:
 /S takes hex megabytes (0-80, 0 = off, the default). The
 fixtures use /S10 (16 MB).
 
+If the file has no ZRDX block, zrdxconf appends one with the
+defaults (flags 0, swap 0, transfer buffer 400h, XMS FFFFFFFFh,
+low memory F000h), then applies the options. A rejected option
+leaves the file unchanged.
+
 ## Win32 DLLs (tasks 178, 179)
 
 KERNEL32.DLL and USER32.DLL are built in DOS with Open Watcom:
 `cd win32` and `BUILD.BAT` (BUILD.LOG lists compiler errors and
 "NOT BUILT" if a DLL is missing). CHECK.PY builds them for its
-tests. For a release copy both to bin/: a Win32 program finds
-them next to itself or in the current directory. They are not
+tests. For a release copy them to bin/: a Win32 program finds
+them next to itself or in the current directory. The same
+build makes MSVCRT.DLL and UCRTBASE.DLL (docs/MSVCRT.MD; both
+link the objects listed in win32/CRTCOM.LNK; the math part is
+NASM, CRTM.ASM and CRTJMP.ASM). They are not
 part of the stub set, so TOOLS.JSN does not hash them.

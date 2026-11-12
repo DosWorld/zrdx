@@ -1,13 +1,18 @@
-; Native 16/32-bit DPMI contract fixture. No intermediate execution.
+; Native 16/32-bit DPMI contract fixture. No intermediate
+; execution.
 bits 16
 org 100h
 %ifndef CLIENT32
 %define CLIENT32 0
 %endif
-; Masks record ZRDX register guarantees, including stronger host policy.
-; S1 permits AX/flags to change and memory services to enable IF. Exact AX,
-; DF/high-word preservation and 800xh errors are host regression contracts;
-; non-output general/segment registers and pointer widths follow S1.
+; Masks record ZRDX register guarantees, including stronger host
+; policy.
+; S1 permits AX/flags to change and memory services to enable IF.
+; Exact AX,
+; DF/high-word preservation and 800xh errors are host regression
+; contracts;
+; non-output general/segment registers and pointer widths follow
+; S1.
 %macro KEEP31 6-7 0
         pushfd
         pushad
@@ -22,7 +27,8 @@ org 100h
         pushfd
         pushad
 %if !CLIENT32
-        mov bp, sp               ;word addressing remains valid across IRQ returns
+        ; word addressing remains valid across IRQ returns
+        mov bp, sp
 %define SNAP bp
 %else
 %define SNAP esp
@@ -80,7 +86,8 @@ org 100h
 %endif
         mov eax, [ss:SNAP+32]
         xor eax, [ss:SNAP+68]
-        and eax, 600h & ~(%7)     ;IF/DF, excluding explicit IF outputs
+        ; IF/DF, excluding explicit IF outputs
+        and eax, 600h & ~(%7)
         jnz bad
 %ifdef POSITIVE
         mov byte [ss:regwhy], 9

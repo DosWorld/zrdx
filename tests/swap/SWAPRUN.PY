@@ -36,6 +36,9 @@ def main():
     ap.add_argument("--image", required=True, type=Path)
     ap.add_argument("--work", required=True, type=Path)
     ap.add_argument("--mem", type=int, default=8)
+    ap.add_argument("--regress", action="store_true",
+                    help="run the whole CHECK.PY on the SWAP "
+                         "build")
     ap.add_argument("--fail", action="store_true",
                     help="SWAPFAIL build: disk error cases")
     args = ap.parse_args()
@@ -44,7 +47,7 @@ def main():
     tree = work / "tree"
     if work.exists():
         shutil.rmtree(work)
-    for name in ("src", "bin", "tests", "docs"):
+    for name in ("src", "bin", "tests", "docs", "sdk", "win32"):
         shutil.copytree(ROOT / name, tree / name)
     edit(tree / "src/segdefs.asm",
          "\r\n;%assign SWAP 1", "\r\n%assign SWAP 1")
@@ -53,8 +56,12 @@ def main():
              "\r\n;%assign SWAPFAIL 1", "\r\n%assign SWAPFAIL 1")
     edit(tree / "src/makefile",
          "PSTUBSZ = 14336", "PSTUBSZ = 15872")
+    edit(tree / "src/makefile",
+         "PMXSZ   = 18944", "PMXSZ   = 20480")
     check = ["--profile", "raw", "--core", "normal",
-             "--bugs-only"]
+             "--bugs-only", "--timeout", "3000"]
+    if not args.regress:
+        check.append("--build-only")
     run([PY, tree / "tests/CHECK.PY", "--work", work / "sw1"]
         + check)
     dpmi = ROOT / "tests/dpmi"
@@ -73,7 +80,8 @@ def main():
         run(common + ["--work", work / profile] + case_args
             + ([] if args.fail else ["--case", "SWAPN"]))
         run(common + ["--work", work / (profile + "n"),
-                      "--native-host", work / "sw1/bin/zrdxdpmi.exe"]
+                      "--native-host",
+                      work / "sw1/bin/zrdxdpmi.exe"]
             + case_args
             + ([] if args.fail else ["--case", "SWAPN"]))
     print("swap OK")

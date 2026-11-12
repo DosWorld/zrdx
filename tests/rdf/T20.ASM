@@ -1,4 +1,5 @@
-; DPMI 0501h / 0502h: allocate a block, write and read it through the flat data selector, free it
+; DPMI 0501h / 0502h: allocate a block, write and read it through
+; the flat data selector, free it
 %include "t.inc"
 bits 32
 global start

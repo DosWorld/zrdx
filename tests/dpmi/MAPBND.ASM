@@ -1,4 +1,5 @@
-; Exercise a device mapping that shares a page table with ordinary RAM.
+; Exercise a device mapping that shares a page table with
+; ordinary RAM.
 %include "../rdf/T.INC"
 bits 32
 global start
@@ -30,8 +31,10 @@ start: BEGIN
        loop .fill
        mov dword [ebx+400000h-4], 76543210h
        mov byte [step], 2
-       ; The existing allocator chooses the top of the linear arena.
-       ; Leave one page above the normal block, in its last directory.
+       ; The existing allocator chooses the top of the linear
+       ; arena.
+       ; Leave one page above the normal block, in its last
+       ; directory.
        lea eax, [ebx+400000h+1000h]
        mov edi, 0ffc00000h
        sub edi, eax
@@ -40,7 +43,8 @@ start: BEGIN
        mov ebx, 10h
        xor ecx, ecx
        mov eax, 800h
-       std                       ;the host must not inherit a client copy direction
+       ; the host must not inherit a client copy direction
+       std
        int 31h
        jc near bad
        pushfd
@@ -63,7 +67,8 @@ start: BEGIN
        add edi, 1000h
        loop .check
        push ds
-       pop es                   ;BEGIN leaves ES on the PSP, not the data buffer
+       ; BEGIN leaves ES on the PSP, not the data buffer
+       pop es
        mov edi, info
        mov eax, 500h
        int 31h

@@ -1,4 +1,5 @@
-; write 40000 bytes to NUL in one DOS call (bigger than the transfer buffer)
+; write 40000 bytes to NUL in one DOS call (bigger than the
+; transfer buffer)
 %include "t.inc"
 bits 32
 global start

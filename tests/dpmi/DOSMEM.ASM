@@ -1,4 +1,5 @@
-; Native DOS block descriptor arrays, stack safety and resize atomicity.
+; Native DOS block descriptor arrays, stack safety and resize
+; atomicity.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -39,7 +40,8 @@ start:  cld
         mov bx, dx
         lsl eax, ebx
         jnz bad
-        cmp eax, 1000Fh          ;host capability, not client operand size
+        ; host capability, not client operand size
+        cmp eax, 1000Fh
         jne bad
         mov bx, [head]
         mov byte [step], 2
@@ -149,7 +151,8 @@ start:  cld
         mov bx, [head]
         lsl eax, ebx
         jnz bad
-        cmp eax, 1000Fh          ;S9.3 successful grow preserves full head
+        ; S9.3 successful grow preserves full head
+        cmp eax, 1000Fh
         jne bad
         mov bx, [tail]
         lsl eax, ebx
@@ -214,7 +217,8 @@ start:  cld
         mov esi, 16
         call free_held
         mov dx, [head]
-        mov ebx, 0FFFFh         ;guaranteed physical failure, slots available
+        ; guaranteed physical failure, slots available
+        mov ebx, 0FFFFh
         mov eax, 102h
         int 31h
         jnc bad
@@ -239,7 +243,8 @@ start:  cld
         xor eax, eax
         int 31h
         jc bad
-        cmp ax, [tail]          ;every provisional descriptor was rolled back
+        ; every provisional descriptor was rolled back
+        cmp ax, [tail]
         jne bad
         mov bx, ax
         mov esi, 15
@@ -248,7 +253,8 @@ start:  cld
         mov eax, 101h
         int 31h
         jc bad
-        ; Preserve the final real segment for the independent alias probe.
+        ; Preserve the final real segment for the independent
+        ; alias probe.
         mov bx, [head]
         mov eax, 6
         int 31h
@@ -257,7 +263,8 @@ start:  cld
         mov cx, dx
         shr ecx, 4
         mov [rmseg], cx
-        ; 0002h must not return the DOS head/follower as its cached alias.
+        ; 0002h must not return the DOS head/follower as its
+        ; cached alias.
         mov bx, [rmseg]
         mov eax, 2
         int 31h
@@ -270,7 +277,8 @@ start:  cld
         jnz bad
         cmp eax, 0FFFFh
         jne bad
-        mov eax, 101h            ;a real-segment alias is not a DOS block
+        ; a real-segment alias is not a DOS block
+        mov eax, 101h
         mov dx, bx
         int 31h
         jnc bad
@@ -282,7 +290,8 @@ start:  cld
         jc bad
         mov word [head], 0
         mov bx, [alias]
-        lsl eax, ebx             ;freeing the DOS head keeps the alias alive
+        ; freeing the DOS head keeps the alias alive
+        lsl eax, ebx
         jnz bad
         cmp eax, 0FFFFh
         jne bad

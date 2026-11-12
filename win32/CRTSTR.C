@@ -63,8 +63,7 @@ int __cdecl _memicmp(const void *a, const void *b, DWORD n)
     const unsigned char *x = a, *y = b;
     int p, q;
 
-    for (; n; n--, x++, y++)
-    {
+    for (; n; n--, x++, y++) {
         p = tolower(*x);
         q = tolower(*y);
         if (p != q)
@@ -121,8 +120,7 @@ char *__cdecl strncat(char *d, const char *s, DWORD n)
 
 int __cdecl strcmp(const char *a, const char *b)
 {
-    while (*a && *a == *b)
-    {
+    while (*a && *a == *b) {
         a++;
         b++;
     }
@@ -132,11 +130,10 @@ int __cdecl strcmp(const char *a, const char *b)
 
 int __cdecl strncmp(const char *a, const char *b, DWORD n)
 {
-    for (; n; n--, a++, b++)
-    {
+    for (; n; n--, a++, b++) {
         if (*a != *b)
             return (unsigned char) * a < (unsigned char) * b
-                ? -1 : 1;
+                   ? -1 : 1;
         if (*a == 0)
             break;
     }
@@ -147,8 +144,7 @@ int __cdecl _stricmp(const char *a, const char *b)
 {
     int p, q;
 
-    for (;; a++, b++)
-    {
+    for (;; a++, b++) {
         p = tolower((unsigned char) * a);
         q = tolower((unsigned char) * b);
         if (p != q)
@@ -162,8 +158,7 @@ int __cdecl _strnicmp(const char *a, const char *b, DWORD n)
 {
     int p, q;
 
-    for (; n; n--, a++, b++)
-    {
+    for (; n; n--, a++, b++) {
         p = tolower((unsigned char) * a);
         q = tolower((unsigned char) * b);
         if (p != q)
@@ -190,8 +185,7 @@ DWORD __cdecl strxfrm(char *d, const char *s, DWORD n)
 
 char *__cdecl strchr(const char *s, int c)
 {
-    for (;; s++)
-    {
+    for (;; s++) {
         if (*s == (char)c)
             return (char *)s;
         if (*s == 0)
@@ -203,8 +197,7 @@ char *__cdecl strrchr(const char *s, int c)
 {
     const char *r = NULL;
 
-    for (;; s++)
-    {
+    for (;; s++) {
         if (*s == (char)c)
             r = s;
         if (*s == 0)
@@ -257,19 +250,16 @@ char *__cdecl strtok(char *s, const char *delim)
     if (s == NULL)
         return NULL;
     s += strspn(s, delim);
-    if (*s == 0)
-    {
+    if (*s == 0) {
         tok_save = NULL;
         return NULL;
     }
     start = s;
     s += strcspn(s, delim);
-    if (*s)
-    {
+    if (*s) {
         *s = 0;
         tok_save = s + 1;
-    }
-    else
+    } else
         tok_save = NULL;
     return start;
 }
@@ -307,8 +297,7 @@ char *__cdecl _strrev(char *s)
     DWORD i = 0, j = strlen(s);
     char t;
 
-    while (i + 1 < j)
-    {
+    while (i + 1 < j) {
         t = s[i];
         s[i++] = s[--j];
         s[j] = t;
@@ -338,8 +327,7 @@ void __cdecl _swab(char *s, char *d, int n)
 {
     int i;
 
-    for (i = 0; i + 1 < n; i += 2)
-    {
+    for (i = 0; i + 1 < n; i += 2) {
         d[i] = s[i + 1];
         d[i + 1] = s[i];
     }
@@ -347,8 +335,7 @@ void __cdecl _swab(char *s, char *d, int n)
 
 char *__cdecl strerror(int e)
 {
-    switch (e)
-    {
+    switch (e) {
     case 0:
         return "No error";
     case 1:
@@ -383,8 +370,7 @@ char *__cdecl _strerror(const char *prefix)
     char *m = strerror(crt_errno);
 
     buf[0] = 0;
-    if (prefix && *prefix)
-    {
+    if (prefix && *prefix) {
         strncat(buf, prefix, 100);
         strcat(buf, ": ");
     }

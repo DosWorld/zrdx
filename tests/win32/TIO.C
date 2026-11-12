@@ -97,9 +97,9 @@ static void file_tests(void)
     int fd;
 
     CHECK(_open("TIO.NONE", O_RDONLY, 0) == -1
-        && *_errno() == 2);
+          && *_errno() == 2);
     fd = _open("TIO.TMP", O_CREAT | O_TRUNC | O_RDWR | O_TEXT,
-        0);
+               0);
     CHECK(fd >= 3);
     CHECK(_write(fd, "a\nb", 3) == 3);
     CHECK(_lseek(fd, 0, 2) == 4 && _filelength(fd) == 4);
@@ -121,7 +121,7 @@ static void file_tests(void)
     fd = _open("TIO.TMP", O_TRUNC | O_RDWR | O_BINARY, 0);
     CHECK(fd >= 3 && _write(fd, "x\x1Ay", 3) == 3);
     CHECK(_setmode(fd, O_TEXT) == O_BINARY && _lseek(fd, 0,
-        0) == 0);
+            0) == 0);
     CHECK(_read(fd, buf, 16) == 1 && buf[0] == 'x');
     CHECK(_read(fd, buf, 16) == 0);
     CHECK(_close(fd) == 0);
@@ -129,7 +129,7 @@ static void file_tests(void)
           _access("TIO.NONE", 0) == -1);
     CHECK(rename("TIO.TMP", "TIO2.TMP") == 0);
     CHECK(_access("TIO.TMP", 0) == -1
-        && _unlink("TIO2.TMP") == 0);
+          && _unlink("TIO2.TMP") == 0);
     CHECK(_unlink("TIO2.TMP") == -1 && *_errno() == 2);
 }
 

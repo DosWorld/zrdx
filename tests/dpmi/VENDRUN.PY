@@ -26,12 +26,13 @@ def main():
     tree = work / "tree"
     if work.exists():
         shutil.rmtree(work)
-    for name in ("src", "bin", "tests", "docs"):
+    for name in ("src", "bin", "tests", "docs", "sdk", "win32"):
         shutil.copytree(ROOT / name, tree / name)
     edit(tree / "src/segdefs.asm",
          "\r\n;%assign VENDOR 1", "\r\n%assign VENDOR 1")
     run([PY, tree / "tests/CHECK.PY", "--work", work / "sw1",
-         "--profile", "raw", "--core", "normal", "--bugs-only"])
+         "--profile", "raw", "--core", "normal", "--bugs-only",
+         "--timeout", "3000"])
     dpmi = ROOT / "tests/dpmi"
     run([PY, dpmi / "VERIFY.PY", "--work", work / "fx",
          "--profile", "raw", "--tools", work / "sw1/bin",

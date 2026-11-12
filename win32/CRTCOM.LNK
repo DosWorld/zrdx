@@ -15,6 +15,7 @@ file CRTJMP.OBJ
 file CRTSIG.OBJ
 file CRTWCS.OBJ
 file CRTWFMT.OBJ
+file CRTWSCN.OBJ
 file CRTMATH.OBJ
 option nodefaultlibs
 option start='_CrtMain@12'
@@ -352,3 +353,13 @@ export wprintf='_wprintf'
 export fputwc='_fputwc'
 export putwchar='_putwchar'
 export fputws='_fputws'
+export vfwscanf='_vfwscanf'
+export fwscanf='_fwscanf'
+export wscanf='_wscanf'
+export swscanf='_swscanf'
+export fgetws='_fgetws'
+export _wfopen='__wfopen'
+export __wgetmainargs='___wgetmainargs'
+export __p___wargv='___p___wargv'
+export __p___wargc='___p___wargc'
+export _wenviron='__wenviron'

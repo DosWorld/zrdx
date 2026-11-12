@@ -26,8 +26,7 @@ void w32_dos2(struct dregs *r, DWORD lfnax, DWORD plainax)
 
     r->eax = lfnax;
     dos21(r);
-    if (r->cf && (r->eax & 0xFFFF) == 0x7100)
-    {
+    if (r->cf && (r->eax & 0xFFFF) == 0x7100) {
         *r = saved;
         r->eax = plainax;
         dos21(r);
@@ -55,8 +54,7 @@ static BOOL byname(const char *name, DWORD lfnax, DWORD plainax)
 {
     struct dregs r;
 
-    if (name == NULL)
-    {
+    if (name == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -71,8 +69,7 @@ DWORD WINAPI GetFileAttributesA(const char *name)
     struct dregs r;
     W32T("GetFileAttributesA");
 
-    if (name == NULL)
-    {
+    if (name == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0xFFFFFFFFUL;
     }
@@ -81,15 +78,13 @@ DWORD WINAPI GetFileAttributesA(const char *name)
     r.eax = 0x7143;
     r.ebx = 0;
     dos21(&r);
-    if (r.cf && (r.eax & 0xFFFF) == 0x7100)
-    {
+    if (r.cf && (r.eax & 0xFFFF) == 0x7100) {
         w32_zero(&r, sizeof r);
         r.edx = (DWORD)name;
         r.eax = 0x4300;
         dos21(&r);
     }
-    if (r.cf)
-    {
+    if (r.cf) {
         dosfail(&r);
         return 0xFFFFFFFFUL;
     }
@@ -101,8 +96,7 @@ BOOL WINAPI SetFileAttributesA(const char *name, DWORD attr)
     struct dregs r;
     W32T("SetFileAttributesA");
 
-    if (name == NULL)
-    {
+    if (name == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -113,8 +107,7 @@ BOOL WINAPI SetFileAttributesA(const char *name, DWORD attr)
     r.ebx = 1;
     r.ecx = attr;
     dos21(&r);
-    if (r.cf && (r.eax & 0xFFFF) == 0x7100)
-    {
+    if (r.cf && (r.eax & 0xFFFF) == 0x7100) {
         w32_zero(&r, sizeof r);
         r.edx = (DWORD)name;
         r.eax = 0x4301;
@@ -151,13 +144,11 @@ BOOL WINAPI MoveFileA(const char *from, const char *to)
     struct dregs r;
     W32T("MoveFileA");
 
-    if (from == NULL || to == NULL)
-    {
+    if (from == NULL || to == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (GetFileAttributesA(to) != 0xFFFFFFFFUL)
-    {
+    if (GetFileAttributesA(to) != 0xFFFFFFFFUL) {
         w32_seterr(ERROR_ALREADY_EXISTS);
         return FALSE;
     }
@@ -182,8 +173,7 @@ BOOL WINAPI CopyFileA(const char *from, const char *to,
         return FALSE;
     out = CreateFileA(to, 0x40000000UL, 0, NULL, noover ? 1 : 2,
                       0, NULL);
-    if (out == INVALID_HANDLE_VALUE)
-    {
+    if (out == INVALID_HANDLE_VALUE) {
         CloseHandle(in);
         return FALSE;
     }
@@ -198,7 +188,7 @@ BOOL WINAPI CopyFileA(const char *from, const char *to,
 DWORD WINAPI GetCurrentDirectoryA(DWORD size, char *buf)
 {
     struct dregs r;
-    char path[70];
+    char path[270];
     DWORD n;
     W32T("GetCurrentDirectoryA");
 
@@ -212,8 +202,7 @@ DWORD WINAPI GetCurrentDirectoryA(DWORD size, char *buf)
     r.esi = (DWORD)path + 3;
     r.edx = 0;
     w32_dos2(&r, 0x7147, 0x4700);
-    if (r.cf)
-    {
+    if (r.cf) {
         dosfail(&r);
         return 0;
     }
@@ -229,13 +218,11 @@ BOOL WINAPI SetCurrentDirectoryA(const char *name)
     struct dregs r;
     W32T("SetCurrentDirectoryA");
 
-    if (name == NULL)
-    {
+    if (name == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (name[0] && name[1] == ':')
-    {
+    if (name[0] && name[1] == ':') {
         char d = name[0] >= 'a' ? (char)(name[0] - 32) : name[0];
 
         w32_zero(&r, sizeof r);
@@ -255,8 +242,7 @@ DWORD WINAPI GetFullPathNameA(const char *name, DWORD size,
     DWORD n, i, last;
     W32T("GetFullPathNameA");
 
-    if (name == NULL)
-    {
+    if (name == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -265,8 +251,7 @@ DWORD WINAPI GetFullPathNameA(const char *name, DWORD size,
     r.edi = (DWORD)path;
     r.ecx = 0;
     w32_dos2(&r, 0x7160, 0x6000);
-    if (r.cf)
-    {
+    if (r.cf) {
         dosfail(&r);
         return 0;
     }
@@ -274,8 +259,7 @@ DWORD WINAPI GetFullPathNameA(const char *name, DWORD size,
     if (n >= size)
         return n + 1;
     w32_copy(buf, path, n + 1);
-    if (part)
-    {
+    if (part) {
         last = 0;
         for (i = 0; i < n; i++)
             if (path[i] == '\\')
@@ -294,8 +278,7 @@ DWORD WINAPI GetTempPathA(DWORD size, char *buf)
     n = GetEnvironmentVariableA("TEMP", t, 120);
     if (n == 0 || n >= 120)
         n = GetEnvironmentVariableA("TMP", t, 120);
-    if (n == 0 || n >= 120)
-    {
+    if (n == 0 || n >= 120) {
         struct dregs r;
 
         w32_zero(&r, sizeof r);

@@ -7,7 +7,8 @@ RRTEntryes equ _RRTEntryes
 segment Stock
 ;end of the real mode data (BSS16 may grow past RStackEnd)
 RMBSSEnd equ BSS16LC16
-%assign nStock (OffLastInit - KernelBase) + WinSize + 2000h + BSS16LC16 - XCurSegBaseR
+%assign nStock (OffLastInit - KernelBase) + WinSize + 2000h \
+        + BSS16LC16 - XCurSegBaseR
         resb nStock
 %assign XCurSegBaseR XCurSegBaseR + nStock
 segment Stack16

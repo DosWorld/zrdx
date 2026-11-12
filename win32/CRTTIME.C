@@ -12,8 +12,7 @@
 
 typedef long time_t;
 
-typedef struct Tm
-{
+typedef struct Tm {
     int tm_sec;
     int tm_min;
     int tm_hour;
@@ -25,16 +24,14 @@ typedef struct Tm
     int tm_isdst;
 } Tm;
 
-typedef struct TimeB
-{
+typedef struct TimeB {
     time_t time;
     unsigned short millitm;
     short timezone;
     short dstflag;
 } TimeB;
 
-typedef struct SysTime
-{
+typedef struct SysTime {
     WORD year, month, wday, day, hour, minute, second, msec;
 } SysTime;
 
@@ -50,14 +47,14 @@ static char ascbuf[28];
 static DWORD start_tick;
 
 static const char *const wdays[7] = {"Sunday", "Monday",
-    "Tuesday",
+                                     "Tuesday",
                                      "Wednesday", "Thursday",
                                      "Friday", "Saturday"
                                     };
 static const char *const months[12] = {"January", "February",
-    "March",
+                                       "March",
                                        "April", "May", "June",
-                                           "July",
+                                       "July",
                                        "August", "September",
                                        "October", "November",
                                        "December"
@@ -257,8 +254,7 @@ static int num(char *buf, DWORD max, DWORD *n, int v, int width)
     char t[12];
     int i;
 
-    for (i = width - 1; i >= 0; i--)
-    {
+    for (i = width - 1; i >= 0; i--) {
         t[i] = (char)('0' + v % 10);
         v /= 10;
     }
@@ -271,8 +267,7 @@ static int format(char *buf, DWORD max, DWORD *n, char f,
 {
     int h12 = tm->tm_hour % 12 ? tm->tm_hour % 12 : 12;
 
-    switch (f)
-    {
+    switch (f) {
     case 'a':
         return add3(buf, max, n, wdays[tm->tm_wday % 7]);
     case 'A':
@@ -284,7 +279,7 @@ static int format(char *buf, DWORD max, DWORD *n, char f,
         return add(buf, max, n, months[tm->tm_mon % 12]);
     case 'c':
         return format(buf, max, n, 'x', tm) && add(buf, max, n,
-            " ") &&
+                " ") &&
                format(buf, max, n, 'X', tm);
     case 'd':
         return num(buf, max, n, tm->tm_mday, 2);
@@ -310,7 +305,7 @@ static int format(char *buf, DWORD max, DWORD *n, char f,
     case 'W':
         return num(buf, max, n,
                    (tm->tm_yday + 7 - (tm->tm_wday + 6) % 7) / 7,
-                       2);
+                   2);
     case 'x':
         return num(buf, max, n, tm->tm_mon + 1, 2) &&
                add(buf, max, n, "/") &&
@@ -344,10 +339,8 @@ DWORD __cdecl strftime(char *buf, DWORD max, const char *fmt,
     if (max == 0)
         return 0;
     buf[0] = 0;
-    for (; *fmt; fmt++)
-    {
-        if (*fmt != '%' || fmt[1] == 0)
-        {
+    for (; *fmt; fmt++) {
+        if (*fmt != '%' || fmt[1] == 0) {
             one[0] = *fmt;
             one[1] = 0;
             if (!add(buf, max, &n, one))

@@ -169,7 +169,8 @@ ROff %+ %1 equ ($ - $$) - CurSegBaseR
         dw ((%1) >> 16) & 0FFFFh
 %endmacro
 
-; SS.B, not the client's mode or CS.B, selects the stack offset width.
+; SS.B, not the client's mode or CS.B, selects the stack offset
+; width.
 %macro ClientFrameSP 2
         push eax
         lea eax, [esp + 4 + %1]
@@ -216,8 +217,10 @@ S32Bit equ 18
 %assign XXX 45h
 SSPrefix equ 36h
 PSP equ 100h
-VCPIPageBit equ 8 ;this bit in the page table or directory indicates,
-                 ;that page is from VCPI, and must be returned to it
+; this bit in the page table or directory indicates,
+VCPIPageBit equ 8
+                 ; that page is from VCPI, and must be returned
+                 ; to it
 ;Init flags:
 PriorVCPIUse equ 1
 
@@ -250,7 +253,8 @@ CFrESP equ 8
 CFrSS equ 12
 CFrame_size equ 16
 
-;frame of this structure are created on the real mode stack before
+; frame of this structure are created on the real mode stack
+; before
 ;returning to VM86
 ;fields StartEIP0, StartCS0 initalized by SwitcherToVM
 ;VMIShortStruct struc
@@ -301,7 +305,8 @@ RMIE_CS equ 44 + RMIEExtra
 RMIE_EFlags equ 48 + RMIEExtra
 RMIEStruct_size equ 52 + RMIEExtra
 
-;stack frame for simple interrupt from client PM - save all selectors,
+; stack frame for simple interrupt from client PM - save all
+; selectors,
 ;replaced with RM segments
 ;PMIStruct STRUC
 ;        ;saved registers
@@ -373,7 +378,8 @@ EDC_Struct_size equ 80
           ;DC_GS0   DW ?
           ;DC_SavedSize DD ?       ;saved size of the moved data
           ;DC_IntNum DB ?          ;number of requested interrupt
-          ;DC_OffsetIndex  DB ?    ;index of register, contains offset of the transferred date
+          ; DC_OffsetIndex  DB ?    ;index of register, contains
+          ; offset of the transferred date
           ;DC_SegmentIndex DB ?    ;-- for segment register
 DC_FirstSR0 equ DC_ES0
 DC_FirstSR equ DC_ES

@@ -11,12 +11,14 @@
         VCPITrap
         and dh, 0F0h
         or dh, VCPIPageBit  ;mark this page as allocated via VCPI
-                              ;(must be freed via VCPI on termination)
+                              ; (must be freed via VCPI on
+                              ; termination)
         or ah, ah
         jz Success@8
         shr byte [OffVCPIMemAvailable], 1
 TryXMS@8:
-        shr byte [OffXMSBlockNotAllocated], 1    ;check and clear flag
+        ; check and clear flag
+        shr byte [OffXMSBlockNotAllocated], 1
         _ifnot jnc
         ;try to allocate and lock xms block
           pushad

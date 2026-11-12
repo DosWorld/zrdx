@@ -1,4 +1,5 @@
-; Isolated native-entry bootstrap experiment. Not part of the ordinary build.
+; Isolated native-entry bootstrap experiment. Not part of the
+; ordinary build.
 %include "../rdf/T.INC"
 bits 32
 global start
@@ -137,8 +138,10 @@ start: BEGIN
        int 31h
        PASS
 
-; 32-bit gate frames are retained; only pointer arguments are narrowed.
-; Full copied-parameter and vector adaptation are separate pending work.
+; 32-bit gate frames are retained; only pointer arguments are
+; narrowed.
+; Full copied-parameter and vector adaptation are separate
+; pending work.
 native31:
        cmp dword [cs:active], 0
        je .chain
@@ -244,7 +247,8 @@ native_entry:
        mov ax, [envsel]
        mov [ebx+2ch], ax
        movzx edi, word [cbregs+46]
-       add di, 4             ;remove the original native-entry FAR return
+       ; remove the original native-entry FAR return
+       add di, 4
        sub di, 12
        mov [usersp], edi
        movzx ebx, word [cbregs+48]
@@ -399,7 +403,8 @@ rmexec:
 rmold: dd 0
 rmcallback: dd 0
 rmblock:
-       dw 0, rmtail-rmbegin, 0, rmfcb-rmbegin, 0, rmfcb-rmbegin, 0
+       dw 0, rmtail-rmbegin, 0, rmfcb-rmbegin, 0, \
+               rmfcb-rmbegin, 0
 rmtail: db 0, 13
 rmfcb: times 37 db 0
 %if CLIENT32

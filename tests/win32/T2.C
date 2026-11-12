@@ -15,7 +15,8 @@ extern unsigned __stdcall GetACP(void);
 extern unsigned __stdcall GetOEMCP(void);
 extern int __stdcall GetCPInfo(unsigned, void *);
 extern void *__stdcall VirtualAlloc(void *, unsigned long,
-        unsigned long, unsigned long);
+                                    unsigned long,
+                                    unsigned long);
 extern int __stdcall VirtualFree(void *, unsigned long,
                                  unsigned long);
 extern unsigned long __stdcall GetFileType(void *);

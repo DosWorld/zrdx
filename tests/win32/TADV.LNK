@@ -1,0 +1,14 @@
+system nt
+name TADV.EXE
+file TADV.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import '_AdUserA@8' ADVAPI32.GetUserNameA
+import '_AdUserW@8' ADVAPI32.GetUserNameW
+import '_AdOpenA@20' ADVAPI32.RegOpenKeyExA
+import '_AdOpenW@20' ADVAPI32.RegOpenKeyExW
+import '_AdQueryA@24' ADVAPI32.RegQueryValueExA
+import '_AdClose@4' ADVAPI32.RegCloseKey
+import '_AdToken@12' ADVAPI32.OpenProcessToken
+import '_AdInfo@20' ADVAPI32.GetTokenInformation
+import '_AdRandom@8' ADVAPI32.SystemFunction036

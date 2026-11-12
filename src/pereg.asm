@@ -21,6 +21,8 @@ RecExpSize equ 28
 RecKind equ 32
 RecState equ 36
 RecSeq equ 112
+RecTlsRVA equ 116
+RecTlsIdx equ 120
 RecImpRVA equ 104
 RecImpSize equ 108
 RecName1 equ 40
@@ -32,7 +34,8 @@ RfMain equ 4
 RfMark equ 8
 
 ;Selector loads use immediates patched by realinit: the QEMU TCG
-;ignores the CS base of "cs:" data reads when DS, ES and SS are flat.
+;ignores the CS base of "cs:" data reads when DS, ES and SS are
+;flat.
 PELoadFS:
         push 0FFFFh
         LLabel PESelD
@@ -57,6 +60,12 @@ PELoadES:
         dd 0
         LDWord PEHostLack
         dd 0
+        LDWord PEEntryFS
+        dd 0
+        LDWord PETlsTab
+        dd 0
+        LDWord PETlsTabH
+        dd 0
 %ifdef FAKELACK
         LDWord PEFakeCnt
         dd 0
@@ -66,7 +75,8 @@ PELoadES:
         ESEG EData
 
 ;ds:esi ASCIIZ path -> ss:edi upper case base name (NameMax),
-;".DLL" added if it has no extension. CF set if empty or too long. Clobbers eax, ebx, ecx, esi.
+;".DLL" added if it has no extension. CF set if empty or too
+;long. Clobbers eax, ebx, ecx, esi.
 PENormName:
         mov ebx, esi
 .scan:  lodsb
@@ -81,7 +91,35 @@ PENormName:
 .sep:   mov ebx, esi
         jmp .scan
 .copy:  mov esi, ebx
-        xor ecx, ecx
+        xor ecx, ecx                    ;api-ms-win-crt-* is
+.az:    cmp byte [ds:esi + ecx], 0      ;UCRTBASE.DLL (task 200)
+        je .noapi
+        inc ecx
+        cmp ecx, 15
+        jb .az
+        mov eax, [ds:esi]
+        or eax, 20202020h
+        cmp eax, 'api-'
+        jne .noapi
+        mov eax, [ds:esi + 4]
+        or eax, 20202020h
+        cmp eax, 'ms-w'
+        jne .noapi
+        mov eax, [ds:esi + 8]
+        or eax, 20202020h
+        cmp eax, 'in-c'
+        jne .noapi
+        mov eax, [ds:esi + 11]
+        or eax, 20202020h
+        cmp eax, 'crt-'
+        jne .noapi
+        mov dword [ss:edi], 'UCRT'
+        mov dword [ss:edi + 4], 'BASE'
+        mov dword [ss:edi + 8], '.DLL'
+        mov byte [ss:edi + 12], 0
+        clc
+        ret
+.noapi: xor ecx, ecx
 .cp:    lodsb
         test al, al
         jz .end
@@ -104,8 +142,8 @@ PENormName:
         je .done
         inc edx
         jmp .dot
-.noext: cmp ecx, NameMax - 5            ;no extension: ".DLL" as the
-        ja .bad                         ;Win32 loader does
+.noext: cmp ecx, NameMax - 5            ;no ext: add ".DLL"
+        ja .bad                         ;(Win32 loader)
         mov dword [ss:edi + ecx], '.DLL'
         add ecx, 4
 .done:  mov byte [ss:edi + ecx], 0
@@ -158,7 +196,8 @@ PERegFind:
         ret
 
 ;es flat. Out: CF clear and edx = new zeroed record (used);
-;CF set and eax = 4 if no memory. Clobbers eax, ebx, ecx, esi, edi.
+;CF set and eax = 4 if no memory. Clobbers eax, ebx, ecx, esi,
+;edi.
 PERegAdd:
         push fs
         call PELoadFS
@@ -269,9 +308,12 @@ PERegRollback:
 
 ;Out: ds:esi = path of the program, CF set if unavailable. The
 ;path is the environment path of the stub file, or, when the
-;environment holds ZRDXROLE (unbound run, task 170) or the command tail
-;starts with the marker /#R (task 172), the first token after it, kept in PEProgPath and cut off the
-;tail. Clobbers eax, ebx, ecx, edx (edi is kept). The caller saves
+;environment holds ZRDXROLE (unbound run, task 170) or the
+;command tail
+;starts with the marker /#R (task 172), the first token after it,
+;kept in PEProgPath and cut off the
+;tail. Clobbers eax, ebx, ecx, edx (edi is kept). The caller
+;saves
 ;ds.
 PEEnvPtr:
         push fs
@@ -415,11 +457,21 @@ PEExpName:
         jz .out
         add eax, [ebp + CtxBase]
         mov esi, [es:eax + 12]
-        lea ecx, [esi + NameMax]
-        cmp ecx, [ebp + PEImageSize]
-        ja .out
-        add esi, [ebp + CtxBase]
-        push ds
+        mov ecx, [ebp + PEImageSize]
+        sub ecx, esi                    ;bytes to the end
+        jbe .out
+        cmp ecx, NameMax
+        jbe .lim
+        mov ecx, NameMax
+.lim:   add esi, [ebp + CtxBase]
+        xor ebx, ebx
+.z:     cmp byte [es:esi + ebx], 0      ;the name must end inside
+        je .ended
+        inc ebx
+        cmp ebx, ecx
+        jb .z
+        jmp .out
+.ended: push ds
         push es
         pop ds
         call PENormName
@@ -476,12 +528,216 @@ PERegFill:
         inc ecx
         cmp ecx, NameMax
         jb .cn
-        clc
+        call PETlsSetup
 .ret:   ret
 .coll:  pop esi
         mov eax, 9
         stc
         ret
+
+;The TLS table (task 208, 209): a block of 8192 bytes, 1024 block
+;pointers (the array behind FS:[2Ch]) and the 1024 DPMI handles
+;of the blocks. Out: CF clear and esi = table, or CF set (no
+;memory).
+PETlsTable:
+        push fs
+        call PELoadFS
+        mov esi, [fs:OffPETlsTab]
+        pop fs
+        or esi, esi
+        jnz .ok
+        mov ebx, 8192
+        mov ax, 501h
+        call PEDpmi
+        jc .ret
+        push fs
+        call PELoadFS
+        mov [fs:OffPETlsTab], ebx
+        mov [fs:OffPETlsTabH], esi
+        pop fs
+        mov edi, ebx
+        mov ecx, 8192 / 4
+        xor eax, eax
+        cld
+        rep stosd
+        mov esi, ebx
+.ok:    clc
+.ret:   ret
+
+;edx = record, ebp = PELoadCtx (es flat). A module with a TLS
+;directory gets a block (raw data and zero fill), a free index,
+;written to the directory's index variable, and a table slot.
+;Out: CF clear, or CF set and eax = 4 no memory / 10 bad
+;directory (the record is cleared; the caller frees the image).
+PETlsSetup:
+        push edx                        ;rec
+        cmp dword [ebp + PENumDirs], 10
+        jb .none
+        mov eax, [ebp + PEDirTLS]
+        or eax, eax
+        jz .none
+        mov [es:edx + RecTlsRVA], eax
+        cmp dword [ebp + PEDirTLSSize], 24
+        jb .bad
+        add eax, 24
+        jc .bad
+        cmp eax, [ebp + PEImageSize]
+        ja .bad
+        mov ebx, [ebp + CtxBase]
+        mov esi, [ebp + PEDirTLS]
+        add esi, ebx                    ;esi = directory
+        mov ecx, [es:esi + 4]
+        sub ecx, [es:esi]               ;ecx = raw data size
+        jb .bad
+        cmp ecx, 100000h
+        ja .bad
+        mov eax, [es:esi]
+        sub eax, ebx
+        jb .bad
+        add eax, ecx
+        jc .bad
+        cmp eax, [ebp + PEImageSize]
+        ja .bad
+        mov eax, [es:esi + 8]           ;the index variable
+        sub eax, ebx
+        jb .bad
+        add eax, 4
+        cmp eax, [ebp + PEImageSize]
+        ja .bad
+        mov eax, [es:esi + 12]          ;callbacks array, if any
+        or eax, eax
+        jz .cbok
+        sub eax, ebx
+        jb .bad
+        add eax, 4
+        cmp eax, [ebp + PEImageSize]
+        ja .bad
+.cbok:  mov eax, [es:esi + 16]          ;zero fill
+        cmp eax, 100000h
+        ja .bad
+        add eax, ecx
+        add eax, 0FFFh
+        and eax, ~0FFFh                 ;block size, whole pages
+        jnz .size
+        mov eax, 1000h
+.size:  push eax                        ;size
+        push esi                        ;dir
+        push ecx                        ;raw: [esp] = raw,
+        call PETlsTable                 ;+4 dir, +8 size, +12 rec
+        jc .nomem
+        xor ebx, ebx
+.slot:  cmp dword [es:esi + ebx * 4], 0
+        je .got
+        inc ebx
+        cmp ebx, 1024
+        jb .slot
+        jmp .nomem
+.got:   push ebx                        ;slot
+        push esi                        ;table
+        mov ebx, [esp + 16]
+        mov ax, 501h
+        call PEDpmi                     ;ebx = block
+        pop edi
+        pop eax
+        jc .nomem
+        mov [es:edi + eax * 4], ebx
+        mov [es:edi + eax * 4 + 4096], esi
+        push eax                        ;slot
+        mov edi, ebx
+        mov ecx, [esp + 12]
+        shr ecx, 2
+        xor eax, eax
+        cld
+.zero:  mov [es:edi], eax
+        add edi, 4
+        loop .zero
+        mov esi, [esp + 8]
+        mov esi, [es:esi]               ;raw data (start address)
+        mov edi, ebx
+        mov ecx, [esp + 4]
+.cp:    jecxz .cpd
+        mov al, [es:esi]
+        mov [es:edi], al
+        inc esi
+        inc edi
+        dec ecx
+        jmp .cp
+.cpd:   pop eax                         ;slot
+        mov esi, [esp + 4]
+        mov esi, [es:esi + 8]
+        mov [es:esi], eax               ;the TLS index
+        mov edx, [esp + 12]
+        inc eax
+        mov [es:edx + RecTlsIdx], eax
+        add esp, 12
+.none:  pop edx
+        clc
+        ret
+.nomem: add esp, 12
+        mov eax, 4
+        jmp .fail
+.bad:   mov eax, 10
+.fail:  pop edx
+        push eax
+        mov edi, edx
+        mov ecx, RecSz / 4
+        xor eax, eax
+        cld
+        rep stosd
+        pop eax
+        push eax
+        call PERegTrim
+        pop eax
+        stc
+        ret
+
+;Free the block of the record in edx (kept) and its table slot.
+PETlsRelease:
+        mov eax, [es:edx + RecTlsIdx]
+        or eax, eax
+        jz .ret
+        dec eax
+        push fs
+        call PELoadFS
+        mov esi, [fs:OffPETlsTab]
+        pop fs
+        mov dword [es:esi + eax * 4], 0
+        mov esi, [es:esi + eax * 4 + 4096]
+        push edx
+        mov ax, 502h
+        call PEDpmi
+        pop edx
+.ret:   ret
+
+;Free every block and the table (at exit).
+PETlsFreeAll:
+        push fs
+        call PELoadFS
+        mov ebx, [fs:OffPETlsTab]
+        pop fs
+        or ebx, ebx
+        jz .ret
+        xor ecx, ecx
+.l:     cmp dword [es:ebx + ecx * 4], 0
+        je .n
+        push ecx
+        push ebx
+        mov esi, [es:ebx + ecx * 4 + 4096]
+        mov ax, 502h
+        call PEDpmi
+        pop ebx
+        pop ecx
+.n:     inc ecx
+        cmp ecx, 1024
+        jb .l
+        push fs
+        call PELoadFS
+        mov esi, [fs:OffPETlsTabH]
+        mov dword [fs:OffPETlsTab], 0
+        pop fs
+        mov ax, 502h
+        call PEDpmi
+.ret:   ret
 
 ;Far call from the loader, EBP = PELoadCtx of the main EXE.
 ;Registers it (pinned) under its file name and export name.
@@ -498,10 +754,12 @@ PERegFill:
         call PEExpName
         mov esi, esp
         call PERegFill
-        jc .fail
+        jc .err
         or dword [es:edx + RecFlags], RfPinned + RfMain
         mov dword [es:edx + RecRef], 1
         clc
+        jmp .fail
+.err:   mov [esp + 2 * NameMax + 8 + 28], eax
 .fail:  lea esp, [esp + 2 * NameMax]
         pop es
         pop ds
@@ -510,11 +768,15 @@ PERegFill:
 
 ;Ring 3 vendor entry (INT 2Fh 168Ah), far call, AX = function:
 ;0 GetVersion, 1 LoadLibrary (DS:EDX path), 2 GetModuleHandle
-;(DS:EDX name), 3 GetProcAddress (EBX handle, EDX ordinal < 10000h
+;(DS:EDX name), 3 GetProcAddress (EBX handle, EDX ordinal <
+;10000h
 ;or DS:EDX name), 4 FreeLibrary (EBX), 5 GetLastError.
 ;6 ProgramInfo (DS:EDX buffer of 128 bytes gets the main program
 ;path; EAX = its image base, EBX = its module handle), 7 Exit
-;(EDX = code: detach all DLLs like the exit stub, end the program).
+;(EDX = code: detach all DLLs like the exit stub, end the
+;program),
+;8 SetEntryFS (EDX = selector the program starts with in FS),
+;9 TlsTable (EAX = the array for FS:[2Ch], one block per module).
 ;Other functions: CF set, EAX = 1. See docs/PEABI.MD.
         DPROC PEVendor
         pushad
@@ -538,6 +800,10 @@ PERegFill:
         je .pinfo
         cmp ax, 7
         je .exit
+        cmp ax, 9
+        je .tls
+        cmp ax, 8
+        je .sfs
         mov eax, 1
         jmp .err
 .exit:  mov eax, [esp + 8 + 32 + 4]     ;7: detach all and end
@@ -549,9 +815,22 @@ PERegFill:
         pop eax
         mov ah, 4Ch
         int 21h
-.pinfo: mov edi, edx                    ;6: program path to ds:edx
+.tls:   call PETlsTable                 ;9: TLS table
+        mov eax, esi
+        jnc .ok
+        mov eax, 4
+        jmp .err
+.sfs:   mov eax, [esp + 8 + 20]         ;8: FS of the program
+        push fs
+        call PELoadFS
+        mov [fs:OffPEEntryFS], eax
+        pop fs
+        jmp .ok
+.pinfo: mov edi, edx                    ;6: path to ds:edx
         xor ecx, ecx
-.pn:    call PERegNth
+.pn:    push ecx                        ;PERegNth clobbers ecx
+        call PERegNth
+        pop ecx
         jc .nomod
         test dword [es:edx + RecFlags], RfMain
         jnz .pm
@@ -559,18 +838,21 @@ PERegFill:
         jmp .pn
 .pm:    mov eax, [es:edx + RecBase]
         mov [esp + 8 + 16], edx         ;ebx = module handle
-        push fs
-        call PELoadFS
-        xor ecx, ecx
-.pc:    mov bl, [fs:OffPEProgPath + ecx]
-        mov [ds:edi + ecx], bl
+        push ds                         ;the path: ds:esi
+        push eax
+        call PEEnvPtr
+        mov ecx, 0
+        jc .pe
+.pc:    mov bl, [ds:esi + ecx]
+        mov [es:edi + ecx], bl
         inc ecx
         test bl, bl
         jz .pd
         cmp ecx, 127
         jb .pc
-        mov byte [ds:edi + ecx], 0
-.pd:    pop fs
+.pe:    mov byte [es:edi + ecx], 0
+.pd:    pop eax
+        pop ds
         jmp .ok
 .lib:   call PELoadLib
         jc .err

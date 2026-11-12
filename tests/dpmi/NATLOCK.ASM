@@ -1,4 +1,5 @@
-; Native 32-bit exception/IRQ delivery must use the host's 4 KB stack.
+; Native 32-bit exception/IRQ delivery must use the host's 4 KB
+; stack.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -31,7 +32,8 @@ start:  cld
         jc bad
         mov [original], ss
         mov [saveddata], ds
-        mov ebx, 200h           ;two client-owned real stacks, not host workspace
+        ; two client-owned real stacks, not host workspace
+        mov ebx, 200h
         mov eax, 100h
         int 31h
         jc bad
@@ -143,7 +145,8 @@ start:  cld
         mov edi, rmregs
         xor ecx, ecx
         mov eax, 301h
-        mov bh, 1                ;A20 reset must survive nested callbacks
+        ; A20 reset must survive nested callbacks
+        mov bh, 1
         int 31h
         jc bad
         cmp byte [cbseen], 2
@@ -206,7 +209,8 @@ check:  pushad
         jnz .broken
         cmp eax, 0fffh
         jne .broken
-        ; Reentrant service on the locked stack must preserve this frame.
+        ; Reentrant service on the locked stack must preserve
+        ; this frame.
         mov eax, 604h
         int 31h
         jc .broken
@@ -230,9 +234,11 @@ irq:    pushad
         call check
         mov byte [irqseen], 1
 %if !CLIENT32
-        or esp, 12340000h       ;SS.B=0: only SP addresses the interrupted stack
+        ; SS.B=0: only SP addresses the interrupted stack
+        or esp, 12340000h
 %endif
-        int3                  ;nested event must continue on this stack
+        ; nested event must continue on this stack
+        int3
 %if CLIENT32
         pushfd
         call dword far [oldirq]
@@ -248,7 +254,8 @@ irq:    pushad
 %endif
 callback:
 %if !CLIENT32
-        and esp, 0FFFFh         ;use 32-bit local addressing on a word stack
+        ; use 32-bit local addressing on a word stack
+        and esp, 0FFFFh
 %endif
         mov ax, [esi]
         mov [es:edi+42], ax
@@ -260,12 +267,15 @@ callback:
         mov ds, ax
         call check
 %if !CLIENT32
-        and esp, 0FFFFh         ;a word-stack API return leaves high ESP undefined
+        ; a word-stack API return leaves high ESP undefined
+        and esp, 0FFFFh
 %endif
-        int3                   ;exception nested inside callback, same locked stack
+        ; exception nested inside callback, same locked stack
+        int3
         inc byte [cbdepth]
 %if !CLIENT32
-        ; Preserve both opaque states, then briefly switch the alias base
+        ; Preserve both opaque states, then briefly switch the
+        ; alias base
         ; without any intervening API call or frame allocation.
         cmp byte [cbdepth], 1
         jne .inner_state
@@ -275,7 +285,8 @@ callback:
         jmp .state_done
 .inner_state:
         mov bx, sp
-        mov ax, [ss:bx]          ;callback's saved real-stack alias selector
+        ; callback's saved real-stack alias selector
+        mov ax, [ss:bx]
         mov [alias], ax
         mov edi, innerstate
         xor al, al
@@ -300,8 +311,10 @@ callback:
         je .state_done
         mov byte [broken], 3
 .state_done:
-        movzx esp, sp            ;the state-call IRET leaves high ESP undefined
-        mov edi, cbpacket        ;packet address required by the outer copy
+        ; the state-call IRET leaves high ESP undefined
+        movzx esp, sp
+        ; packet address required by the outer copy
+        mov edi, cbpacket
 %endif
         cmp byte [cbdepth], 1
         jne .nested
@@ -319,7 +332,8 @@ callback:
         mov edi, rmregs
         xor ecx, ecx
         mov eax, 301h
-        mov bh, 1                ;A20 reset must survive nested callbacks
+        ; A20 reset must survive nested callbacks
+        mov bh, 1
         int 31h
         jnc .restore
         mov byte [broken], 1

@@ -1,4 +1,5 @@
-; Keep one VM alive while successive real-mode children request a mode.
+; Keep one VM alive while successive real-mode children request a
+; mode.
 bits 16
 org 100h
 %ifndef FIRST32

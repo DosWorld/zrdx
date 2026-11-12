@@ -28,15 +28,13 @@
 #define GENERIC_READ 0x80000000UL
 #define GENERIC_WRITE 0x40000000UL
 
-typedef struct FdRec
-{
+typedef struct FdRec {
     HANDLE h;
     DWORD flags;
     int pending;
 } FdRec;
 
-typedef struct FdChunk
-{
+typedef struct FdChunk {
     FdRec rec[FD_PER];
     struct FdChunk *next;
 } FdChunk;
@@ -53,11 +51,9 @@ static FdRec *slot(int fd)
 
     if (fd < 0 || fd >= FD_MAX)
         return NULL;
-    for (n = fd / FD_PER; ; pp = &c->next, n--)
-    {
+    for (n = fd / FD_PER; ; pp = &c->next, n--) {
         c = *pp;
-        if (c == NULL)
-        {
+        if (c == NULL) {
             c = calloc(1, sizeof(FdChunk));
             if (c == NULL)
                 return NULL;
@@ -79,8 +75,7 @@ static void io_init(void)
     if (io_ready)
         return;
     io_ready = 1;
-    for (i = 0; i < 3; i++)
-    {
+    for (i = 0; i < 3; i++) {
         r = slot(i);
         if (r == NULL)
             continue;
@@ -95,8 +90,7 @@ static FdRec *fdget(int fd)
 
     io_init();
     r = slot(fd);
-    if (r == NULL || !(r->flags & FD_OPEN))
-    {
+    if (r == NULL || !(r->flags & FD_OPEN)) {
         crt_errno = CRT_EBADF;
         return NULL;
     }
@@ -107,8 +101,7 @@ void crt_io_free(void)
 {
     FdChunk *c, *n;
 
-    for (c = fds; c; c = n)
-    {
+    for (c = fds; c; c = n) {
         n = c->next;
         free(c);
     }
@@ -133,20 +126,17 @@ int __cdecl _open(const char *path, int oflag, int pmode)
         disp = (oflag & O_TRUNC) ? 5 : 3;
     if (disp == 5)
         access |= GENERIC_WRITE;
-    for (fd = 3; fd < FD_MAX; fd++)
-    {
+    for (fd = 3; fd < FD_MAX; fd++) {
         r = slot(fd);
         if (r == NULL || !(r->flags & FD_OPEN))
             break;
     }
-    if (fd >= FD_MAX || r == NULL)
-    {
+    if (fd >= FD_MAX || r == NULL) {
         crt_errno = CRT_EMFILE;
         return -1;
     }
     h = CreateFileA(path, access, 3, NULL, disp, 0x80, NULL);
-    if (h == INVALID_HANDLE_VALUE)
-    {
+    if (h == INVALID_HANDLE_VALUE) {
         crt_seterr_win(GetLastError());
         return -1;
     }
@@ -156,7 +146,7 @@ int __cdecl _open(const char *path, int oflag, int pmode)
     if (oflag & O_APPEND)
         r->flags |= FD_APPEND;
     if ((oflag & O_BINARY) ? 0 : (oflag & O_TEXT) ? 1
-        : _fmode == 0)
+            : _fmode == 0)
         r->flags |= FD_TEXT;
     return fd;
 }
@@ -168,8 +158,7 @@ int __cdecl _close(int fd)
     if (r == NULL)
         return -1;
     r->flags = 0;
-    if (fd > 2 && !CloseHandle(r->h))
-    {
+    if (fd > 2 && !CloseHandle(r->h)) {
         crt_seterr_win(GetLastError());
         return -1;
     }
@@ -188,8 +177,7 @@ int __cdecl _setmode(int fd, int mode)
         r->flags |= FD_TEXT;
     else if (mode == O_BINARY)
         r->flags &= ~(DWORD)FD_TEXT;
-    else
-    {
+    else {
         crt_errno = CRT_EINVAL;
         return -1;
     }
@@ -218,16 +206,14 @@ long __cdecl _lseek(int fd, long off, int origin)
 
     if (r == NULL)
         return -1L;
-    if (origin < 0 || origin > 2)
-    {
+    if (origin < 0 || origin > 2) {
         crt_errno = CRT_EINVAL;
         return -1L;
     }
     r->flags &= ~(DWORD)(FD_PEND | FD_EOF);
     hi = off < 0 && origin != 0 ? -1L : 0L;
     p = SetFilePointer(r->h, off, &hi, (DWORD)origin);
-    if (p == 0xFFFFFFFFUL)
-    {
+    if (p == 0xFFFFFFFFUL) {
         crt_seterr_win(GetLastError());
         return -1L;
     }
@@ -257,34 +243,36 @@ int __cdecl _commit(int fd)
     return r && FlushFileBuffers(r->h) ? 0 : -1;
 }
 
+int crt_fdstate(int fd)
+{
+    FdRec *r = fdget(fd);
+
+    if (r == NULL)
+        return 0;
+    return ((r->flags & FD_TEXT) ? 1 : 0) |
+           ((r->flags & FD_PEND) ? 2 : 0);
+}
+
 /* text mode input: CR LF -> LF, Ctrl-Z is the end of the file */
 static int squeeze(FdRec *r, unsigned char *b, int n)
 {
     int i, o = 0;
 
-    for (i = 0; i < n; i++)
-    {
-        if (b[i] == 0x1A)
-        {
+    for (i = 0; i < n; i++) {
+        if (b[i] == 0x1A) {
             r->flags |= FD_EOF;
             break;
         }
-        if (b[i] == '\r')
-        {
-            if (i + 1 < n)
-            {
+        if (b[i] == '\r') {
+            if (i + 1 < n) {
                 if (b[i + 1] == '\n')
                     continue;
-            }
-            else
-            {
+            } else {
                 DWORD got = 0;
                 unsigned char nx;
 
-                if (ReadFile(r->h, &nx, 1, &got, NULL) && got)
-                {
-                    if (nx == '\n')
-                    {
+                if (ReadFile(r->h, &nx, 1, &got, NULL) && got) {
+                    if (nx == '\n') {
                         b[o++] = '\n';
                         break;
                     }
@@ -309,15 +297,14 @@ int __cdecl _read(int fd, void *buf, unsigned count)
         return -1;
     if (count == 0 || (r->flags & FD_EOF))
         return 0;
-    if (r->flags & FD_PEND)
-    {
+    if (r->flags & FD_PEND) {
         b[n++] = (unsigned char)r->pending;
         r->flags &= ~(DWORD)FD_PEND;
         if (n == (int)count)
             return n;
     }
-    if (!ReadFile(r->h, b + n, count - (unsigned)n, &got, NULL))
-    {
+    if (!ReadFile(r->h, b + n, count - (unsigned)n, &got,
+                  NULL)) {
         crt_seterr_win(GetLastError());
         return -1;
     }
@@ -340,28 +327,23 @@ int __cdecl _write(int fd, const void *buf, unsigned count)
         return -1;
     if (r->flags & FD_APPEND)
         SetFilePointer(r->h, 0, NULL, 2);
-    if (!(r->flags & FD_TEXT))
-    {
+    if (!(r->flags & FD_TEXT)) {
         if (!WriteFile(r->h, buf, count, &put, NULL)
-            || put != count)
-        {
+                || put != count) {
             crt_seterr_win(put == count ? GetLastError() : 112);
             return -1;
         }
         return (int)count;
     }
-    while (done < count)
-    {
+    while (done < count) {
         for (o = 0; done < count
-            && o < (int)sizeof tmp - 1; done++)
-        {
+                && o < (int)sizeof tmp - 1; done++) {
             if (s[done] == '\n')
                 tmp[o++] = '\r';
             tmp[o++] = s[done];
         }
         if (!WriteFile(r->h, tmp, (DWORD)o, &put, NULL) ||
-                put != (DWORD)o)
-        {
+                put != (DWORD)o) {
             crt_seterr_win(112);
             return -1;
         }
@@ -373,13 +355,11 @@ int __cdecl _access(const char *path, int mode)
 {
     DWORD a = GetFileAttributesA(path);
 
-    if (a == 0xFFFFFFFFUL)
-    {
+    if (a == 0xFFFFFFFFUL) {
         crt_seterr_win(GetLastError());
         return -1;
     }
-    if ((mode & 2) && (a & 1))
-    {
+    if ((mode & 2) && (a & 1)) {
         crt_errno = CRT_EACCES;
         return -1;
     }
@@ -435,8 +415,7 @@ char *__cdecl _getcwd(char *buf, int size)
         return NULL;
     if (buf == NULL)
         buf = malloc(n + 1 > (DWORD)size ? n + 1 : (DWORD)size);
-    else if (n >= (DWORD)size)
-    {
+    else if (n >= (DWORD)size) {
         crt_errno = CRT_ERANGE;
         return NULL;
     }

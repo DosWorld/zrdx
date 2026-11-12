@@ -22,11 +22,13 @@
         mov dword [OffSwitchTableEIP], OffRMS_PMHandler
         RRT 4
         push eax ;Data1Selector
-        push OffKernelStack1End  ;OffUserStackEnd;-size DC_Struct; OffLockedStack-800h
+        ; OffUserStackEnd;-size DC_Struct; OffLockedStack-800h
+        push OffKernelStack1End
         push Code1Selector
         push OffPL3Entry
         mov eax, cr0
-        mov [OffRMCR0], eax          ;save original CR0 for Real(or VM) Mode
+        ; save original CR0 for Real(or VM) Mode
+        mov [OffRMCR0], eax
         RRT
         and eax, ~(05002Ch)   ;clear AM & WP & TS & EM & NE
         mov [OffPMCR0], eax
@@ -47,9 +49,26 @@
         _ifnot jb
           mov al, NExitPages
         _endif
+%ifdef SWAP
+        ; XMS memory is not zeroed: a
+        push eax
+        ; stale entry made SWAP think
+        push ecx
+        ; a table exists (task 221)
+        push edi
+        mov edi, OffnEntriesInTable
+        xor eax, eax
+        mov ecx, 1024
+        cld
+        rep stosd
+        pop edi
+        pop ecx
+        pop eax
+%endif
         mov esi, ((OffLastInit + 0FFFh) & ~(0FFFh)) - 4
         mov ebx, OffPage2 + NExitPages * 4
-        mov dword [OffnEntriesInTable + 4], 2   ;prevent page table 2 from free
+        ; prevent page table 2 from free
+        mov dword [OffnEntriesInTable + 4], 2
         _do
         dec al
         mov ecx, 1024
@@ -62,7 +81,8 @@
 MovePage@7:
         mov edi, OffFreePageWin + 1000h - 4
         std
-        mov [OffPage2 + ((OffFreePageWin - KernelBase) >> 10)], edx
+        mov [OffPage2 + ((OffFreePageWin - KernelBase) >> 10)], \
+                edx
         db CallFarCode ;PageMoveTrap
         dd 0
         dw PageMoveGateSelector
@@ -71,7 +91,8 @@ NExitPages equ (OffLastInit - KernelBase + 4095) / 4096
 NLoaderPages equ WinSize >> 12
         pop eax
         _enddo jmp
-        and byte [OffPageDir + 4], ~(2) ;disable client write access to server area
+        ; disable client write access to server area
+        and byte [OffPageDir + 4], ~(2)
         cld
 
 %define _nextrarpages ecx
@@ -97,7 +118,8 @@ NLoaderPages equ WinSize >> 12
             inc dword [OffnFreePages]
             or _counter, _counter
             _ifnot jnz
-              mov [OffPage2 + ((Offfplist - KernelBase) >> 10)], eax
+              mov [OffPage2 + ((Offfplist - KernelBase) \
+                      >> 10)], eax
               InvalidateTLB
               xor eax, eax
               mov [OffnEntriesInFplist], eax
@@ -110,7 +132,8 @@ L5@7:
         inc _counter
             _loop jmp
           _enddo
-          sub _counter, NLoaderPages + NExitPages + 15   ;!!!!!!!!!!!!!!
+          ; !!!!!!!!!!!!!!
+          sub _counter, NLoaderPages + NExitPages + 15
           _ifnot jae
             cmp _counter, -(15)
             _ifnot ja

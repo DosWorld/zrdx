@@ -1,5 +1,7 @@
-; DPMI 0.9 S8.9/S8.12 reject present execute-only/conforming code.
-; Absent descriptors relax these type restrictions (the explicit 0.9 errata).
+; DPMI 0.9 S8.9/S8.12 reject present execute-only/conforming
+; code.
+; Absent descriptors relax these type restrictions (the explicit
+; 0.9 errata).
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -120,7 +122,9 @@ start:  cld
         xor bx, bx
         jmp print
 under_alias:
-        int 0                   ;#GP software-INT decoder dispatches through the new alias
+        ; #GP software-INT decoder dispatches through the new
+        ; alias
+        int 0
         retf
 software:
         inc byte [hits]

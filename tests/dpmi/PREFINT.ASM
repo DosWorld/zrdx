@@ -82,7 +82,8 @@ start:  cld
         int 0                   ;16 bytes: must remain a CPU #GP
 long_done:
         mov word [resume], prefixes_done
-        times 15 db 66h          ;no opcode within architectural limit
+        ; no opcode within architectural limit
+        times 15 db 66h
         int 0
 prefixes_done:
         mov word [resume], lock_done

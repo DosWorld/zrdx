@@ -9,8 +9,7 @@
  */
 #include "w32.h"
 
-typedef struct Csbi
-{
+typedef struct Csbi {
     WORD cols, rows;
     WORD curx, cury;
     WORD attr;
@@ -42,8 +41,7 @@ static int console(HANDLE h)
     struct dregs r;
     int d = w32_dosh(h);
 
-    if (d < 0 || d > 7)
-    {
+    if (d < 0 || d > 7) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return -1;
     }
@@ -51,8 +49,7 @@ static int console(HANDLE h)
     r.eax = 0x4400;
     r.ebx = (DWORD)d;
     dos21(&r);
-    if (r.cf || !(r.edx & 0x80))
-    {
+    if (r.cf || !(r.edx & 0x80)) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return -1;
     }
@@ -161,8 +158,7 @@ UINT WINAPI GetConsoleOutputCP(void)
 BOOL WINAPI SetConsoleCP(UINT cp)
 {
     W32T("SetConsoleCP");
-    if (w32_cptab(cp) == NULL && cp != 28591 && cp != 65001)
-    {
+    if (w32_cptab(cp) == NULL && cp != 28591 && cp != 65001) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -173,8 +169,7 @@ BOOL WINAPI SetConsoleCP(UINT cp)
 BOOL WINAPI SetConsoleOutputCP(UINT cp)
 {
     W32T("SetConsoleOutputCP");
-    if (w32_cptab(cp) == NULL && cp != 28591 && cp != 65001)
-    {
+    if (w32_cptab(cp) == NULL && cp != 28591 && cp != 65001) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -213,13 +208,12 @@ BOOL WINAPI WriteConsoleW(HANDLE h, const WORD *buf, DWORD n,
 
     if (console(h) < 0)
         return FALSE;
-    while (done < n)
-    {
+    while (done < n) {
         part = n - done > 128 ? 128 : n - done;
         k = WideCharToMultiByte(GetConsoleOutputCP(), 0, buf
-            + done,
+                                + done,
                                 (int)part, tmp, sizeof tmp, NULL,
-                                    NULL);
+                                NULL);
         if (k == 0 || !WriteFile(h, tmp, (DWORD)k, &put, NULL))
             return FALSE;
         done += part;

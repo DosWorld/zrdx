@@ -19,7 +19,7 @@ Vendor168A:
         jc near ToOldInt0
         cmp ecx, eax
         ja near ToOldInt0
-        push ds                         ;flat ds: ToOldInt0 needs it
+        push ds                         ;flat ds: ToOldInt0
         mov ds, edx
         cmp dword [ebx], 'ZRDX'
         jne .other

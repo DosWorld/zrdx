@@ -50,7 +50,8 @@ start:  cld
         neg ecx
         add ecx, 8192
         xor eax, eax
-        int 31h                 ;one allocation through index 8191
+        ; one allocation through index 8191
+        int 31h
         jc near bad
         cmp ax, [first]
         jne near bad

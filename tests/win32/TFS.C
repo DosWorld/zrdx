@@ -143,15 +143,13 @@ static void find_tests(void)
 
     h = FindFirstFileA("ZRDXD\\*.TXT", fd);
     CHECK(h != (HANDLE) - 1L);
-    do
-    {
+    do {
         count++;
         CHECK(fd[44] == 'B' || fd[44] == 'C');
         n = fd[44] == 'B' ? 5UL : 2UL;
         CHECK(*(DWORD *)(fd + 32) == n);
         CHECK(!(*(DWORD *)fd & 0x10));
-    }
-    while (FindNextFileA(h, fd));
+    } while (FindNextFileA(h, fd));
     CHECK(GetLastError() == 18 && count == 2);
     CHECK(FindClose(h));
     CHECK(!FindClose(h));

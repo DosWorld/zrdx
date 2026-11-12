@@ -10,6 +10,9 @@ file K32TIME.OBJ
 file K32PROC.OBJ
 file K32HEAP.OBJ
 file K32TLS.OBJ
+file K32TEB.OBJ
+file K32EXC.OBJ
+file K32EXA.OBJ
 file K32FS.OBJ
 file K32FIND.OBJ
 file K32CP.OBJ
@@ -45,6 +48,8 @@ export SetEnvironmentVariableA='_SetEnvironmentVariableA@8'
 export SetFilePointer='_SetFilePointer@16'
 export SetLastError='_SetLastError@4'
 export SetStdHandle='_SetStdHandle@8'
+export RaiseException='_RaiseException@16'
+export RtlUnwind='_RtlUnwind@16'
 export SetUnhandledExceptionFilter='_SetUnhandledExceptionFilter@4'
 export UnhandledExceptionFilter='_UnhandledExceptionFilter@4'
 export VirtualAlloc='_VirtualAlloc@16'

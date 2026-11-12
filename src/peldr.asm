@@ -2,7 +2,8 @@
 ;                     (C) 1998, Sergey Belyakov
 ;                     (C) 2026, Viacheslav Komenda
 
-;IMAGE_FILE_HEADER and IMAGE_OPTIONAL_HEADER offsets from the "PE" signature
+;IMAGE_FILE_HEADER and IMAGE_OPTIONAL_HEADER offsets from the
+;"PE" signature
 PEMachine equ 4
 PENumSections equ 6
 PEOptHdrSize equ 20
@@ -35,19 +36,20 @@ PSVirtualAddr equ 12
 PSRawSize equ 16
 PSRawPtr equ 20
 PSHeader_size equ 40
-MaxPESections equ 24
+HdrSize equ 600h                ;header bytes read
+MaxPESections equ 32            ;fits HdrSize
 ;PELoadCtx: header buffer first, so [ebp + PExxx] reach the
 ;header; the fields follow it.
-CtxFile equ 400h
-CtxDisp equ 404h
-CtxHdrPos equ 408h
-CtxSP equ 40Ch
-CtxSize equ 410h
-CtxHandle equ 414h
-CtxBase equ 418h
-CtxEntry equ 41Ch
-CtxKind equ 420h
-PECtxSize equ 424h
+CtxFile equ HdrSize
+CtxDisp equ CtxFile + 4
+CtxHdrPos equ CtxFile + 8
+CtxSP equ CtxFile + 12
+CtxSize equ CtxFile + 16
+CtxHandle equ CtxFile + 20
+CtxBase equ CtxFile + 24
+CtxEntry equ CtxFile + 28
+CtxKind equ CtxFile + 32
+PECtxSize equ CtxFile + 36
 
         VSegm IEBSS
         DFD LoaderStack, 400
@@ -93,7 +95,7 @@ PECtxSize equ 424h
           shl ebx, 16
           mov bx, cx
           shl esi, 16
-          or si, di   ;this instruction clear CF instead of "mov si, di"
+          or si, di   ;clears CF (unlike "mov si, di")
           ;clc
         _endif
         pop edi
@@ -132,10 +134,11 @@ Loader:
       DefLDErr ErrPEInit, 'PE DLL initialization failed$'
       DefLDErr ErrPEHost, 'DPMI host lacks a function$'
 %endif
-      DefLDErr ErrPETls, 'PE TLS is not supported$'
+      DefLDErr ErrPETls, 'bad PE TLS directory$'
       DefLDErr ErrAllocSel, "can't allocate selector$"
       DefLDErr ErrLock, "can't lock extender$"
-      DefLDErr ErrTransferBuf@129, "can't allocate transfer buffer$"
+      DefLDErr ErrTransferBuf@129, \
+          "can't allocate transfer buffer$"
         SEGM IEData
         LLabel LoadErrMsg
         db 'ZRDX loader error: $'
@@ -203,8 +206,6 @@ LoaderEntry:
         mov ah, 1Ah
         int 21h
 
-        ;int 3
-
         ;---- setup exception handlers -------
         mov ecx, ebp                ;extender code selector
         mov dx, OffExc3Handler
@@ -260,8 +261,21 @@ LoaderDbgEntry:
         jmp ErrEXE@129
 PEImageLoaded:
 %ifdef PEMAX
+        ; vendor entry for DPMI 0A00h
+        pushad
+        mov ax, 0A01h
+        mov cx, 0FFFFh
+        LBack ExtenderSelV, 2
+        mov edx, OffPEVendor
+        ; an unsupported host: ignored
+        int 31h
+        popad
         ExtCall ExtenderSelC, PERegMain
-        jc ErrNoDPMIMemory
+        jnc PERegOK
+        cmp al, 10
+        je ErrPETls
+        jmp ErrNoDPMIMemory
+PERegOK:
 %endif
         mov ebx, [ebp + PEStackReserve]
         cmp ebx, 10000h
@@ -336,6 +350,11 @@ PEImageLoaded:
 PEBound:
 %endif
         mov eax, [ebp + CtxEntry]
+%ifdef PEMAX
+        mov ebp, edx                    ;FS of the program
+%else
+        xor ebp, ebp
+%endif
         mov ebx, [ss:OffCodeSel]
         push dword [ss:OffDataSel]
         push dword [ss:OffStackTop]
@@ -353,8 +372,8 @@ PEBound:
         xor ebx, ebx
         mov ecx, ebx
         mov edx, ebx
+        mov fs, bp
         mov ebp, ebx
-        mov fs, bx
         push ss
         pop ds
         retf
@@ -364,7 +383,8 @@ PEBound:
              dd 0
         ESEG IEData
 ;create a selector for the object by the object index
-;if the object is 16-bit then base = object base, limit = object length
+;if the object is 16-bit then base = object base, limit = object
+;length
 ;otherwise base = 0, limit = 4G
 
 ;ebx-base, ecx-size, dx-attrs

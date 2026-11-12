@@ -45,29 +45,26 @@ static DWORD parse(const char *s, char **end, int base, int *neg,
         p++;
     if (*p == '-' || *p == '+')
         *neg = *p++ == '-';
-    if (base == 0)
-    {
+    if (base == 0) {
         if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
             base = 16;
         else
             base = p[0] == '0' ? 8 : 10;
     }
-    if (base < 2 || base > 36)
-    {
+    if (base < 2 || base > 36) {
         crt_errno = CRT_EINVAL;
         if (end)
             *end = (char *)s;
         return 0;
     }
     if (base == 16 && p[0] == '0' && (p[1] == 'x'
-        || p[1] == 'X') &&
+                                      || p[1] == 'X') &&
             digit_val((unsigned char)p[2]) < 16)
         p += 2;
     start = p;
     cutoff = 0xFFFFFFFFUL / (DWORD)base;
     cutlim = 0xFFFFFFFFUL % (DWORD)base;
-    for (; (d = digit_val((unsigned char) * p)) < base; p++)
-    {
+    for (; (d = digit_val((unsigned char) * p)) < base; p++) {
         any = 1;
         if (v > cutoff || (v == cutoff && (DWORD)d > cutlim))
             *over = 1;
@@ -86,8 +83,7 @@ unsigned long __cdecl strtoul(const char *s, char **end,
     int neg, over;
     DWORD v = parse(s, end, base, &neg, &over);
 
-    if (over)
-    {
+    if (over) {
         crt_errno = CRT_ERANGE;
         return 0xFFFFFFFFUL;
     }
@@ -100,8 +96,7 @@ long __cdecl strtol(const char *s, char **end, int base)
     DWORD v = parse(s, end, base, &neg, &over);
 
     if (over || (!neg && v > LONG_MAX_V) ||
-            (neg && v > LONG_MAX_V + 1))
-    {
+            (neg && v > LONG_MAX_V + 1)) {
         crt_errno = CRT_ERANGE;
         return neg ? (long)0x80000000UL : (long)LONG_MAX_V;
     }

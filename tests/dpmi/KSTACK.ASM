@@ -1,4 +1,5 @@
-; Direct reads of both kernel stacks must raise user protection #PF.
+; Direct reads of both kernel stacks must raise user protection
+; #PF.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -44,7 +45,8 @@ start:  cld
         mov eax, 203h
         int 31h
         jc bad
-        mov ax, 1Bh              ;built-in public flat data selector
+        ; built-in public flat data selector
+        mov ax, 1Bh
         mov fs, ax
         mov ebx, KSTACK0
         mov [target], ebx

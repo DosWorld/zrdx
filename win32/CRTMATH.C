@@ -57,13 +57,10 @@ double __cdecl sinh(double x)
 {
     double a = x < 0 ? -x : x, e;
 
-    if (a < 0.5)
-    {
+    if (a < 0.5) {
         e = crt_expm1(a);
         a = (e + e / (e + 1.0)) / 2.0;
-    }
-    else
-    {
+    } else {
         e = exp(a);
         a = (e - 1.0 / e) / 2.0;
     }
@@ -83,13 +80,10 @@ double __cdecl tanh(double x)
 
     if (a > 20.0)
         return x < 0 ? -1.0 : 1.0;
-    if (a < 0.25)
-    {
+    if (a < 0.25) {
         e = crt_expm1(2.0 * a);
         a = e / (e + 2.0);
-    }
-    else
-    {
+    } else {
         e = exp(2.0 * a);
         a = (e - 1.0) / (e + 1.0);
     }

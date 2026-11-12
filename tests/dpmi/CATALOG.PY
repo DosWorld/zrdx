@@ -1,4 +1,6 @@
-"""Single expectation catalog for native, bound and auxiliary fixtures."""
+"""Single expectation catalog for native, bound and auxiliary
+fixtures.
+"""
 
 NATIVE = {'PREF16': 'PREF ignored and invalid prefixes: ok',
  'PREF32': 'PREF ignored and invalid prefixes: ok',
@@ -87,7 +89,8 @@ BOUND = {'LDTAIL': 'LDTAIL final slots and exhaustion: ok',
 AUX = {'DRSAVE': 'BAS32 base and register contracts: ok\n'
            'NEST32 owned cleanup: ok\n'
            'DRSAVE upstream registers: ok',
- 'A20R': 'A20RM reset flag: ok\nNATL16 locked events: ok\nA20R normal-off cleanup: ok',
+ 'A20R': 'A20RM reset flag: ok\nNATL16 locked events: ok\nA20R '
+         'normal-off cleanup: ok',
  'LATENC': 'LATENC common calls: ok',
  'A20X': 'BRG16 real mode bridges: ok\n'
          'NATL16 locked events: ok\n'
@@ -107,5 +110,6 @@ VENDOR = {'VENDOR': 'VENDOR entry: ok'}
 SWAP_CRASH = ('SWAPC', 'SWAPR')
 # zrdxconf /S value of a case (default 10h); SWAPFAIL builds only
 SWAP_SIZE = {'SWAPW': '71', 'SWAPR': '72'}
-# more zrdxconf options of a case: the parent leaves memory to its child
+# more zrdxconf options of a case: the parent leaves memory to
+# its child
 SWAP_OPTS = {'SWAPN': '/X800 '}

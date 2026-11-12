@@ -53,6 +53,12 @@ extern int __cdecl _snwprintf(W *, unsigned, const W *, ...);
 extern int __cdecl _scwprintf(const W *, ...);
 extern int __cdecl wprintf(const W *, ...);
 extern int __cdecl fputws(const W *, void *);
+extern int __cdecl swscanf(const W *, const W *, ...);
+extern W *__cdecl fgetws(W *, int, void *);
+extern void *__cdecl _wfopen(const W *, const W *);
+extern int __cdecl fclose(void *);
+extern int __cdecl __wgetmainargs(int *, W ***, W ***, int,
+                                  void *);
 extern void __cdecl free(void *);
 extern void __cdecl exit(int);
 extern int __cdecl printf(const char *, ...);
@@ -190,11 +196,39 @@ static void format_tests(void)
     CHECK(swprintf(b, L"%d|%s|%S|%c|%5.1f", 5, L"ab", "cd",
                    (int)'x', 2.5) == 15);
     CHECK(b[0] == '5' && b[2] == 'a' && b[5] == 'c' && !b[15]);
-    CHECK(b[8] == 'x' && b[13] == '2' && b[14] == '5');
+    CHECK(b[8] == 'x' && b[12] == '2' && b[14] == '5');
     CHECK(_snwprintf(b, 4, L"%s", L"abcdef") == -1);
-    CHECK(_snwprintf(b, 6, L"%hs", "abcdef") == 6 && b[5] == 'f');
+    CHECK(_snwprintf(b, 6, L"%hs", "abcdef") == 6 &&
+          b[5] == 'f');
     CHECK(_scwprintf(L"[%4d]", 12) == 6);
     CHECK(wprintf(L"wide-out %hs %s\r\n", "n", L"w") == 14);
+}
+
+static void scan_tests(void)
+{
+    W w[20], c, **av, **ev;
+    char n[20];
+    int a, argc;
+    void *f;
+
+    CHECK(swscanf(L"12 abc x", L"%d %s %c", &a, w, &c) == 3);
+    CHECK(a == 12 && w[0] == 'a' && w[2] == 'c' && !w[3]);
+    CHECK(c == 'x');
+    CHECK(swscanf(L"q9", L"%[a-z]%d", w, &a) == 2 &&
+          w[0] == 'q');
+    CHECK(swscanf(L"zz", L"%hs", n) == 1 && n[1] == 'z');
+    f = _wfopen(L"TWCS.TMP", L"w");
+    CHECK(f != 0);
+    fputws(L"one\ntwo\n", f);
+    fclose(f);
+    f = _wfopen(L"TWCS.TMP", L"r");
+    CHECK(f && fgetws(w, 20, f) == w && w[0] == 'o' &&
+          w[3] == 10);
+    CHECK(fgetws(w, 20, f) == w && w[0] == 't');
+    CHECK(fgetws(w, 20, f) == 0);
+    fclose(f);
+    CHECK(__wgetmainargs(&argc, &av, &ev, 0, 0) == 0);
+    CHECK(argc >= 1 && av[0] && av[0][0] && !av[argc] && ev[0]);
 }
 
 void mainCRTStartup(void)
@@ -205,8 +239,8 @@ void mainCRTStartup(void)
     string_tests();
     number_tests();
     format_tests();
-    if (failed)
-    {
+    scan_tests();
+    if (failed) {
         printf("\r\nWCS: fail %d\r\n", failed);
         exit(1);
     }

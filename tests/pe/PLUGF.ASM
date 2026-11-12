@@ -1,5 +1,7 @@
-; Unload scenario (task 013). IAT: 0 LoadLibrary, 1 GetModuleHandle,
-; 2 FreeLibrary (imported from RF.EXE). PlugRun returns 0 or a step.
+; Unload scenario (task 013). IAT: 0 LoadLibrary, 1
+; GetModuleHandle,
+; 2 FreeLibrary (imported from RF.EXE). PlugRun returns 0 or a
+; step.
 bits 32
 %ifndef BASE
 %define BASE 401000h

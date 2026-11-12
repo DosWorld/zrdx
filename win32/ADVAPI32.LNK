@@ -1,0 +1,14 @@
+system nt_dll
+name ADVAPI32.DLL
+file ADVAPI32.OBJ
+option nodefaultlibs
+export GetUserNameA='_GetUserNameA@8'
+export GetUserNameW='_GetUserNameW@8'
+export RegOpenKeyExA='_RegOpenKeyExA@20'
+export RegOpenKeyExW='_RegOpenKeyExW@20'
+export RegQueryValueExA='_RegQueryValueExA@24'
+export RegQueryValueExW='_RegQueryValueExW@24'
+export RegCloseKey='_RegCloseKey@4'
+export OpenProcessToken='_OpenProcessToken@12'
+export GetTokenInformation='_GetTokenInformation@20'
+export SystemFunction036='_SystemFunction036@8'

@@ -6,7 +6,7 @@ call BUILD.BAT
 cd ..\tests\win32
 copy ..\..\win32\KERNEL32.DLL . > NUL
 wcc386 -zq -s -ecc -bt=nt -i=..\..\sdk T1.C
-wlink system nt name T1.EXE file T1.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILD.LOG
+call LNK T1 BUILD.LOG
 R:\BIN\ZRDXDPMI.EXE T1.EXE > T1.LOG
 if errorlevel 5 if not errorlevel 6 echo T1 OK >> RESULT.LOG
 if not errorlevel 5 echo T1 FAILED >> RESULT.LOG
@@ -17,10 +17,10 @@ R:\BIN\ZRDXDPMI.EXE W.EXE > W.LOG
 if errorlevel 1 echo W FAILED >> RESULT.LOG
 if not errorlevel 1 echo W OK >> RESULT.LOG
 wcc386 -zq -s -ecc -bt=nt T2.C
-wlink system nt name T2.EXE file T2.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILD2.LOG
+call LNK T2 BUILD2.LOG
 R:\BIN\ZRDXDPMI.EXE T2.EXE > T2.LOG
 wcc386 -zq -s -ecc -bt=nt TAPI.C
-wlink system nt name TAPI.EXE file TAPI.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILDA.LOG
+call LNK TAPI BUILDA.LOG
 R:\BIN\ZRDXDPMI.EXE TAPI.EXE > TAPI.LOG
 if errorlevel 1 echo TAPI FAILED >> RESULT.LOG
 if not errorlevel 1 echo TAPI OK >> RESULT.LOG
@@ -29,24 +29,98 @@ WB.EXE > WB.LOG
 if errorlevel 1 echo WB FAILED >> RESULT.LOG
 if not errorlevel 1 echo WB OK >> RESULT.LOG
 wcc386 -zq -s -ecc -bt=nt TPROC.C
-wlink system nt name TPROC.EXE file TPROC.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILDP.LOG
+call LNK TPROC BUILDP.LOG
 R:\BIN\ZRDXDPMI.EXE TPROC.EXE > TPROC.LOG
 if errorlevel 1 echo TPROC FAILED >> RESULT.LOG
 if not errorlevel 1 echo TPROC OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TTEB.C
+call LNK TTEB BUILDB.LOG
+R:\BIN\ZRDXDPMI.EXE TTEB.EXE > TTEB.LOG
+if errorlevel 1 echo TTEB FAILED >> RESULT.LOG
+if not errorlevel 1 echo TTEB OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TSEH.C
+call LNK TSEH BUILDX.LOG
+R:\BIN\ZRDXDPMI.EXE TSEH.EXE > TSEH.LOG
+if errorlevel 1 echo TSEH FAILED >> RESULT.LOG
+if not errorlevel 1 echo TSEH OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TUNW.C
+call LNK TUNW BUILDZ.LOG
+R:\BIN\ZRDXDPMI.EXE TUNW.EXE > TUNW.LOG
+if errorlevel 1 echo TUNW FAILED >> RESULT.LOG
+if not errorlevel 1 echo TUNW OK >> RESULT.LOG
+wcl -zq -ml -fe=ADDTLS.EXE ADDTLS.C
+wcc386 -zq -s -ecc -bt=nt TTLS.C
+call LNK TTLS BUILDT.LOG
+ADDTLS.EXE TTLS.EXE
+R:\BIN\ZRDXDPMI.EXE TTLS.EXE > TTLS.LOG
+if errorlevel 1 echo TTLS FAILED >> RESULT.LOG
+if not errorlevel 1 echo TTLS OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TTLSD.C
+wlink @TTLSD.LNK > BUILDL.LOG
+ADDTLS.EXE TTLSD.DLL
+wcc386 -zq -s -ecc -bt=nt TTLD.C
+wlink @TTLD.LNK > BUILDL2.LOG
+R:\BIN\ZRDXDPMI.EXE TTLD.EXE > TTLD.LOG
+if errorlevel 1 echo TTLD FAILED >> RESULT.LOG
+if not errorlevel 1 echo TTLD OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TSEHX.C
+call LNK TSEHX BUILDY.LOG
+R:\BIN\ZRDXDPMI.EXE TSEHX.EXE > TSEHX.LOG
+if errorlevel 148 if not errorlevel 149 echo TSEHX OK>>RESULT.LOG
+if errorlevel 149 echo TSEHX FAILED >> RESULT.LOG
+if not errorlevel 148 echo TSEHX FAILED >> RESULT.LOG
+if exist CC\CC32W.EXE call CCRUN.BAT
+wcc386 -zq -s -ecc -bt=nt TUSR.C
+call LNK TUSR BUILDU.LOG
+R:\BIN\ZRDXDPMI.EXE TUSR.EXE > TUSR.LOG
+if errorlevel 1 echo TUSR FAILED >> RESULT.LOG
+if not errorlevel 1 echo TUSR OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TKBS.C
+wlink @TKBS.LNK > BUILDK.LOG
+R:\BIN\ZRDXDPMI.EXE TKBS.EXE > TKBS.LOG
+if errorlevel 1 echo TKBS FAILED >> RESULT.LOG
+if not errorlevel 1 echo TKBS OK >> RESULT.LOG
+copy ..\..\win32\NTDLL.DLL . > NUL
+wcc386 -zq -s -ecc -bt=nt TNTD.C
+wlink @TNTD.LNK > BUILDN.LOG
+R:\BIN\ZRDXDPMI.EXE TNTD.EXE > TNTD.LOG
+if errorlevel 1 echo TNTD FAILED >> RESULT.LOG
+if not errorlevel 1 echo TNTD OK >> RESULT.LOG
+copy ..\..\win32\ADVAPI32.DLL . > NUL
+wcc386 -zq -s -ecc -bt=nt TADV.C
+wlink @TADV.LNK > BUILDV.LOG
+R:\BIN\ZRDXDPMI.EXE TADV.EXE > TADV.LOG
+if errorlevel 1 echo TADV FAILED >> RESULT.LOG
+if not errorlevel 1 echo TADV OK >> RESULT.LOG
+copy ..\..\win32\SHELL32.DLL . > NUL
+wcc386 -zq -s -ecc -bt=nt TSHL.C
+wlink @TSHL.LNK > BUILDH.LOG
+R:\BIN\ZRDXDPMI.EXE TSHL.EXE > TSHL.LOG
+if errorlevel 1 echo TSHL FAILED >> RESULT.LOG
+if not errorlevel 1 echo TSHL OK >> RESULT.LOG
+wcc386 -zq -s -ecc -bt=nt TMFN.C
+call LNK TMFN BUILDM2.LOG
+R:\BIN\ZRDXDPMI.EXE TMFN.EXE > TMFN.LOG
+if errorlevel 1 echo TMFN FAILED >> RESULT.LOG
+if not errorlevel 1 echo TMFN OK >> RESULT.LOG
+R:\BIN\ZRDXBIND -y TMFN.EXE TMFB.EXE > NUL
+TMFB.EXE > TMFB.LOG
+if errorlevel 1 echo TMFB FAILED >> RESULT.LOG
+if not errorlevel 1 echo TMFB OK >> RESULT.LOG
 wcc386 -zq -s -ecc -bt=nt TMEM.C
-wlink system nt name TMEM.EXE file TMEM.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILDM.LOG
+call LNK TMEM BUILDM.LOG
 R:\BIN\ZRDXDPMI.EXE TMEM.EXE > TMEM.LOG
 if errorlevel 1 echo TMEM FAILED >> RESULT.LOG
 if not errorlevel 1 echo TMEM OK >> RESULT.LOG
 if exist ZRDXD\\*.* del ZRDXD\\*.* > NUL
 if exist ZRDXD rd ZRDXD
 wcc386 -zq -s -ecc -bt=nt TFS.C
-wlink system nt name TFS.EXE file TFS.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILDF.LOG
+call LNK TFS BUILDF.LOG
 R:\BIN\ZRDXDPMI.EXE TFS.EXE > TFS.LOG
 if errorlevel 1 echo TFS FAILED >> RESULT.LOG
 if not errorlevel 1 echo TFS OK >> RESULT.LOG
 wcc386 -zq -s -ecc -bt=nt TTXT.C
-wlink system nt name TTXT.EXE file TTXT.OBJ option start=_mainCRTStartup option nodefaultlibs > BUILDT.LOG
+call LNK TTXT BUILDT.LOG
 R:\BIN\ZRDXDPMI.EXE TTXT.EXE > TTXT.LOG
 if errorlevel 1 echo TTXT FAILED >> RESULT.LOG
 if not errorlevel 1 echo TTXT OK >> RESULT.LOG
@@ -107,3 +181,7 @@ wlink @TUCRT.LNK > BUILDE.LOG
 R:\BIN\ZRDXDPMI.EXE TUCRT.EXE > TUCRT.LOG
 if errorlevel 1 echo TUCRT FAILED >> RESULT.LOG
 if not errorlevel 1 echo TUCRT OK >> RESULT.LOG
+wlink @TAMS.LNK > BUILDA2.LOG
+R:\BIN\ZRDXDPMI.EXE TAMS.EXE > TAMS.LOG
+if errorlevel 1 echo TAMS FAILED >> RESULT.LOG
+if not errorlevel 1 echo TAMS OK >> RESULT.LOG

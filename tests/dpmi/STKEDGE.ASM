@@ -1,4 +1,5 @@
-; Full-range software-INT stack preflight: faults and valid controls.
+; Full-range software-INT stack preflight: faults and valid
+; controls.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -64,7 +65,8 @@ start:  cld
         mov [alias], ax
         mov ax, 1Bh
         mov fs, ax
-        ; Each tuple is base delta, limit, rights, SP, exception, error.
+        ; Each tuple is base delta, limit, rights, SP, exception,
+        ; error.
  .cycle:mov esi, cases
         mov byte [remaining], (cases_end-cases)/24
 .next:  mov bx, [alias]
@@ -99,7 +101,8 @@ start:  cld
         mov [expected], al
         mov eax, [esi+20]
         mov [errwant], ax
-        ; A cross-page failure must not write the preceding mapped page.
+        ; A cross-page failure must not write the preceding
+        ; mapped page.
         mov edi, [buffer]
         add edi, 0FFF0h
         mov dword [fs:edi], 12345678h
@@ -154,7 +157,8 @@ resume: mov ss, [oldss]
         sti
         mov eax, [retflags]
         and eax, 601h
-        cmp eax, 401h           ;client CF/DF and disabled IF restored
+        ; client CF/DF and disabled IF restored
+        cmp eax, 401h
         jne .bad
         mov al, [expected]
         cmp [seen], al
@@ -195,7 +199,8 @@ handler:
 %endif
         pushf
         pop ax
-        test ah, 2              ;S10.4 exception entry has interrupts disabled
+        ; S10.4 exception entry has interrupts disabled
+        test ah, 2
         jnz .wrong
 %if CLIENT32
         cmp dword [ss:bp+IP], fault_ip
@@ -242,14 +247,19 @@ done:   mov ax, 4C00h
 cases:
         dd 0,0FFFFh,40F2h,4,12,0          ;underflow
         dd 0,0FFFFh,40F2h,90000004h,12,0 ;outside segment
-        dd 0,0FFFFh,0F2h,4,12,0          ;word stack wrap crosses limit
-        dd 0,0FFFFh,0F2h,0,0,0           ;word SP=0 exact wrap fits
-        dd 0,0FFFFh,40F2h,1004h,0,0      ;valid crossing of mapped pages
+        ; word stack wrap crosses limit
+        dd 0,0FFFFh,0F2h,4,12,0
+        ; word SP=0 exact wrap fits
+        dd 0,0FFFFh,0F2h,0,0,0
+        ; valid crossing of mapped pages
+        dd 0,0FFFFh,40F2h,1004h,0,0
         dd 0,0FFFh,40F6h,2000h,0,0       ;valid expand-down
         dd 0,0FFFh,40F6h,1004h,12,0      ;expand-down lower bound
         dd 90000000h,0FFFh,40F2h,1000h,14,6 ;absent PDE
-        dd 0F000h,1FFFh,40F2h,1004h,14,6 ;second page absent, no partial stores
-        ; KSTACK0 is mapped supervisor-only; use absolute base marker below.
+        ; second page absent, no partial stores
+        dd 0F000h,1FFFh,40F2h,1004h,14,6
+        ; KSTACK0 is mapped supervisor-only; use absolute base
+        ; marker below.
         dd (KSTACK0 & ~0FFFh) | 80000000h,0FFFh,40F2h,1000h,14,7
 cases_end:
 oldsp: dd stacktop

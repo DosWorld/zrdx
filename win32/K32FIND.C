@@ -11,19 +11,16 @@
 #define FIND_MAGIC 0x464E4430UL
 #define FA_DIR 0x10UL
 
-typedef struct FileTime
-{
+typedef struct FileTime {
     DWORD lo, hi;
 } FileTime;
 
-typedef struct SysTime
-{
+typedef struct SysTime {
     WORD year, month, wday, day, hour, minute, second, msec;
 } SysTime;
 
 /* the Win32 and the LFN layout are the same, 318 bytes */
-typedef struct FindData
-{
+typedef struct FindData {
     DWORD attr;
     FileTime created, accessed, written;
     DWORD sizehi, sizelo;
@@ -32,8 +29,7 @@ typedef struct FindData
     char alt[14];
 } FindData;
 
-typedef struct FindRec
-{
+typedef struct FindRec {
     DWORD magic;
     DWORD lfn;
     DWORD dos;
@@ -71,8 +67,7 @@ static void ft_to_dos(const FileTime *ft, DWORD *date,
 {
     SysTime st;
 
-    if (!FileTimeToSystemTime(ft, &st) || st.year < 1980)
-    {
+    if (!FileTimeToSystemTime(ft, &st) || st.year < 1980) {
         *date = 0x21;
         *time = 0;
         return;
@@ -126,8 +121,7 @@ BOOL WINAPI SetFilePointerEx(HANDLE h, DWORD lo, long hi,
     p = SetFilePointer(h, (long)lo, &high, method);
     if (p == 0xFFFFFFFFUL)
         return FALSE;
-    if (newpos)
-    {
+    if (newpos) {
         newpos[0] = p;
         newpos[1] = 0;
     }
@@ -140,8 +134,7 @@ BOOL WINAPI SetEndOfFile(HANDLE h)
     int d = w32_dosh(h);
     W32T("SetEndOfFile");
 
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -163,8 +156,7 @@ BOOL WINAPI GetFileTime(HANDLE h, FileTime *created,
     int d = w32_dosh(h);
     W32T("GetFileTime");
 
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -172,8 +164,7 @@ BOOL WINAPI GetFileTime(HANDLE h, FileTime *created,
     r.eax = 0x5700;
     r.ebx = (DWORD)d;
     dos21(&r);
-    if (r.cf)
-    {
+    if (r.cf) {
         w32_seterr(w32_doserr(&r));
         return FALSE;
     }
@@ -195,8 +186,7 @@ BOOL WINAPI SetFileTime(HANDLE h, const FileTime *created,
     int d = w32_dosh(h);
     W32T("SetFileTime");
 
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -240,8 +230,7 @@ HANDLE WINAPI FindFirstFileA(const char *pattern, FindData *fd)
     HANDLE heap = GetProcessHeap();
     W32T("FindFirstFileA");
 
-    if (pattern == NULL || fd == NULL)
-    {
+    if (pattern == NULL || fd == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return INVALID_HANDLE_VALUE;
     }
@@ -256,14 +245,12 @@ HANDLE WINAPI FindFirstFileA(const char *pattern, FindData *fd)
     r.esi = 0;
     r.edi = (DWORD)fd;
     dos21(&r);
-    if (!r.cf)
-    {
+    if (!r.cf) {
         rec->lfn = 1;
         rec->dos = r.eax & 0xFFFF;
         return rec;
     }
-    if ((r.eax & 0xFFFF) != 0x7100)
-    {
+    if ((r.eax & 0xFFFF) != 0x7100) {
         w32_seterr(w32_doserr(&r));
         HeapFree(heap, 0, rec);
         return INVALID_HANDLE_VALUE;
@@ -277,8 +264,7 @@ HANDLE WINAPI FindFirstFileA(const char *pattern, FindData *fd)
     r.ecx = 0x0016;
     r.edx = (DWORD)pattern;
     dos21(&r);
-    if (r.cf)
-    {
+    if (r.cf) {
         w32_seterr(w32_doserr(&r));
         HeapFree(heap, 0, rec);
         return INVALID_HANDLE_VALUE;
@@ -294,22 +280,18 @@ BOOL WINAPI FindNextFileA(HANDLE h, FindData *fd)
     W32T("FindNextFileA");
 
     if (rec == NULL || rec == INVALID_HANDLE_VALUE ||
-            rec->magic != FIND_MAGIC || fd == NULL)
-    {
+            rec->magic != FIND_MAGIC || fd == NULL) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
     w32_zero(&r, sizeof r);
-    if (rec->lfn)
-    {
+    if (rec->lfn) {
         r.eax = 0x714F;
         r.ebx = rec->dos;
         r.esi = 0;
         r.edi = (DWORD)fd;
         dos21(&r);
-    }
-    else
-    {
+    } else {
         r.eax = 0x1A00;
         r.edx = (DWORD)rec->dta;
         dos21(&r);
@@ -331,13 +313,11 @@ BOOL WINAPI FindClose(HANDLE h)
     W32T("FindClose");
 
     if (rec == NULL || rec == INVALID_HANDLE_VALUE ||
-            rec->magic != FIND_MAGIC)
-    {
+            rec->magic != FIND_MAGIC) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
-    if (rec->lfn)
-    {
+    if (rec->lfn) {
         w32_zero(&r, sizeof r);
         r.eax = 0x71A1;
         r.ebx = rec->dos;

@@ -41,11 +41,33 @@ def main():
         assert code == 1 and "out of range" in out, "swap range"
         code, out = run(exe, tmp, "/T10", rel)
         assert code == 1 and "out of range" in out, "range check"
+        dflt = (b"ZRDX" + bytes([0, 0, 0, 4]) +
+                b"\xff\xff\xff\xff" + b"\x00\xf0")
+        for arg in ("/X-1", "/X1FFFFFFFF", "/X 10", "/X+1"):
+            code, out = run(exe, tmp, arg, rel)
+            assert code == 1 and "syntax" in out, arg
         bad = tmp / "BAD.EXE"
+        for body in (bytes(40), b"MZ\x01"):
+            bad.write_bytes(body)
+            code, out = run(exe, tmp, "/M1", bad.name)
+            assert code == 0 and "creating" in out, "create msg"
+            data = bad.read_bytes()
+            assert len(data) == len(body) + 14, "grown by 14"
+            assert data[:len(body)] == body, "body kept"
+            want = bytearray(dflt)
+            want[4] = 2
+            assert data[len(body):] == want, "defaults"
+            code, out = run(exe, tmp, bad.name)
+            assert code == 0 and "creating" not in out, "reread"
+            assert bad.read_bytes() == data, "view keeps file"
         bad.write_bytes(bytes(40))
         code, out = run(exe, tmp, bad.name)
-        assert code == 1, "no signature"
-        assert "not detected" in out, "no signature msg"
+        assert code == 0, "view"
+        assert bad.read_bytes()[40:] == dflt, "view data"
+        bad.write_bytes(bytes(40))
+        code, out = run(exe, tmp, "/S81", bad.name)
+        assert code == 1, "bad opt"
+        assert bad.read_bytes() == bytes(40), "bad opt kept"
     print("zrdxconf OK")
 
 

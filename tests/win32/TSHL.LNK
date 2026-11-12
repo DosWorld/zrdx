@@ -1,0 +1,11 @@
+system nt
+name TSHL.EXE
+file TSHL.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import '_ShArgv@8' SHELL32.CommandLineToArgvW
+import '_ShFolderA@20' SHELL32.SHGetFolderPathA
+import '_ShFolderW@20' SHELL32.SHGetFolderPathW
+import '_ShSpecialA@16' SHELL32.SHGetSpecialFolderPathA
+import '_ShExecA@24' SHELL32.ShellExecuteA
+import '_ShExecW@24' SHELL32.ShellExecuteW

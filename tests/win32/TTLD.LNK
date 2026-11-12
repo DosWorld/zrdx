@@ -1,0 +1,9 @@
+system nt
+name TTLD.EXE
+file TTLD.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import '_DlData@0' TTLSD.TlsData
+import '_DlLog@0' TTLSD.TlsLog
+import '_DlIndex@0' TTLSD.TlsIndex
+import '_DlLen@0' TTLSD.TlsLen

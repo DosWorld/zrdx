@@ -1,0 +1,85 @@
+zrdx [] rc=0 2a37af014c271fad
+zrdx [-dSWAP] rc=0 1324c81a99ce7ea8
+zrdx [-dSWAP -dPEMAX=1000] rc=1 
+zrdx [-dNATIVEPE] rc=1 
+zrdx [-dNATIVEPE -dSWAP] rc=1 
+zrdx [-dEDebug] rc=1 
+zrdx [-dRelease] rc=0 2a37af014c271fad
+zrdx [-dVENDOR] rc=0 66a2c7f051122f7a
+zrdx [-dVENDOR -dVENDORREG] rc=1 
+zrdx [-dPEMAX=1000] rc=1 
+zrdx [-dSWAP -dSWAPFAIL] rc=0 e602cb1494ec57e5
+zrdx [-dD4G] rc=1 
+zrdx [-dFAKELACK] rc=0 2a37af014c271fad
+zrdx [-dPELDR] rc=1 
+zrdxpe [] rc=0 ab130e7f8e880c31
+zrdxpe [-dSWAP] rc=0 4a3393e408dd0c26
+zrdxpe [-dSWAP -dPEMAX=1000] rc=0 dc72b3159ea5f1cb
+zrdxpe [-dNATIVEPE] rc=1 
+zrdxpe [-dNATIVEPE -dSWAP] rc=1 
+zrdxpe [-dEDebug] rc=1 
+zrdxpe [-dRelease] rc=0 ab130e7f8e880c31
+zrdxpe [-dVENDOR] rc=0 89f7cc2f20809de2
+zrdxpe [-dVENDOR -dVENDORREG] rc=1 
+zrdxpe [-dPEMAX=1000] rc=0 d582eae843251082
+zrdxpe [-dSWAP -dSWAPFAIL] rc=0 2df6666daad7791d
+zrdxpe [-dD4G] rc=1 
+zrdxpe [-dFAKELACK] rc=0 ab130e7f8e880c31
+zrdxpe [-dPELDR] rc=0 ab130e7f8e880c31
+zrdxpm [] rc=0 a34014734bbb23ba
+zrdxpm [-dSWAP] rc=0 2c0aac5fec6a8496
+zrdxpm [-dSWAP -dPEMAX=1000] rc=0 2c0aac5fec6a8496
+zrdxpm [-dNATIVEPE] rc=1 
+zrdxpm [-dNATIVEPE -dSWAP] rc=1 
+zrdxpm [-dEDebug] rc=1 
+zrdxpm [-dRelease] rc=0 a34014734bbb23ba
+zrdxpm [-dVENDOR] rc=1 
+zrdxpm [-dVENDOR -dVENDORREG] rc=1 
+zrdxpm [-dPEMAX=1000] rc=0 a34014734bbb23ba
+zrdxpm [-dSWAP -dSWAPFAIL] rc=0 b116d7c54f821f79
+zrdxpm [-dD4G] rc=1 
+zrdxpm [-dFAKELACK] rc=1 
+zrdxpm [-dPELDR] rc=0 a34014734bbb23ba
+zrdxnp [] rc=0 7e7e92c30db41238
+zrdxnp [-dSWAP] rc=0 dc1d6c618b244bfc
+zrdxnp [-dSWAP -dPEMAX=1000] rc=0 dc1d6c618b244bfc
+zrdxnp [-dNATIVEPE] rc=0 7e7e92c30db41238
+zrdxnp [-dNATIVEPE -dSWAP] rc=0 dc1d6c618b244bfc
+zrdxnp [-dEDebug] rc=1 
+zrdxnp [-dRelease] rc=0 7e7e92c30db41238
+zrdxnp [-dVENDOR] rc=0 7e7e92c30db41238
+zrdxnp [-dVENDOR -dVENDORREG] rc=1 
+zrdxnp [-dPEMAX=1000] rc=0 7e7e92c30db41238
+zrdxnp [-dSWAP -dSWAPFAIL] rc=1 
+zrdxnp [-dD4G] rc=1 
+zrdxnp [-dFAKELACK] rc=1 
+zrdxnp [-dPELDR] rc=0 7e7e92c30db41238
+zrdxdpmi [] rc=0 cac9b7d115ed4786
+zrdxdpmi [-dSWAP] rc=0 314cdcba75a25cf0
+zrdxdpmi [-dSWAP -dPEMAX=1000] rc=1 
+zrdxdpmi [-dNATIVEPE] rc=1 
+zrdxdpmi [-dNATIVEPE -dSWAP] rc=1 
+zrdxdpmi [-dEDebug] rc=1 
+zrdxdpmi [-dRelease] rc=0 cac9b7d115ed4786
+zrdxdpmi [-dVENDOR] rc=0 cac9b7d115ed4786
+zrdxdpmi [-dVENDOR -dVENDORREG] rc=1 
+zrdxdpmi [-dPEMAX=1000] rc=1 
+zrdxdpmi [-dSWAP -dSWAPFAIL] rc=1 
+zrdxdpmi [-dD4G] rc=0 cac9b7d115ed4786
+zrdxdpmi [-dFAKELACK] rc=0 cac9b7d115ed4786
+zrdxdpmi [-dPELDR] rc=0 cac9b7d115ed4786
+zrdxrdf [] rc=0 db9f1930202c2b53
+zrdxrdf [-dSWAP] rc=0 1c3f38e41826ceda
+zrdxrdf [-dSWAP -dPEMAX=1000] rc=1 
+zrdxrdf [-dNATIVEPE] rc=1 
+zrdxrdf [-dNATIVEPE -dSWAP] rc=1 
+zrdxrdf [-dEDebug] rc=1 
+zrdxrdf [-dRelease] rc=0 db9f1930202c2b53
+zrdxrdf [-dVENDOR] rc=0 274fc22abfb5cdfa
+zrdxrdf [-dVENDOR -dVENDORREG] rc=1 
+zrdxrdf [-dPEMAX=1000] rc=1 
+zrdxrdf [-dSWAP -dSWAPFAIL] rc=0 a0df2fba58b1b2f5
+zrdxrdf [-dD4G] rc=1 
+zrdxrdf [-dFAKELACK] rc=0 db9f1930202c2b53
+zrdxrdf [-dPELDR] rc=1 
+bnd 894757ba3a9b4baa

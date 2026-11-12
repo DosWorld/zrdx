@@ -13,8 +13,7 @@ typedef WORD wchar;
 extern void *__cdecl malloc(DWORD);
 extern void __cdecl free(void *);
 
-typedef struct WOut
-{
+typedef struct WOut {
     wchar *p;
     int cap;
     int n;
@@ -46,7 +45,7 @@ static int spec_char(wchar c)
 }
 
 /* narrow copy of a wide format, malloc'ed (NULL: no memory) */
-static char *narrow_fmt(const wchar * w)
+char *crt_narrow_fmt(const wchar * w)
 {
     DWORD n = 0, i = 0;
     char *b;
@@ -57,46 +56,43 @@ static char *narrow_fmt(const wchar * w)
     b = malloc(n * 2 + 1);
     if (!b)
         return NULL;
-    for (n = 0; w[n]; n++)
-    {
+    for (n = 0; w[n]; n++) {
         b[i++] = (char)(w[n] < 0x80 ? w[n] : '?');
         if (w[n] != '%')
             continue;
-        if (w[n + 1] == '%')
-        {
+        if (w[n + 1] == '%') {
             b[i++] = '%';
             n++;
             continue;
         }
         pre = 0;
-        while (spec_char(w[n + 1]))
-        {
+        while (spec_char(w[n + 1])) {
             n++;
             pre |= (w[n] == 'h' || w[n] == 'l' || w[n] == 'w' ||
                     w[n] == 'I');
             b[i++] = (char)w[n];
         }
-        if (w[n + 1] == 's' || w[n + 1] == 'c')
-        {
+        if (w[n + 1] == 's' || w[n + 1] == 'c' ||
+            w[n + 1] == '[') {
             if (!pre)
                 b[i++] = 'l';
         }
-        if (w[n + 1])
-        {
+        if (w[n + 1]) {
             n++;
             b[i++] = (char)((w[n] == 'S' || w[n] == 'C') ?
-                            w[n] + 32 : (w[n] < 0x80 ? w[n] : '?'));
+                            w[n] + 32 :
+                            (w[n] < 0x80 ? w[n] : '?'));
         }
     }
     b[i] = 0;
     return b;
 }
 
-int __cdecl _vsnwprintf(wchar * buf, DWORD count, const wchar * fmt,
-                        va_list ap)
+int __cdecl _vsnwprintf(wchar * buf, DWORD count,
+                        const wchar * fmt, va_list ap)
 {
     WOut s;
-    char *nf = narrow_fmt(fmt);
+    char *nf = crt_narrow_fmt(fmt);
 
     if (!nf)
         return -1;
@@ -105,8 +101,7 @@ int __cdecl _vsnwprintf(wchar * buf, DWORD count, const wchar * fmt,
     s.n = 0;
     crt_format(out_w, &s, nf, ap);
     free(nf);
-    if (s.n < s.cap)
-    {
+    if (s.n < s.cap) {
         buf[s.n] = 0;
         return s.n;
     }
@@ -120,7 +115,7 @@ int __cdecl vswprintf(wchar * buf, const wchar * fmt, va_list ap)
 
 int __cdecl _vscwprintf(const wchar * fmt, va_list ap)
 {
-    char *nf = narrow_fmt(fmt);
+    char *nf = crt_narrow_fmt(fmt);
     int n;
 
     if (!nf)
@@ -132,7 +127,7 @@ int __cdecl _vscwprintf(const wchar * fmt, va_list ap)
 
 int __cdecl vfwprintf(FILE * f, const wchar * fmt, va_list ap)
 {
-    char *nf = narrow_fmt(fmt);
+    char *nf = crt_narrow_fmt(fmt);
     int n;
 
     if (!nf)
@@ -147,8 +142,8 @@ int __cdecl vwprintf(const wchar * fmt, va_list ap)
     return vfwprintf(&_iob[1], fmt, ap);
 }
 
-int __cdecl _snwprintf(wchar * buf, DWORD count, const wchar * fmt,
-                       ...)
+int __cdecl _snwprintf(wchar * buf, DWORD count,
+                       const wchar * fmt, ...)
 {
     va_list ap;
     int n;

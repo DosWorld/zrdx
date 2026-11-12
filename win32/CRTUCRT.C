@@ -9,8 +9,7 @@
  */
 #include "crt.h"
 
-typedef struct OnExitTable
-{
+typedef struct OnExitTable {
     PVFV *first, *last, *end;
 } OnExitTable;
 
@@ -50,8 +49,7 @@ int __cdecl __stdio_common_vsprintf(DWORD olo, DWORD ohi,
     if (!(olo & OPT_STD_SNPRINTF))
         return _vsnprintf(buf, count, fmt, ap);
     n = _vscprintf(fmt, ap);
-    if (count)
-    {
+    if (count) {
         _vsnprintf(buf, count - 1, fmt, ap);
         buf[(DWORD) n < count - 1 ? (DWORD) n : count - 1] = 0;
     }
@@ -66,8 +64,7 @@ int __cdecl __stdio_common_vsprintf_s(DWORD olo, DWORD ohi,
 {
     int n = _vscprintf(fmt, ap);
 
-    if (n < 0 || (DWORD) n >= count)
-    {
+    if (n < 0 || (DWORD) n >= count) {
         if (count)
             buf[0] = 0;
         return -1;
@@ -140,8 +137,7 @@ int __cdecl _register_onexit_function(OnExitTable * t, PVFV fn)
 
     if (!t)
         return -1;
-    if (t->last == t->end)
-    {
+    if (t->last == t->end) {
         used = (DWORD) (t->last - t->first);
         cap = used ? used * 2 : 16;
         p = t->first ? HeapReAlloc(heap, 8, t->first, cap * 4) :

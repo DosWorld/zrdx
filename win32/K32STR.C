@@ -13,8 +13,7 @@
 #define CP_UTF8 65001UL
 #define MB_ERR_INVALID_CHARS 8UL
 
-typedef struct CpInfo
-{
+typedef struct CpInfo {
     UINT maxchar;
     BYTE defchar[2];
     BYTE lead[12];
@@ -67,8 +66,7 @@ BOOL WINAPI GetCPInfo(UINT cp, CpInfo *info)
     DWORD i;
     W32T("GetCPInfo");
 
-    if (!known(cp) || info == NULL)
-    {
+    if (!known(cp) || info == NULL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -86,8 +84,7 @@ static DWORD utf8(const BYTE *s, DWORD n, DWORD *cp)
 {
     DWORD len, v, i;
 
-    if (s[0] < 0x80)
-    {
+    if (s[0] < 0x80) {
         *cp = s[0];
         return 1;
     }
@@ -96,8 +93,7 @@ static DWORD utf8(const BYTE *s, DWORD n, DWORD *cp)
     if (len == 0 || s[0] > 0xF4 || len > n)
         return 0;
     v = s[0] & (0x3F >> (len - 1));
-    for (i = 1; i < len; i++)
-    {
+    for (i = 1; i < len; i++) {
         if ((s[i] & 0xC0) != 0x80)
             return 0;
         v = (v << 6) | (s[i] & 0x3F);
@@ -121,32 +117,25 @@ int WINAPI MultiByteToWideChar(UINT cp, DWORD flags,
 
     if (src == NULL || cb == 0 || cb < -1 || cch < 0 ||
             !known(cp) ||
-            (cch > 0 && dst == NULL))
-    {
+            (cch > 0 && dst == NULL)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
     cp = w32_realcp(cp);
     tab = w32_cptab(cp);
-    if (cb == -1)
-    {
+    if (cb == -1) {
         for (n = 0; s[n]; n++)
             ;
         n++;
-    }
-    else
+    } else
         n = (DWORD)cb;
-    while (i < n)
-    {
+    while (i < n) {
         v = byte_to_wide(tab, s[i]);
         len = 1;
-        if (cp == CP_UTF8 && v >= 0x80)
-        {
+        if (cp == CP_UTF8 && v >= 0x80) {
             len = utf8(s + i, n - i, &v);
-            if (len == 0)
-            {
-                if (flags & MB_ERR_INVALID_CHARS)
-                {
+            if (len == 0) {
+                if (flags & MB_ERR_INVALID_CHARS) {
                     w32_seterr(ERROR_NO_UNICODE_TRANSLATION);
                     return 0;
                 }
@@ -155,19 +144,15 @@ int WINAPI MultiByteToWideChar(UINT cp, DWORD flags,
             }
         }
         i += len;
-        if (v >= 0x10000UL)
-        {
+        if (v >= 0x10000UL) {
             if (cch && out + 2 > (DWORD)cch)
                 goto small;
-            if (cch)
-            {
+            if (cch) {
                 dst[out] = (WORD)(0xD7C0 + (v >> 10));
                 dst[out + 1] = (WORD)(0xDC00 + (v & 0x3FF));
             }
             out += 2;
-        }
-        else
-        {
+        } else {
             if (cch && out + 1 > (DWORD)cch)
                 goto small;
             if (cch)
@@ -188,34 +173,26 @@ static DWORD put_utf8(DWORD v, BYTE *out, DWORD at, DWORD cap)
     BYTE t[4];
     DWORD n, i;
 
-    if (v < 0x80)
-    {
+    if (v < 0x80) {
         t[0] = (BYTE)v;
         n = 1;
-    }
-    else if (v < 0x800)
-    {
+    } else if (v < 0x800) {
         t[0] = (BYTE)(0xC0 | (v >> 6));
         t[1] = (BYTE)(0x80 | (v & 0x3F));
         n = 2;
-    }
-    else if (v < 0x10000UL)
-    {
+    } else if (v < 0x10000UL) {
         t[0] = (BYTE)(0xE0 | (v >> 12));
         t[1] = (BYTE)(0x80 | ((v >> 6) & 0x3F));
         t[2] = (BYTE)(0x80 | (v & 0x3F));
         n = 3;
-    }
-    else
-    {
+    } else {
         t[0] = (BYTE)(0xF0 | (v >> 18));
         t[1] = (BYTE)(0x80 | ((v >> 12) & 0x3F));
         t[2] = (BYTE)(0x80 | ((v >> 6) & 0x3F));
         t[3] = (BYTE)(0x80 | (v & 0x3F));
         n = 4;
     }
-    if (cap)
-    {
+    if (cap) {
         if (at + n > cap)
             return 0;
         for (i = 0; i < n; i++)
@@ -252,8 +229,7 @@ int WINAPI WideCharToMultiByte(UINT cp, DWORD flags,
 
     if (src == NULL || cch == 0 || cch < -1 || cb < 0 ||
             !known(cp) ||
-            (cb > 0 && dst == NULL))
-    {
+            (cb > 0 && dst == NULL)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -261,24 +237,20 @@ int WINAPI WideCharToMultiByte(UINT cp, DWORD flags,
         *used = FALSE;
     cp = w32_realcp(cp);
     tab = w32_cptab(cp);
-    if (cch == -1)
-    {
+    if (cch == -1) {
         for (n = 0; src[n]; n++)
             ;
         n++;
-    }
-    else
+    } else
         n = (DWORD)cch;
-    while (i < n)
-    {
+    while (i < n) {
         v = src[i++];
         if (v >= 0xD800 && v < 0xDC00 && i < n
-            && src[i] >= 0xDC00 &&
+                && src[i] >= 0xDC00 &&
                 src[i] < 0xE000)
             v = 0x10000UL + ((v - 0xD800) << 10)
                 + (src[i++] - 0xDC00);
-        if (cp == CP_UTF8)
-        {
+        if (cp == CP_UTF8) {
             k = put_utf8(v, out, at, (DWORD)cb);
             if (cb && k == 0)
                 goto small;
@@ -286,14 +258,12 @@ int WINAPI WideCharToMultiByte(UINT cp, DWORD flags,
             continue;
         }
         b = wide_to_byte(tab, v);
-        if (b < 0)
-        {
+        if (b < 0) {
             b = defchar ? (BYTE)defchar[0] : '?';
             if (used)
                 *used = TRUE;
         }
-        if (cb)
-        {
+        if (cb) {
             if (at + 1 > (DWORD)cb)
                 goto small;
             out[at] = (BYTE)b;

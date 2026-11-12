@@ -1,4 +1,5 @@
-; clipboard API (INT 2Fh, AX=17xxh): text round trip. Needs a clipboard driver (clipdrv), otherwise skipped
+; clipboard API (INT 2Fh, AX=17xxh): text round trip. Needs a
+; clipboard driver (clipdrv), otherwise skipped
 %include "t.inc"
 bits 32
 global start

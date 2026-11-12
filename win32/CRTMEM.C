@@ -24,8 +24,7 @@ DWORD *__cdecl __doserrno(void)
 void crt_seterr_win(DWORD e)
 {
     dos_errno = (int)e;
-    switch (e)
-    {
+    switch (e) {
     case 2:
     case 3:
         crt_errno = CRT_ENOENT;
@@ -80,8 +79,7 @@ void *__cdecl calloc(DWORD count, DWORD size)
 {
     void *p;
 
-    if (size && count > 0xFFFFFFFFUL / size)
-    {
+    if (size && count > 0xFFFFFFFFUL / size) {
         crt_errno = CRT_ENOMEM;
         return NULL;
     }
@@ -104,8 +102,7 @@ void *__cdecl realloc(void *p, DWORD n)
 
     if (p == NULL)
         return malloc(n);
-    if (n == 0)
-    {
+    if (n == 0) {
         free(p);
         return NULL;
     }

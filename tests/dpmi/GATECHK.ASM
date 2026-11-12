@@ -1,4 +1,5 @@
-; Native 16/32-bit DPMI contract fixture. No intermediate execution.
+; Native 16/32-bit DPMI contract fixture. No intermediate
+; execution.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -60,13 +61,16 @@ gate_done:
         mov word [expected], 0
         mov word [resume], after_cr3
         xor eax, eax
-        mov cr3, eax             ;must not replace the host's page tables
+        ; must not replace the host's page tables
+        mov cr3, eax
 after_cr3:
         mov word [resume], after_dr7
-        mov dr7, eax             ;must not bypass owned debug services
+        ; must not bypass owned debug services
+        mov dr7, eax
 after_dr7:
         mov word [resume], after_esp
-        mov esp, cr0             ;must not replace the host's own ESP
+        ; must not replace the host's own ESP
+        mov esp, cr0
 after_esp:
         cmp byte [hits], 7
         jne bad

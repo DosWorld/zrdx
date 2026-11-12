@@ -1,0 +1,9 @@
+system nt_dll
+name TTLSD.DLL
+file TTLSD.OBJ
+option start='_DllEntry@12'
+option nodefaultlibs
+export TlsData='_TlsData@0'
+export TlsLog='_TlsLog@0'
+export TlsIndex='_TlsIndex@0'
+export TlsLen='_TlsLen@0'

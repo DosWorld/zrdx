@@ -1,4 +1,5 @@
-; EDX = linear address of the PSP, command tail is read from it (run with: T13 ABC)
+; EDX = linear address of the PSP, command tail is read from it
+; (run with: T13 ABC)
 %include "t.inc"
 bits 32
 global start

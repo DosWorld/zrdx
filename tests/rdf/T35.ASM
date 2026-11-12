@@ -1,4 +1,5 @@
-; clipboard API: 40001 bytes (larger than the transfer buffer), set and get back
+; clipboard API: 40001 bytes (larger than the transfer buffer),
+; set and get back
 %include "t.inc"
 bits 32
 global start

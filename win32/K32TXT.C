@@ -40,12 +40,11 @@ DWORD w32_upper(DWORD c)
         return c - 32;
     if (c == 0xB5)
         return 0x39C;
-    if (c >= 0x100 && c <= 0x17F)
-    {
+    if (c >= 0x100 && c <= 0x17F) {
         if (c == 0x131 || c == 0x138 || c == 0x149 || c == 0x17F)
             return c;
         if ((c >= 0x139 && c <= 0x148) || (c >= 0x179
-            && c <= 0x17E))
+                                           && c <= 0x17E))
             return (c & 1) ? c : c - 1;
         if (c == 0x178)
             return c;
@@ -68,12 +67,11 @@ DWORD w32_lower(DWORD c)
         return c + 32;
     if (c == 0x178)
         return 0xFF;
-    if (c >= 0x100 && c <= 0x17F)
-    {
+    if (c >= 0x100 && c <= 0x17F) {
         if (c == 0x130 || c == 0x138 || c == 0x149 || c == 0x17F)
             return c;
         if ((c >= 0x139 && c <= 0x148) || (c >= 0x179
-            && c <= 0x17E))
+                                           && c <= 0x17E))
             return (c & 1) ? c + 1 : c;
         return (c & 1) ? c : c + 1;
     }
@@ -90,8 +88,7 @@ static WORD ctype(DWORD c)
 {
     WORD f = 0;
 
-    if (c < 0x20 || (c >= 0x7F && c < 0xA0))
-    {
+    if (c < 0x20 || (c >= 0x7F && c < 0xA0)) {
         f = C1_CNTRL;
         if (c >= 9 && c <= 13)
             f |= C1_SPACE;
@@ -111,12 +108,12 @@ static WORD ctype(DWORD c)
     if (w32_lower(c) != c)
         return f | C1_UPPER | C1_ALPHA;
     if (w32_upper(c) != c || c == 0xAA || c == 0xBA
-        || c == 0xDF ||
+            || c == 0xDF ||
             c == 0xFF)
         return f | C1_LOWER | C1_ALPHA;
     if (c >= 0x100 &&
             ((c >= 0x370 && c <= 0x52F) || (c >= 0x5D0
-                && c <= 0x6FF) ||
+                                            && c <= 0x6FF) ||
              (c >= 0x3040 && c <= 0x9FFF)))
         return C1_ALPHA;
     if (c >= 0xC0 && c != 0xD7 && c != 0xF7 && c < 0x100)
@@ -131,18 +128,15 @@ BOOL WINAPI GetStringTypeW(DWORD info, const WORD *src, int cch,
     W32T("GetStringTypeW");
 
     if (info != 1 || src == NULL || out == NULL || cch == 0 ||
-            cch < -1)
-    {
+            cch < -1) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (cch == -1)
-    {
+    if (cch == -1) {
         for (n = 0; src[n]; n++)
             ;
         n++;
-    }
-    else
+    } else
         n = cch;
     for (i = 0; i < n; i++)
         out[i] = ctype(src[i]);
@@ -157,19 +151,16 @@ BOOL WINAPI GetStringTypeA(DWORD locale, DWORD info,
     W32T("GetStringTypeA");
 
     if (src == NULL || out == NULL || cch == 0 || cch < -1 ||
-            info != 1)
-    {
+            info != 1) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (cch == -1)
-    {
+    if (cch == -1) {
         for (n = 0; src[n]; n++)
             ;
         n++;
     }
-    for (i = 0; i < n; i++)
-    {
+    for (i = 0; i < n; i++) {
         WORD w;
 
         MultiByteToWideChar(0, 0, src + i, 1, &w, 1);
@@ -197,24 +188,20 @@ int WINAPI LCMapStringW(DWORD locale, DWORD flags,
     if (src == NULL || cch == 0 || cch < -1 || cchdst < 0 ||
             (flags & ~(LCMAP_LOWERCASE | LCMAP_UPPERCASE)) ||
             (flags & LCMAP_LOWERCASE
-                && flags & LCMAP_UPPERCASE) ||
-            (cchdst && dst == NULL))
-    {
+             && flags & LCMAP_UPPERCASE) ||
+            (cchdst && dst == NULL)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
-    if (cch == -1)
-    {
+    if (cch == -1) {
         for (n = 0; src[n]; n++)
             ;
         n++;
-    }
-    else
+    } else
         n = cch;
     if (cchdst == 0)
         return n;
-    if (cchdst < n)
-    {
+    if (cchdst < n) {
         w32_seterr(ERROR_INSUFFICIENT_BUFFER);
         return 0;
     }
@@ -233,33 +220,30 @@ int WINAPI LCMapStringA(DWORD locale, DWORD flags,
     if (src == NULL || cch == 0 || cch < -1 || cchdst < 0 ||
             (cchdst && dst == NULL) ||
             (flags & ~(LCMAP_LOWERCASE | LCMAP_UPPERCASE)) ||
-            (flags & LCMAP_LOWERCASE && flags & LCMAP_UPPERCASE))
-    {
+            (flags & LCMAP_LOWERCASE &&
+             flags & LCMAP_UPPERCASE)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
-    if (cch == -1)
-    {
+    if (cch == -1) {
         for (n = 0; src[n]; n++)
             ;
         n++;
     }
     if (cchdst == 0)
         return n;
-    if (cchdst < n)
-    {
+    if (cchdst < n) {
         w32_seterr(ERROR_INSUFFICIENT_BUFFER);
         return 0;
     }
-    for (i = 0; i < n; i++)
-    {
+    for (i = 0; i < n; i++) {
         WORD w;
         char back;
 
         MultiByteToWideChar(0, 0, src + i, 1, &w, 1);
         w = (WORD)fold(flags, w);
         if (WideCharToMultiByte(0, 0, &w, 1, &back, 1, NULL,
-            NULL))
+                                NULL))
             dst[i] = back;
         else
             dst[i] = src[i];
@@ -280,12 +264,10 @@ static int cmpw(DWORD flags, const WORD *a, int na,
     if (nb == -1)
         for (nb = 0; b[nb]; nb++)
             ;
-    while (i < na && i < nb)
-    {
+    while (i < na && i < nb) {
         x = a[i];
         y = b[i];
-        if (flags & NORM_IGNORECASE)
-        {
+        if (flags & NORM_IGNORECASE) {
             x = w32_upper(x);
             y = w32_upper(y);
         }
@@ -301,8 +283,7 @@ int WINAPI CompareStringW(DWORD locale, DWORD flags,
                           int na, const WORD *b, int nb)
 {
     W32T("CompareStringW");
-    if (a == NULL || b == NULL || na < -1 || nb < -1)
-    {
+    if (a == NULL || b == NULL || na < -1 || nb < -1) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -317,8 +298,7 @@ int WINAPI CompareStringA(DWORD locale, DWORD flags,
     int ca, cb;
     W32T("CompareStringA");
 
-    if (a == NULL || b == NULL || na < -1 || nb < -1)
-    {
+    if (a == NULL || b == NULL || na < -1 || nb < -1) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -388,13 +368,12 @@ char *WINAPI lstrcatA(char *d, const char *s)
 
 int WINAPI lstrcmpA(const char *a, const char *b)
 {
-    while (*a && *a == *b)
-    {
+    while (*a && *a == *b) {
         a++;
         b++;
     }
     return (BYTE) * a < (BYTE) * b ? -1
-        : (BYTE) * a > (BYTE) * b;
+           : (BYTE) * a > (BYTE) * b;
 }
 
 int WINAPI lstrcmpiA(const char *a, const char *b)

@@ -37,8 +37,7 @@ static char *map_a(char *s, DWORD flags)
 {
     char c;
 
-    if (((DWORD)s >> 16) == 0)
-    {
+    if (((DWORD)s >> 16) == 0) {
         c = (char)(DWORD)s;
         LCMapStringA(0, flags, &c, 1, &c, 1);
         return (char *)(DWORD)(BYTE)c;
@@ -51,8 +50,7 @@ static WORD *map_w(WORD *s, DWORD flags)
 {
     WORD c;
 
-    if (((DWORD)s >> 16) == 0)
-    {
+    if (((DWORD)s >> 16) == 0) {
         c = (WORD)(DWORD)s;
         LCMapStringW(0, flags, &c, 1, &c, 1);
         return (WORD *)(DWORD)c;
@@ -85,7 +83,7 @@ DWORD WINAPI CharUpperBuffA(char *s, DWORD n)
 {
     return n &&
            LCMapStringA(0, LCMAP_UPPERCASE, s, (int)n, s,
-               (int)n) ?
+                        (int)n) ?
            n : 0;
 }
 
@@ -93,7 +91,7 @@ DWORD WINAPI CharLowerBuffA(char *s, DWORD n)
 {
     return n &&
            LCMapStringA(0, LCMAP_LOWERCASE, s, (int)n, s,
-               (int)n) ?
+                        (int)n) ?
            n : 0;
 }
 
@@ -101,7 +99,7 @@ DWORD WINAPI CharUpperBuffW(WORD *s, DWORD n)
 {
     return n &&
            LCMapStringW(0, LCMAP_UPPERCASE, s, (int)n, s,
-               (int)n) ?
+                        (int)n) ?
            n : 0;
 }
 
@@ -109,7 +107,7 @@ DWORD WINAPI CharLowerBuffW(WORD *s, DWORD n)
 {
     return n &&
            LCMapStringW(0, LCMAP_LOWERCASE, s, (int)n, s,
-               (int)n) ?
+                        (int)n) ?
            n : 0;
 }
 

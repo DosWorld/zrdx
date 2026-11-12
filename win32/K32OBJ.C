@@ -10,15 +10,13 @@
 #define KO_PER 680
 #define OBJBASE 0x10000UL
 
-typedef struct KObj
-{
+typedef struct KObj {
     DWORD type;
     DWORD signaled;
     DWORD manual;
 } KObj;
 
-typedef struct KChunk
-{
+typedef struct KChunk {
     KObj rec[KO_PER];
     DWORD handle;
     struct KChunk *next;
@@ -35,8 +33,7 @@ HANDLE WINAPI CreateEventA(void *sa, BOOL manual, BOOL initial,
     int found = 0;
     W32T("CreateEventA");
 
-    for (c = khead; c && !found; c = found ? c : c->next)
-    {
+    for (c = khead; c && !found; c = found ? c : c->next) {
         for (i = 0; i < KO_PER && !found; i++)
             found = c->rec[i].type == 0;
         if (found)
@@ -44,11 +41,9 @@ HANDLE WINAPI CreateEventA(void *sa, BOOL manual, BOOL initial,
         last = c;
         n++;
     }
-    if (!found)
-    {
+    if (!found) {
         c = w32_pages(sizeof(KChunk), &h);
-        if (c == NULL)
-        {
+        if (c == NULL) {
             w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
             return NULL;
         }
@@ -73,8 +68,7 @@ BOOL w32_objclose(HANDLE h)
 
     for (c = khead; c && n; c = c->next)
         n--;
-    if (c == NULL || c->rec[idx % KO_PER].type == 0)
-    {
+    if (c == NULL || c->rec[idx % KO_PER].type == 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -87,8 +81,7 @@ void w32_objfree(void)
     KChunk *k = khead, *kn;
 
     khead = NULL;
-    while (k)
-    {
+    while (k) {
         kn = k->next;
         w32_freepages(k->handle);
         k = kn;
@@ -115,8 +108,7 @@ static BOOL setstate(HANDLE h, DWORD signaled)
 {
     KObj *e = event(h);
 
-    if (e == NULL)
-    {
+    if (e == NULL) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -145,19 +137,16 @@ DWORD WINAPI WaitForSingleObject(HANDLE h, DWORD ms)
     KObj *e = event(h);
     W32T("WaitForSingleObject");
 
-    if (e == NULL)
-    {
+    if (e == NULL) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return 0xFFFFFFFFUL;
     }
-    if (e->signaled)
-    {
+    if (e->signaled) {
         if (!e->manual)
             e->signaled = 0;
         return 0;
     }
-    if (ms == 0xFFFFFFFFUL)
-    {
+    if (ms == 0xFFFFFFFFUL) {
         w32_seterr(1359);
         return 0xFFFFFFFFUL;
     }

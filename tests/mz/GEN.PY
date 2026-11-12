@@ -1,4 +1,6 @@
-"""Generate bounded MZ aligner inputs and verify the preserved load image."""
+"""Generate bounded MZ aligner inputs and verify the preserved
+load image.
+"""
 from pathlib import Path
 import struct
 
@@ -14,7 +16,8 @@ def original():
 def generate(folder):
     folder = Path(folder)
     cases = {"FULL": (original(), 0), "LEGACY": (original(), 0),
-             "RELOCS": (original(), 4), "HEADER": (original(), 4),
+             "RELOCS": (original(), 4),
+             "HEADER": (original(), 4),
              "PAGES": (original(), 4), "SMALL": (original(), 2),
              "TAIL": (original() + bytes(range(16)), 0)}
     struct.pack_into("<H", cases["LEGACY"][0], 2, 512)
@@ -25,15 +28,25 @@ def generate(folder):
     for name, (data, status) in cases.items():
         (folder / (name + ".EXE")).write_bytes(data)
         size = 1024 if name == "SMALL" else 1536
-        lines += [r"R:\src\aligner.exe " + name + ".EXE " + str(size)]
+        lines += [r"R:\src\aligner.exe " + name + ".EXE "
+                  + str(size)]
         if status == 0:
-            lines += ["if errorlevel 1 echo " + name + " FAILED >> RESULT.LOG",
-                      "if not errorlevel 1 echo " + name + " OK >> RESULT.LOG"]
+            lines += ["if errorlevel 1 echo " + name
+                      + " FAILED >> RESULT.LOG",
+                      "if not errorlevel 1 echo " + name
+                      + " OK >> RESULT.LOG"]
         else:
-            lines += ["if errorlevel " + str(status) + " if not errorlevel " + str(status+1) + " echo " + name + " OK >> RESULT.LOG",
-                      "if not errorlevel " + str(status) + " echo " + name + " FAILED >> RESULT.LOG",
-                      "if errorlevel " + str(status+1) + " echo " + name + " FAILED >> RESULT.LOG"]
-    (folder / "RUN.BAT").write_bytes(("\r\n".join(lines) + "\r\n").encode("ascii"))
+            lines += ["if errorlevel " + str(status)
+                      + " if not errorlevel " + str(status+1)
+                      + " echo " + name + " OK >> RESULT.LOG",
+                      "if not errorlevel " + str(status)
+                      + " echo " + name
+                      + " FAILED >> RESULT.LOG",
+                      "if errorlevel " + str(status+1)
+                      + " echo " + name
+                      + " FAILED >> RESULT.LOG"]
+    (folder / "RUN.BAT").write_bytes(("\r\n".join(lines)
+                                      + "\r\n").encode("ascii"))
 
 
 def verify(folder):
@@ -43,16 +56,22 @@ def verify(folder):
         size = 1552 if name == "TAIL" else 1536
         if name == "TAIL" and data[1536:] != bytes(range(16)):
             raise RuntimeError("aligner lost the tail: " + name)
-        if len(data) != size or struct.unpack_from("<HH", data, 2) != (0, 3):
-            raise RuntimeError("aligner size/page header mismatch: " + name)
-        if data[64:1056] != original()[32:] or any(data[1056:1536]):
-            raise RuntimeError("aligner lost or changed load bytes: " + name)
+        if len(data) != size or struct.unpack_from("<HH", data,
+            2) != (0, 3):
+            raise RuntimeError(
+                "aligner size/page header mismatch: " + name)
+        if data[64:1056] != original()[32:] or any(
+            data[1056:1536]):
+            raise RuntimeError(
+                "aligner lost or changed load bytes: " + name)
     for name in ("RELOCS", "HEADER", "PAGES", "SMALL"):
         data = (folder / (name + ".EXE")).read_bytes()
         expected = original()
-        changes = {"RELOCS": (6, 40), "HEADER": (8, 0xf000), "PAGES": (4, 0xffff)}
+        changes = {"RELOCS": (6, 40), "HEADER": (8, 0xf000),
+                   "PAGES": (4, 0xffff)}
         if name in changes:
             offset, value = changes[name]
             struct.pack_into("<H", expected, offset, value)
         if data != expected:
-            raise RuntimeError("aligner modified rejected input: " + name)
+            raise RuntimeError(
+                "aligner modified rejected input: " + name)

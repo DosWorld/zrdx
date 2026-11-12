@@ -10,6 +10,9 @@
 %ifdef PEMAX
 %define VENDORON
 %define VENDORPE
+%ifndef NativeHost
+%define VENDORREG               ;DPMI 0A00h and 0A01h
+%endif
 %endif
 
 ;layout of the virtual segments, must precede the code
@@ -17,7 +20,8 @@
 %assign MaxSystemSwitchCode 5 * 4
 %assign nMaxCallbacks 20
         VSegm BSS16
-        DFB FirstSwitchCode, MaxSystemSwitchCode + nMaxCallbacks * 4
+        DFB FirstSwitchCode, MaxSystemSwitchCode \
+                + nMaxCallbacks * 4
 RMIretSwitchCode equ 0 + ROffFirstSwitchCode
 Dos1CallRetSwitchCode equ 4 + ROffFirstSwitchCode
 RMIERetSwitchCode equ 8 + ROffFirstSwitchCode
@@ -35,8 +39,10 @@ FirstPassupSwitchCode equ MaxSystemSwitchCode + nMaxCallbacks * 4
         DFD OldVectors, 10
 DTASize equ 40h
         DFB DefaultDTA, 44 ;43          ;DTA, when client started
-        DFB MouseCallbackStruct, 34h    ;DC structure for mouse callback
-        DFD MouseHandlerESP             ;saved ESP for mouse handler
+        ; DC structure for mouse callback
+        DFB MouseCallbackStruct, 34h
+        ; saved ESP for mouse handler
+        DFD MouseHandlerESP
         DFD ImageBaseAddr
         EVSeg EBSS
 
@@ -62,12 +68,15 @@ NTraps3c equ NTraps3
         DFD n_fplists
         DFD Exception0DStack
         DFD TotalPagesCount
-        DFB FirstTrap3, NTrapsP3 * 4 + 8 ;area for default interrupts, exceptions, etc handlers
+        ; area for default interrupts, exceptions, etc handlers
+        DFB FirstTrap3, NTrapsP3 * 4 + 8
         DFB HIntHandlers, 32 * 7
         DFD SavedRealVectors, 256
         DFD LDTFree, 256
-        DFD LDTDOS, 256       ;immutable real-segment aliases (0002h)
-        DFD LDTBlock, 256     ;immutable DOS allocation descriptors
+        ; immutable real-segment aliases (0002h)
+        DFD LDTDOS, 256
+        ; immutable DOS allocation descriptors
+        DFD LDTBlock, 256
         DFD nFreePages
 %ifndef Release
         DFD ExtraDW
@@ -87,18 +96,23 @@ NTraps3c equ NTraps3
         DFB CallbacksTable, N000
 
 ;KernelStack1 EQU TSS.TSS_ESP1
-        DFD SavedDebug, 6       ;DR0-DR3, DR6 and DR7 before first owned watch
-        DFD DebugUsed           ;owned hardware slots, low four bits
+        ; DR0-DR3, DR6 and DR7 before first owned watch
+        DFD SavedDebug, 6
+        ; owned hardware slots, low four bits
+        DFD DebugUsed
         DFB DebugSaved
 %ifdef NativeHost
-        DFB NativeMode           ;FFh before first successful entry
+        ; FFh before first successful entry
+        DFB NativeMode
         DFW NativeThunkSel
         DFD NativeCurrent
         DFD NativeRealBase
         DFD NativeRootStack
         DFB NativeBoot, 36 + RMSStruct_size
 %endif
-        DFD RIntFlags, 8    ;bit vector :1 - jump to saved real vector, else - to current
+        ; bit vector :1 - jump to saved real vector, else - to
+        ; current
+        DFD RIntFlags, 8
 
         DFD UserStackStart, 100
         DFL UserStackEnd
@@ -122,7 +136,8 @@ NTraps3c equ NTraps3
 ;packed traps format:
 ;  DB 0EA   ;call far inst            <-  Current call
 ;  DW PrevGateSelector                <-I
-;  DB Reserved or Trap ID               I Current IP - ignored by CPU
+; DB Reserved or Trap ID               I Current IP - ignored by
+; CPU
 ;  DB 0EA   ;next trap call far inst  <-I
 ;  DW CurGateSelector                 <-  Current CS
 
@@ -136,7 +151,8 @@ LockedStackSize equ 1000h
         DFD LDT, (17 + 4) * 2
         DFL LastInit
         DFD LDTNext, 4000h - (17 + 4) * 2
-        DFD Page0, 1024     ;VCPI page allocated in the dos memory and cannot be
+        ; VCPI page allocated in the dos memory and cannot be
+        DFD Page0, 1024
                       ;relocated
         DFD fplist, 1024      ;current list of free page entries
 ;PagesDir equ PageDir
@@ -153,14 +169,16 @@ LockedStackSize equ 1000h
 ;PageDirEntry   = Page2[(OffPageDir-KernelBase) shr 10]
 ;Page0Entry      = Page2[(OffPage0-KernelBase) shr 10]
 ;Page2Entry      = Page2[(OffPage2-KernelBase) shr 10]
-;FirstZeroInit_entry = Page2[(OffFirstZeroInit-KernelBase) shr 10]
+; FirstZeroInit_entry = Page2[(OffFirstZeroInit-KernelBase) shr
+; 10]
 ;FpListEntry     = Page2[(OffFpList-KernelBase) shr 10]
 ;PageTableEntry = Page2[(OffPageTableWin - KernelBase) shr 10]
 ;FreePageEntry  = Page2[(OffFreePageWin-KernelBase) shr 10]
 Page2Index equ (OffPage2 - KernelBase) >> 12
 ;SDir0Entry      = Page2[(OffSDir0Win-KernelBase) shr 10]
 ;SDir1Entry      = Page2[(OffSDir1Win-KernelBase) shr 10]
-;FpListPte       = Page2[(OffFpList-KernelBase) shr 10]      ;fplist_entry
+; FpListPte       = Page2[(OffFpList-KernelBase) shr 10]
+; ;fplist_entry
         EVSeg BSS
 
 %assign SelectorNum 8
@@ -182,7 +200,8 @@ Page2Index equ (OffPage2 - KernelBase) >> 12
         DefSelector PageMoveGate, 1, 1
         DefSelector LoadLDTGate, 1, 1
         DefSelector Trap3, 1, 3         ;PL3 selector for traps
-        DefSelector LockedStack, 1, 3   ;not flat selector for client locked stack
+        ; not flat selector for client locked stack
+        DefSelector LockedStack, 1, 3
         DefSelector TSS
         DefSelector LDT
         DefSelector VCPI, 3       ;for VCPI server

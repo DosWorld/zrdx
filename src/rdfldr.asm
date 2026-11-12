@@ -56,7 +56,8 @@ DPMICall:
           shl ebx, 16
           mov bx, cx
           shl esi, 16
-          or si, di   ;this instruction clear CF instead of "mov si, di"
+          ; this instruction clear CF instead of "mov si, di"
+          or si, di
           ;clc
         _endif
         pop edi
@@ -86,7 +87,8 @@ Loader:
       DefLDErr ErrRDFRec, 'unsupported RDF record$'
       DefLDErr ErrAllocSel, "can't allocate selector$"
       DefLDErr ErrLock, "can't lock extender$"
-      DefLDErr ErrTransferBuf@129, "can't allocate transfer buffer$"
+      DefLDErr ErrTransferBuf@129, \
+              "can't allocate transfer buffer$"
         SEGM IEData
         LLabel LoadErrMsg
         db 'ZRDX loader error: $'
@@ -611,7 +613,8 @@ FileRead:
          ret 16
 
 ;create a selector for the object by the object index
-;if the object is 16-bit then base = object base, limit = object length
+; if the object is 16-bit then base = object base, limit = object
+; length
 ;otherwise base = 0, limit = 4G
 
 ;ebx-base, ecx-size, dx-attrs

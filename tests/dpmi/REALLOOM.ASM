@@ -1,5 +1,7 @@
-; 0503h failed moved-block growth: whole-block and neighbor rollback.
-; Exact error codes/accounting are ZRDX policy; S13.4 forbids size zero.
+; 0503h failed moved-block growth: whole-block and neighbor
+; rollback.
+; Exact error codes/accounting are ZRDX policy; S13.4 forbids
+; size zero.
 %ifndef CLIENT32
 %define CLIENT32 0
 %endif
@@ -122,7 +124,8 @@ start:  cld
         jne ERRJ bad
         cmp si, [blocka+2]
         jne ERRJ bad
-        ; Reject a zero resize too, while the original handle remains live.
+        ; Reject a zero resize too, while the original handle
+        ; remains live.
         mov di, [blocka]
         mov si, [blocka+2]
         xor ebx, ebx

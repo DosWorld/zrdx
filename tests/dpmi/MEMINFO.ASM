@@ -1,4 +1,5 @@
-; Native 16/32-bit DPMI contract fixture. No intermediate execution.
+; Native 16/32-bit DPMI contract fixture. No intermediate
+; execution.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -48,17 +49,20 @@ start:  cld
         shr ebx, 16
         mov eax, 501h
         int 31h
-        jnc bad                  ;one byte beyond the reported maximum
+        ; one byte beyond the reported maximum
+        jnc bad
         mov byte [step], 2
         call report
         mov ecx, [largest]
         cmp ecx, [info]
-        jne bad                  ;failed allocation must not consume pages
+        ; failed allocation must not consume pages
+        jne bad
         mov ebx, ecx
         shr ebx, 16
         mov eax, 501h
         int 31h
-        jc bad                   ;the reported maximum must be allocatable
+        ; the reported maximum must be allocatable
+        jc bad
         mov [handle], di
         mov [handle+2], si
         shl ebx, 16
@@ -88,7 +92,8 @@ start:  cld
         mov si, ok
         xor bx, bx
         jmp print
-; Force a 0503h move past an adjacent live block, then shrink and free.
+; Force a 0503h move past an adjacent live block, then shrink and
+; free.
 shapes: mov ebx, 0
         mov ecx, 1000h
         mov eax, 501h

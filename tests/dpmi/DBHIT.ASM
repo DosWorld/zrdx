@@ -13,7 +13,8 @@ oldexc: resd 1
 section .text
 handler:
        inc dword [hits]
-       or dword [ss:esp+20], 10000h ;resume an execution breakpoint once
+       ; resume an execution breakpoint once
+       or dword [ss:esp+20], 10000h
        retf
 start: BEGIN
        mov byte [step], 1
@@ -40,7 +41,8 @@ start: BEGIN
        mov [handle], bx
        mov byte [step], 3
        pushad
-       mov ah, 30h             ;watch must survive a real-mode DOS transition
+       ; watch must survive a real-mode DOS transition
+       mov ah, 30h
        int 21h
        popad
        mov dword [watched], 12345678h

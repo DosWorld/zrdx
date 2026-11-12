@@ -17,7 +17,6 @@
 
 W32_ANCHOR;
 
-static DWORD lasterr;
 static int vok;
 static int minfo;
 static char mpath[132];
@@ -25,7 +24,6 @@ static DWORD mbase, mrec;
 static char cmdA[320];
 static WORD cmdW[320];
 static int cmdok;
-static void *unhandled;
 
 #ifdef W32TRACE
 void w32_val(const char *tag, DWORD v)
@@ -44,7 +42,7 @@ void w32_val(const char *tag, DWORD v)
 
 void w32_seterr(DWORD error)
 {
-    lasterr = error;
+    *w32_errp() = error;
 }
 
 void w32_zero(void *p, DWORD bytes)
@@ -83,8 +81,7 @@ static int vendor(void)
 /* ABI error of the PE service -> Win32 error */
 static DWORD abierr(DWORD code)
 {
-    switch (code)
-    {
+    switch (code) {
     case 2:
     case 5:
         return ERROR_MOD_NOT_FOUND;
@@ -105,8 +102,7 @@ static DWORD abierr(DWORD code)
 
 static int pinfo(void)
 {
-    if (!minfo)
-    {
+    if (!minfo) {
         if (!vendor())
             return 0;
         mrec = 0;
@@ -121,13 +117,13 @@ static int pinfo(void)
 DWORD WINAPI GetLastError(void)
 {
     W32T("GetLastError");
-    return lasterr;
+    return *w32_errp();
 }
 
 void WINAPI SetLastError(DWORD error)
 {
     W32T("SetLastError");
-    lasterr = error;
+    *w32_errp() = error;
 }
 
 DWORD WINAPI GetVersion(void)
@@ -161,29 +157,12 @@ BOOL WINAPI SetConsoleCtrlHandler(void *handler, BOOL add)
     return TRUE;
 }
 
-void *WINAPI SetUnhandledExceptionFilter(void *filter)
-{
-    void *old = unhandled;
-    W32T("SetUnhandledExceptionFilter");
-
-    unhandled = filter;
-    return old;
-}
-
-/* EXCEPTION_EXECUTE_HANDLER: the process ends */
-int WINAPI UnhandledExceptionFilter(void *info)
-{
-    W32T("UnhandledExceptionFilter");
-    return 1;
-}
-
 HANDLE WINAPI LoadLibraryA(const char *name)
 {
     DWORD h;
     W32T("LoadLibraryA");
 
-    if (name == NULL || !vendor())
-    {
+    if (name == NULL || !vendor()) {
         w32_seterr(name == NULL ? ERROR_INVALID_PARAMETER :
                    ERROR_MOD_NOT_FOUND);
         return NULL;
@@ -214,10 +193,8 @@ HANDLE WINAPI GetModuleHandleA(const char *name)
     DWORD h;
     W32T("GetModuleHandleA");
 
-    if (name == NULL)
-    {
-        if (!pinfo())
-        {
+    if (name == NULL) {
+        if (!pinfo()) {
             w32_seterr(ERROR_MOD_NOT_FOUND);
             return NULL;
         }
@@ -225,8 +202,7 @@ HANDLE WINAPI GetModuleHandleA(const char *name)
     }
     h = vendor() ?
         zrdx_cz(2, 0, name, zrdx_vp) : 0;
-    if (!h)
-    {
+    if (!h) {
         w32_seterr(ERROR_MOD_NOT_FOUND);
         return NULL;
     }
@@ -240,8 +216,7 @@ void *WINAPI GetProcAddress(HANDLE mod, const char *name)
     DWORD a;
     W32T("GetProcAddress");
 
-    if (name == NULL || !vendor())
-    {
+    if (name == NULL || !vendor()) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return NULL;
     }
@@ -278,20 +253,17 @@ DWORD WINAPI GetModuleFileNameA(HANDLE mod, char *buf,
     DWORD n;
     W32T("GetModuleFileNameA");
 
-    if (mod != NULL && !(pinfo() && (DWORD)mod == mbase))
-    {
+    if (mod != NULL && !(pinfo() && (DWORD)mod == mbase)) {
         w32_seterr(ERROR_MOD_NOT_FOUND);
         return 0;
     }
     n = fullpath(full);
-    if (n == 0 || size == 0)
-    {
+    if (n == 0 || size == 0) {
         w32_seterr(n == 0 ? ERROR_MOD_NOT_FOUND :
                    ERROR_INSUFFICIENT_BUFFER);
         return 0;
     }
-    if (n >= size)
-    {
+    if (n >= size) {
         w32_copy(buf, full, size);
         w32_seterr(ERROR_INSUFFICIENT_BUFFER);
         return size;
@@ -310,8 +282,7 @@ DWORD WINAPI GetModuleFileNameW(HANDLE mod, WORD *buf,
     n = GetModuleFileNameA(mod, tmp, sizeof tmp);
     if (n == 0)
         return 0;
-    if (n >= size)
-    {
+    if (n >= size) {
         n = size;
         w32_seterr(ERROR_INSUFFICIENT_BUFFER);
     }
@@ -350,8 +321,7 @@ static void buildcmd(void)
     if (cmdok)
         return;
     cmdok = 1;
-    if (pinfo())
-    {
+    if (pinfo()) {
         n = slen(mpath);
         w32_copy(cmdA, mpath, n);
     }
@@ -362,8 +332,7 @@ static void buildcmd(void)
     len = (BYTE)psp[0x80];
     while (i < len && psp[0x81 + i] == ' ')
         i++;
-    if (i < len && psp[0x81 + i] != 13)
-    {
+    if (i < len && psp[0x81 + i] != 13) {
         cmdA[n++] = ' ';
         while (i < len && psp[0x81 + i] != 13 &&
                 n + 1 < sizeof cmdA)
@@ -403,16 +372,28 @@ extern void fp_init(void);
 
 BOOL WINAPI W32Main(HANDLE inst, DWORD reason, LPVOID reserved)
 {
-    if (reason == 1)
+    DWORD sel, tls;
+
+    if (reason == 1) {
         fp_init();
+        sel = w32_tebinit(pinfo() ? mbase : 0,
+                          GetCurrentProcessId(),
+                          (DWORD)GetProcessHeap());
+        if (sel && vendor())
+            ZrdxSetFS(sel);
+        if (vendor() && (tls = ZrdxTlsTable()) > 0xFFFFUL)
+            w32_tebtls(tls);
+        w32_excinit();
+    }
     W32T("W32Main");
-    if (reason == 0)
-    {
+    if (reason == 0) {
         w32_objfree();
         w32_envfree();
         w32_heapfree();
         w32_tlsfree();
         w32_memfree();
+        w32_excfree();
+        w32_tebfree();
     }
     return TRUE;
 }

@@ -30,8 +30,7 @@ static void fail(void)
 
 static int same(const char *a, const char *b)
 {
-    while (*a && *a == *b)
-    {
+    while (*a && *a == *b) {
         a++;
         b++;
     }
@@ -40,8 +39,7 @@ static int same(const char *a, const char *b)
 
 static int in_block(const char *blk, const char *entry)
 {
-    while (*blk)
-    {
+    while (*blk) {
         if (same(blk, entry))
             return 1;
         while (*blk)

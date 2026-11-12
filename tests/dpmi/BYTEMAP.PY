@@ -3,7 +3,8 @@
 Assembles the four roots in a scratch copy of src with a NASM
 listing and sums the bytes per label (a label covers the code up
 to the next label; db/dw/times data shows only partly in a
-listing, so totals are about 10% short). Use it to pick what to shrink (task 142).
+listing, so totals are about 10% short). Use it to pick what to
+shrink (task 142).
 
   BYTEMAP.PY --work <scratch dir> [--swap] [--top N]
 """
@@ -18,7 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CFG = runpy.run_path(str(ROOT / "tests/dpmi/ZRCFG.PY"))
 ROOTS = (("native", "zrdxdpmi"), ("le", "zrdx"))
 SEGS = ("Text16", "IText16", "IData16")
-LINE = re.compile(r"\s*\d+\s+([0-9A-F]{8})\s+([0-9A-F]+)\s+(<\d+>)?(.*)")
+LINE = re.compile(
+    r"\s*\d+\s+([0-9A-F]{8})\s+([0-9A-F]+)\s+(<\d+>)?(.*)")
 LABEL = re.compile(r"\s*([A-Za-z_][\w@$]*):")
 NOADDR = re.compile(r"\s*\d+\s+(<\d+>)?\s*(.*)")
 
@@ -27,11 +29,13 @@ def enable(src, swap):
     seg = src / "segdefs.asm"
     text = seg.read_text()
     if swap:
-        text = text.replace("\n;%assign SWAP 1", "\n%assign SWAP 1")
+        text = text.replace("\n;%assign SWAP 1",
+                            "\n%assign SWAP 1")
     # lift every 16-bit ceiling: only the sizes are wanted
     text = re.sub(r"SetupRTSeg \d+, \d+, (Text16|IText16)",
                   r"SetupRTSeg 6000, 6000, \1", text)
-    seg.write_bytes(text.replace("\r\n", "\n").replace("\n", "\r\n").encode())
+    seg.write_bytes(text.replace("\r\n", "\n").replace("\n",
+        "\r\n").encode())
 
 
 def scan(listing):
@@ -65,7 +69,8 @@ def scan(listing):
             label[cur] = found.group(1)
         if match:
             count = len(match.group(2)) // 2
-            sizes[cur][label[cur]] = sizes[cur].get(label[cur], 0) + count
+            sizes[cur][label[cur]] = sizes[cur].get(label[cur],
+                0) + count
     return sizes
 
 
@@ -84,14 +89,20 @@ def main():
     enable(src, args.swap)
     for name, root in ROOTS:
         listing = work / (name + ".LST")
-        subprocess.run([shutil.which("nasm"), "-O9", "-f", "obj", "-l", str(listing),
-                        root + ".asm", "-o", str(work / (name + ".OBJ"))],
+        subprocess.run([shutil.which("nasm"), "-O9", "-f",
+                        "obj", "-l", str(listing),
+                        root + ".asm", "-o",
+                        str(work / (name + ".OBJ"))],
                        cwd=src, capture_output=True, check=True)
         sizes = scan(listing)
         for seg in SEGS:
-            print("%s %s%s: %d bytes" % (name, seg, " (SWAP)" if args.swap else "",
-                                         sum(sizes[seg].values())))
-            for label, count in sorted(sizes[seg].items(), key=lambda x: -x[1])[:args.top]:
+            print("%s %s%s: %d bytes" % (name, seg,
+                " (SWAP)" if args.swap else "",
+                                         sum(sizes[
+                                             seg].values())))
+            for label, count in sorted(sizes[seg].items(),
+                                       key=lambda x:
+                                       -x[1])[:args.top]:
                 print("  %5d %s" % (count, label))
 
 

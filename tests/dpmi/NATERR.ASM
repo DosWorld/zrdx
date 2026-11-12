@@ -1,4 +1,5 @@
-; Native-host input errors must return to the real-mode FAR caller.
+; Native-host input errors must return to the real-mode FAR
+; caller.
 bits 16
 org 100h
 start:

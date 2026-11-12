@@ -38,12 +38,10 @@ HANDLE WINAPI GetStdHandle(DWORD which)
     DWORD i = 0xFFFFFFF6UL - which;
     W32T("GetStdHandle");
 
-    if (which > 0xFFFFFFF6UL || i > 2)
-    {
+    if (which > 0xFFFFFFF6UL || i > 2) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return INVALID_HANDLE_VALUE;
     }
-    i = 2 - i;
     return stdh[i] ? stdh[i] : w32_hdos((int)i);
 }
 
@@ -52,19 +50,17 @@ BOOL WINAPI SetStdHandle(DWORD which, HANDLE h)
     DWORD i = 0xFFFFFFF6UL - which;
     W32T("SetStdHandle");
 
-    if (which > 0xFFFFFFF6UL || i > 2)
-    {
+    if (which > 0xFFFFFFF6UL || i > 2) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
-    stdh[2 - i] = h;
+    stdh[i] = h;
     return TRUE;
 }
 
 static int same(const char *a, const char *b)
 {
-    while (*a && *b)
-    {
+    while (*a && *b) {
         char x = *a++, y = *b++;
 
         if (x >= 'a' && x <= 'z')
@@ -85,8 +81,7 @@ HANDLE WINAPI CreateFileA(const char *name, DWORD access,
     int rd, wr;
     W32T("CreateFileA");
 
-    if (name == NULL || disp < 1 || disp > 5)
-    {
+    if (name == NULL || disp < 1 || disp > 5) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return INVALID_HANDLE_VALUE;
     }
@@ -106,8 +101,7 @@ HANDLE WINAPI CreateFileA(const char *name, DWORD access,
     r.edx = action;
     r.esi = (DWORD)name;
     dos21(&r);
-    if (r.cf && (r.eax & 0xFFFF) == 0x7100)
-    {
+    if (r.cf && (r.eax & 0xFFFF) == 0x7100) {
         r.eax = 0x6C00;
         r.ebx = mode;
         r.ecx = flags & 0x27;
@@ -115,8 +109,7 @@ HANDLE WINAPI CreateFileA(const char *name, DWORD access,
         r.esi = (DWORD)name;
         dos21(&r);
     }
-    if (r.cf)
-    {
+    if (r.cf) {
         w32_seterr(w32_doserr(&r));
         return INVALID_HANDLE_VALUE;
     }
@@ -135,8 +128,7 @@ BOOL WINAPI CloseHandle(HANDLE h)
     if ((DWORD)h >= 0x10000UL)
         return w32_objclose(h);
     d = w32_dosh(h);
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
@@ -158,13 +150,11 @@ static BOOL transfer(DWORD ah, HANDLE h, char *buf, DWORD n,
     int d = w32_dosh(h);
 
     *done = 0;
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }
-    while (*done < n)
-    {
+    while (*done < n) {
         part = n - *done > IOCHUNK ? IOCHUNK : n - *done;
         w32_zero(&r, sizeof r);
         r.eax = ah << 8;
@@ -172,17 +162,14 @@ static BOOL transfer(DWORD ah, HANDLE h, char *buf, DWORD n,
         r.ecx = part;
         r.edx = (DWORD)(buf + *done);
         dos21(&r);
-        if (r.cf)
-        {
+        if (r.cf) {
             w32_seterr(w32_doserr(&r));
             return FALSE;
         }
         got = r.eax & 0xFFFF;
         *done += got;
-        if (got < part)
-        {
-            if (ah == 0x40)
-            {
+        if (got < part) {
+            if (ah == 0x40) {
                 w32_seterr(112);
                 return FALSE;
             }
@@ -222,8 +209,7 @@ DWORD WINAPI GetFileType(HANDLE h)
     int d = w32_dosh(h);
     W32T("GetFileType");
 
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return 0;
     }
@@ -231,8 +217,7 @@ DWORD WINAPI GetFileType(HANDLE h)
     r.eax = 0x4400;
     r.ebx = (DWORD)d;
     dos21(&r);
-    if (r.cf)
-    {
+    if (r.cf) {
         w32_seterr(w32_doserr(&r));
         return 0;
     }
@@ -246,14 +231,12 @@ DWORD WINAPI SetFilePointer(HANDLE h, long lo, long *hi,
     int d = w32_dosh(h);
     W32T("SetFilePointer");
 
-    if (d < 0 || method > 2)
-    {
+    if (d < 0 || method > 2) {
         w32_seterr(d < 0 ? ERROR_INVALID_HANDLE :
                    ERROR_INVALID_PARAMETER);
         return 0xFFFFFFFFUL;
     }
-    if (hi && *hi != (method != 0 && lo < 0 ? -1L : 0L))
-    {
+    if (hi && *hi != (method != 0 && lo < 0 ? -1L : 0L)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0xFFFFFFFFUL;
     }
@@ -263,8 +246,7 @@ DWORD WINAPI SetFilePointer(HANDLE h, long lo, long *hi,
     r.ecx = ((DWORD)lo) >> 16;
     r.edx = ((DWORD)lo) & 0xFFFF;
     dos21(&r);
-    if (r.cf)
-    {
+    if (r.cf) {
         w32_seterr(w32_doserr(&r));
         return 0xFFFFFFFFUL;
     }
@@ -279,8 +261,7 @@ BOOL WINAPI FlushFileBuffers(HANDLE h)
     int d = w32_dosh(h);
     W32T("FlushFileBuffers");
 
-    if (d < 0)
-    {
+    if (d < 0) {
         w32_seterr(ERROR_INVALID_HANDLE);
         return FALSE;
     }

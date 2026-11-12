@@ -15,23 +15,20 @@
 #define PAGE 0x1000UL
 #define VB_PER 680
 
-typedef struct VBlock
-{
+typedef struct VBlock {
     DWORD base;
     DWORD size;
     DWORD handle;
 } VBlock;
 
-typedef struct VChunk
-{
+typedef struct VChunk {
     VBlock rec[VB_PER];
     DWORD handle;
     struct VChunk *next;
     DWORD unused;
 } VChunk;
 
-typedef struct MemInfo
-{
+typedef struct MemInfo {
     DWORD base, allocbase, allocprot, size, state, prot, type;
 } MemInfo;
 
@@ -47,8 +44,7 @@ void *w32_pages(DWORD bytes, DWORD *handle)
     r.ebx = bytes >> 16;
     r.ecx = bytes & 0xFFFF;
     dpmi31(&r);
-    if (r.cf)
-    {
+    if (r.cf) {
         *handle = 0;
         return NULL;
     }
@@ -111,40 +107,33 @@ LPVOID WINAPI VirtualAlloc(LPVOID addr, DWORD size, DWORD type,
     W32V("s", size);
     W32V("t", type);
 
-    if (size == 0 || !(type & (MEM_COMMIT | MEM_RESERVE)))
-    {
+    if (size == 0 || !(type & (MEM_COMMIT | MEM_RESERVE))) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return NULL;
     }
-    if (addr != NULL)
-    {
+    if (addr != NULL) {
         b = vfind((DWORD)addr);
         if (b == NULL || (DWORD)addr + size < (DWORD)addr ||
-                (DWORD)addr + size > b->base + b->size)
-        {
+                (DWORD)addr + size > b->base + b->size) {
             w32_seterr(ERROR_INVALID_ADDRESS);
             return NULL;
         }
         return (LPVOID)((DWORD)addr & ~(PAGE - 1));
     }
     rs = (size + PAGE - 1) & ~(PAGE - 1);
-    if (rs < size || rs > 0x7FFFF000UL)
-    {
+    if (rs < size || rs > 0x7FFFF000UL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
     b = vnew();
     p = b ? w32_pages(rs, &h) : NULL;
-    if (p != NULL && ((DWORD)p & (PAGE - 1)))
-    {
+    if (p != NULL && ((DWORD)p & (PAGE - 1))) {
         w32_freepages(h);
         p = w32_pages(rs + PAGE, &h);
         base = ((DWORD)p + PAGE - 1) & ~(PAGE - 1);
-    }
-    else
+    } else
         base = (DWORD)p;
-    if (p == NULL)
-    {
+    if (p == NULL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
@@ -163,14 +152,12 @@ BOOL WINAPI VirtualFree(LPVOID addr, DWORD size, DWORD type)
     if (b == NULL ||
             (type != MEM_RELEASE && type != MEM_DECOMMIT) ||
             (type == MEM_RELEASE && (size != 0 ||
-                                     b->base != (DWORD)addr)))
-    {
+                                     b->base != (DWORD)addr))) {
         w32_seterr(b == NULL ? ERROR_INVALID_ADDRESS :
                    ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (type == MEM_RELEASE)
-    {
+    if (type == MEM_RELEASE) {
         w32_freepages(b->handle);
         b->base = 0;
     }
@@ -185,25 +172,21 @@ DWORD WINAPI VirtualQuery(const void *addr, MemInfo *mi,
     W32T("VirtualQuery");
     W32V("q", addr);
 
-    if (len < sizeof(MemInfo))
-    {
+    if (len < sizeof(MemInfo)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
     b = vfind(a);
     w32_zero(mi, sizeof(MemInfo));
     mi->base = a;
-    if (b)
-    {
+    if (b) {
         mi->allocbase = b->base;
         mi->allocprot = 4;
         mi->size = b->base + b->size - a;
         mi->state = MEM_COMMIT;
         mi->prot = 4;
         mi->type = 0x20000UL;
-    }
-    else
-    {
+    } else {
         /* memory we did not allocate (stack, images): committed,
            the whole address space below 2 GB as one region */
         mi->allocbase = 0;
@@ -222,8 +205,7 @@ void w32_memfree(void)
     DWORD i;
 
     vhead = NULL;
-    while (c)
-    {
+    while (c) {
         for (i = 0; i < VB_PER; i++)
             if (c->rec[i].base)
                 w32_freepages(c->rec[i].handle);

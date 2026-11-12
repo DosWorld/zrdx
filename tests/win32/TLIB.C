@@ -5,15 +5,13 @@
  * Task 191: strings, memory functions, ctype, utilities and time
  * of MSVCRT.DLL. Prints "LIB: ok" or "LIB: fail NN".
  */
-typedef struct Tm
-{
+typedef struct Tm {
     int tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year,
         tm_wday,
         tm_yday, tm_isdst;
 } Tm;
 
-typedef struct TimeB
-{
+typedef struct TimeB {
     long time;
     unsigned short millitm;
     short timezone;
@@ -66,7 +64,7 @@ extern int __cdecl _isctype(int, int);
 extern char *__cdecl setlocale(int, const char *);
 extern void __cdecl qsort(void *, unsigned, unsigned,
                           int (__cdecl *)(const void *,
-                              const void *));
+                                  const void *));
 extern void *__cdecl bsearch(const void *, const void *,
                              unsigned,
                              unsigned,
@@ -207,8 +205,7 @@ static void ctype_tests(void)
 {
     int c, ok = 1;
 
-    for (c = 0; c < 128; c++)
-    {
+    for (c = 0; c < 128; c++) {
         if (!!isalpha(c) != ((c >= 'a' && c <= 'z') ||
                              (c >= 'A' && c <= 'Z')))
             ok = 0;
@@ -227,7 +224,7 @@ static void ctype_tests(void)
         if (!!ispunct(c) != (isgraph(c) && !isalnum(c)))
             ok = 0;
         if (!!isxdigit(c) != (isdigit(c) || (c >= 'a'
-            && c <= 'f') ||
+                                             && c <= 'f') ||
                               (c >= 'A' && c <= 'F')))
             ok = 0;
         if (!!isupper(c) != (c >= 'A' && c <= 'Z'))
@@ -275,7 +272,7 @@ static void util_tests(void)
     CHECK(bsearch(&key, v, 500, sizeof(int), cmp_int) == 0);
     qsort(v, 1, sizeof(int), cmp_int);
     CHECK(abs(-5) == 5 && abs(5) == 5
-        && labs(-70000L) == 70000L);
+          && labs(-70000L) == 70000L);
     CHECK(_putenv("ZRDXLIB=value1") == 0);
     CHECK(getenv("ZRDXLIB") != 0 &&
           same(getenv("ZRDXLIB"), "value1"));
@@ -317,15 +314,15 @@ static void time_tests(void)
     t = 1700000000L;
     g = gmtime(&t);
     CHECK(g->tm_year == 123 && g->tm_mon == 10
-        && g->tm_mday == 14);
+          && g->tm_mday == 14);
     CHECK(g->tm_hour == 22 && g->tm_min == 13
-        && g->tm_sec == 20);
+          && g->tm_sec == 20);
     CHECK(g->tm_wday == 2 && g->tm_yday == 317
-        && g->tm_isdst == 0);
+          && g->tm_isdst == 0);
     t = 951782400L;
     g = gmtime(&t);
     CHECK(g->tm_year == 100 && g->tm_mon == 1
-        && g->tm_mday == 29);
+          && g->tm_mday == 29);
     CHECK(g->tm_yday == 59);
     t = -1;
     CHECK(gmtime(&t) == 0);
@@ -352,12 +349,12 @@ static void time_tests(void)
     tm.tm_mon = 0;
     tm.tm_year = 124;
     CHECK(mktime(&tm) == 1704067199L - 86399L
-        && tm.tm_mday == 31);
+          && tm.tm_mday == 31);
     tm.tm_sec = 3600 * 25;
     CHECK(mktime(&tm) >= 0 && tm.tm_mday == 1
-        && tm.tm_hour == 1);
+          && tm.tm_hour == 1);
     CHECK(same(asctime(gmtime(&t)),
-        "Tue Nov 14 22:13:20 2023\n"));
+               "Tue Nov 14 22:13:20 2023\n"));
     CHECK(same(ctime(&t), "Tue Nov 14 22:13:20 2023\n"));
     CHECK(strftime(b, 100,
                    "%a|%A|%b|%B|%d|%H|%I|%j|%m|%M|%p|%S|%U|%w"
@@ -379,9 +376,9 @@ static void time_tests(void)
     dd = difftime(5, 2);
     CHECK(((unsigned long *)&dd)[1] == 0x40080000UL);
     CHECK(strlen(_strdate(b)) == 8 && b[2] == '/'
-        && b[5] == '/');
+          && b[5] == '/');
     CHECK(strlen(_strtime(b)) == 8 && b[2] == ':'
-        && b[5] == ':');
+          && b[5] == ':');
     CHECK(_timezone == 0 && _tzname[0] != 0);
 }
 

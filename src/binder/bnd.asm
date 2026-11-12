@@ -32,13 +32,15 @@ SuccMsg: db 'Binding complete', 13, 10, 0
 UserTermMsg: db 13, 10, 'Terminated by user answer', 0
 CBMsg: db 13, 10, 'Terminated by Control-Break', 0
 NotAccessMsg: db 'File "', 1, '" is not accessable.', 0
-OverwriteMsg: db 'File "', 1, '" already exist, do you want to overwrite it?(y/n)', 0
+OverwriteMsg: db 'File "', 1, \
+        '" already exist, do you want to overwrite it?(y/n)', 0
 OpenErrMsg: db 'Can', "'", 't open file "', 1, '"', 0
 CreatErrMsg: db 'Can', "'", 't create file "', 1, '"', 0
 TCreatErrMsg: db 'Can', "'", 't create temporary file', 0
 TWriteErrMsg: db 'Can', "'", 't write temporary file', 1, 0
 WriteErrMsg: db 'Can', "'", 't write file "', 1, '"', 1, 0
-TRenErrMsg: db 'Can', "'", 't rename temporary file to "', 1, '"', 0
+TRenErrMsg: db 'Can', "'", 't rename temporary file to "', 1, \
+        '"', 0
 RenErrMsg: db 'Can', "'", 't rename "', 1, '" to "', 1, '"', 0
 DelErrMsg: db 'Can', "'", 't delete file "', 1, '"', 0
 ReadErrMsg: db 'Can', "'", 't read file "', 1, '"', 0
@@ -48,10 +50,12 @@ DiskFullMsg: db ', disk full ?'
 EmptyMsg: db 0
 HelpMsg: db "Usage:", 13, 10
 db "  zrdxbind -r [-y][-n] <target file> [backup file]", 13, 10
-db "     replace stub in the target file and make a backup copy to backup file", 13, 10
+db "     replace stub in the target file and make a backup ", \
+    "copy to backup file", 13, 10
 db "     (target name with .bak extention is default)", 13, 10
 db "     -n option: don't make backup", 13, 10
-db "     -y option: assume yes on all questions(never prompt for overwrite)", 13, 10
+db "     -y option: assume yes on all questions", \
+    "(never prompt for overwrite)", 13, 10
 db "  zrdxbind [-c] [-y] <old file> <new file>", 13, 10
 db "     copy <old file> with new stub to <new file>", 13, 10
 db "  zrdxbind -w [-y] [target file]", 13, 10
@@ -204,7 +208,10 @@ start:
         rep stosw            ;initialize BSS to zero
         mov ah, 9
 section .data
-IntroMsg: db 'Zurenava DOS extender bind utility ver.0.52OSE. (C) 1998-1999, Sergey Belyakov', 13, 10, '(C) 2026, Viacheslav Komenda', 13, 10, '$'
+IntroMsg: db 'Zurenava DOS extender bind utility ', \
+    'ver.0.52OSE. ', \
+    '(C) 1998-1999, Sergey Belyakov', 13, 10, \
+    '(C) 2026, Viacheslav Komenda', 13, 10, '$'
 CfgTrailer: db 'ZRDX'
         dw 0
         dw 400h
@@ -221,20 +228,24 @@ section .text
 %define SwitchFlags dh
         xor dx, dx               ;clear SwitchFlags & ParamCount
         _do
-          lodsb                  ;get next symbol from command line
+          ; get next symbol from command line
+          lodsb
 L0@8:
         call charclass         ;check it class
         _enddo jl
         je end_param           ;if EOL
         ja do_switch           ;if '-' or '/'
-        cmp param_count, 2      ;more then 2 parameters are not allowed
+        ; more then 2 parameters are not allowed
+        cmp param_count, 2
         ja TooManyParms
         inc param_count
         mov di, [ParamBase]  ;get address of parameter buffer
-        add word [ParamBase], 140 ;shift pointer to next parameter
+        ; shift pointer to next parameter
+        add word [ParamBase], 140
         mov bx, di
         mov [bx + NamePath], di   ;inital size of the path
-        mov [bx + NameWOExt], di  ;inital size of the name without extension
+        ; inital size of the name without extension
+        mov [bx + NameWOExt], di
         cmp byte [si], ':'  ;parameter has a drive in pathname?
         _ifnot jne
           add word [bx + NamePath], 2
@@ -257,7 +268,8 @@ L0@8:
           _break je
           call charclass
         _enddo jg
-        sub di, bx         ;calculate and store full size of the name
+        ; calculate and store full size of the name
+        sub di, bx
         mov [bx + NameFull], di
         sub [bx + NamePath], bx     ;convert offset to size
         sub [bx + NameWOExt], bx    ;---- // ------
@@ -348,7 +360,8 @@ section .text
             lodsw
             stosw
             stosw
-            rep movsb                ;copy fp[0] to fp[1] without extention len
+            ; copy fp[0] to fp[1] without extention len
+            rep movsb
           _else jmp
             test SwitchFlags, sf_n
 ParamErr1:
@@ -357,7 +370,8 @@ ParamErr1:
           mov di, DestName
           mov si, BakExtTpl
           call set_default_ext         ;.BAK to destination
-          mov si, SrcName        ;get temporary directory from fp[0]
+          ; get temporary directory from fp[0]
+          mov si, SrcName
           test SwitchFlags, sf_n
           mov al, 2h
           jz OvrCheck@8
@@ -417,12 +431,15 @@ Exit:
         mov di, TempName
         mov dx, di
         mov cx, [si + NamePath]
-        rep movsb                          ;copy path only from dest name or srcname
+        ; copy path only from dest name or srcname
+        rep movsb
         mov si, TempNameTpl
         mov cl, 12
-        rep movsb                          ;append fixed temporary name
+        ; append fixed temporary name
+        rep movsb
         mov si, TCreatErrMsg
-        call DosCreat                       ;create temporary file
+        ; create temporary file
+        call DosCreat
         mov [out_handle], ax
 %define _newheader_pos_h si
 %define _newheader_pos_l di
@@ -469,8 +486,10 @@ main_cicle:
           _ifnot jne
             cmp word [header_count], 40h
             jb BadHeader
-            mov _t_l, word [buffer + 40h - 4]   ;e_lfanew wins even
-            or _t_l, word [buffer + 40h - 2]    ;inside the MZ image
+            ; e_lfanew wins even
+            mov _t_l, word [buffer + 40h - 4]
+            ; inside the MZ image
+            or _t_l, word [buffer + 40h - 2]
             _ifnot jz
               mov _msize_h, word [buffer + 40h - 2]
               mov _msize_l, word [buffer + 40h - 4]
@@ -515,7 +534,8 @@ BadHeader:
         _else
           cmp ax, 'LE'
         _toelse jne
-          mov _msize_l, word [buffer + 14h]     ;number of pages in image
+          ; number of pages in image
+          mov _msize_l, word [buffer + 14h]
           mov _msize_h, word [buffer + 14h + 2]
           mov _t_h, 12
           _do

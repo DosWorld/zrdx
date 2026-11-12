@@ -1,4 +1,5 @@
-; DPMI memory exhaustion: failed 0501h/0503h must return an error and leave the host working
+; DPMI memory exhaustion: failed 0501h/0503h must return an error
+; and leave the host working
 %include "t.inc"
 bits 32
 global start

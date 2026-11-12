@@ -16,8 +16,7 @@
 
 W32_ANCHOR;
 
-typedef struct AtChunk
-{
+typedef struct AtChunk {
     PVFV fn[AT_PER];
     DWORD count;
     struct AtChunk *next;
@@ -60,8 +59,7 @@ int __cdecl atexit(PVFV fn)
 
     if (fn == NULL)
         return -1;
-    if (c == NULL || c->count == AT_PER)
-    {
+    if (c == NULL || c->count == AT_PER) {
         c = crt_alloc(sizeof(AtChunk));
         if (c == NULL)
             return -1;
@@ -100,10 +98,8 @@ static void run_atexit(void)
     AtChunk *c;
     PVFV fn;
 
-    while ((c = atexits) != NULL)
-    {
-        if (c->count == 0)
-        {
+    while ((c = atexits) != NULL) {
+        if (c->count == 0) {
             atexits = c->next;
             crt_free(c);
             continue;
@@ -208,8 +204,7 @@ static int split(const char *s, char **argv, char *buf)
     int argc = 0, inq, n;
     char *o = buf;
 
-    for (;;)
-    {
+    for (;;) {
         while (*s == ' ' || *s == '\t')
             s++;
         if (*s == 0)
@@ -217,22 +212,17 @@ static int split(const char *s, char **argv, char *buf)
         if (argv)
             argv[argc] = o;
         argc++;
-        if (argc == 1 && *s == '"')
-        {
+        if (argc == 1 && *s == '"') {
             for (s++; *s && *s != '"'; s++)
                 PUT(*s);
             if (*s)
                 s++;
-        }
-        else
-        {
+        } else {
             inq = 0;
-            while (*s && (inq || (*s != ' ' && *s != '\t')))
-            {
+            while (*s && (inq || (*s != ' ' && *s != '\t'))) {
                 for (n = 0; *s == '\\'; s++)
                     n++;
-                if (*s == '"')
-                {
+                if (*s == '"') {
                     for (; n >= 2; n -= 2)
                         PUT('\\');
                     if (n)
@@ -240,13 +230,10 @@ static int split(const char *s, char **argv, char *buf)
                     else
                         inq = !inq;
                     s++;
-                }
-                else
-                {
+                } else {
                     for (; n > 0; n--)
                         PUT('\\');
-                    if (*s)
-                    {
+                    if (*s) {
                         PUT(*s);
                         s++;
                     }
@@ -371,8 +358,7 @@ unsigned __cdecl _controlfp(unsigned value, unsigned mask)
     unsigned ms = to_ms(crt_getcw());
 
     mask &= MCW_EM | MCW_RC | MCW_PC;
-    if (mask)
-    {
+    if (mask) {
         ms = (ms & ~mask) | (value & mask);
         crt_setcw(from_ms(ms, crt_getcw()));
         ms = to_ms(crt_getcw());
@@ -389,23 +375,20 @@ BOOL WINAPI CrtMain(HANDLE inst, DWORD reason, LPVOID reserved)
 {
     AtChunk *c, *n;
 
-    if (reason == 1)
-    {
+    if (reason == 1) {
         crt_ctype_init();
         crt_clock_start();
         _acmdln = GetCommandLineA();
         _wcmdln = GetCommandLineW();
-    }
-    else if (reason == 0)
-    {
-        for (c = atexits; c; c = n)
-        {
+    } else if (reason == 0) {
+        for (c = atexits; c; c = n) {
             n = c->next;
             crt_free(c);
         }
         atexits = NULL;
         crt_io_free();
         crt_lib_free();
+        crt_wide_free();
         crt_free(argv_blk);
         crt_free(env_blk);
         argv_blk = NULL;

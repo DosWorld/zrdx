@@ -5,7 +5,9 @@
 ;real mode init routines
         SEGM IData16
         LByte IntroMsg
-        db 'Zurenava DOS extender, version 0.52OSE. Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, 'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
+        db 'Zurenava DOS extender, version 0.52OSE. ', \
+        'Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, \
+        'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
         LByte FirstError
         db 'ZRDX init error:$'
         LByte VersionEM
@@ -69,7 +71,8 @@
         ;RMCodeSize = 0 ;SegSizeEText16
         mov bp, cs
         ;mov  ss, bp
-        lea ax, [bp + si + ((ROffLoaderEnd + 200h + 15) / 16) + MouseRHandlerPSize]
+        lea ax, [bp + si + ((ROffLoaderEnd + 200h + 15) / 16) \
+                + MouseRHandlerPSize]
         lea bx, [bp + MouseRHandlerPSize]
         lea bp, [bx + si]
         add [ROff %+ %2 + PSP], si
@@ -83,7 +86,8 @@
         push es
         push di
         mov di, ROffLoaderEnd - 4
-        mov si, ROffLoaderEnd - 4 + PSPSize               ;!!!!!!!!!!!!!!
+        ; !!!!!!!!!!!!!!
+        mov si, ROffLoaderEnd - 4 + PSPSize
         mov cx, (ROffLoaderEnd - ROffPermanentPart + 3) / 4
         mov es, bp
         std
@@ -93,7 +97,8 @@
         mov ax, 1
         mov es, bx
         mov si, ROffSwitchModeEM
-        cld                 ;workaround for MS NT5(windows 2000) beta 3
+        ; workaround for MS NT5(windows 2000) beta 3
+        cld
         retf
 %endmacro
         SEGM IText16
@@ -115,9 +120,12 @@ TryDPMI@167:
         jmp RInitError
 .absent:
         ret
-        ;InitRXV fills the switch stubs before the remaining init calls.
-%if (($-$$)-CurSegBaseR) < (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4)
-        times (ROffFirstSwitchCode + MaxSystemSwitchCode + nMaxCallbacks*4) - (($-$$)-CurSegBaseR) db 90h
+        ; InitRXV fills the switch stubs before the remaining
+        ; init calls.
+%if (($-$$)-CurSegBaseR) < (ROffFirstSwitchCode \
+        + MaxSystemSwitchCode + nMaxCallbacks*4)
+        times (ROffFirstSwitchCode + MaxSystemSwitchCode \
+                + nMaxCallbacks*4) - (($-$$)-CurSegBaseR) db 90h
 %endif
 %else
         ClientBody NoDPMI@167, MemBlock0Size
@@ -214,7 +222,8 @@ RoleOpen@170:
 .fail:  mov si, ROffFileAccessEM
         jmp RInitError
 
-;ds = environment, es = PSP. CF set if the run is a client role: the
+; ds = environment, es = PSP. CF set if the run is a client role:
+; the
 ;environment holds ZRDXROLE= or the command tail starts with the
 ;marker token "/#R" (task 172).
 RoleCheck@172:
@@ -244,7 +253,8 @@ RoleCheck@172:
 
 %ifdef NATIVEPE
 ;Host role, ds = es = PSP. If the first token of the command tail
-;names a PE file, the tail becomes "<own path> /#R <old tail>": the
+; names a PE file, the tail becomes "<own path> /#R <old tail>":
+; the
 ;host then runs itself as the client role (task 172).
 PEWrap@172:
         mov si, 81h
@@ -413,7 +423,8 @@ CriticalInitVCPI@167:
           mov cx, dx
         _endif
         mov ax, ds
-        sub ax, cx             ;get para size of dpmi real mode segment
+        ; get para size of dpmi real mode segment
+        sub ax, cx
                                 ;and vcpi page0
         neg ax
         mov [ROffMemBlock0Size + PSP], ax
@@ -454,10 +465,13 @@ CriticalInitVCPI@167:
         pop word [di]
         add di, 8
         _enddo loop
-        mov byte [ROffLDTFree + (16 / 8) + PSP], 11110b ;set bitmask for allocated descriptors
+        ; set bitmask for allocated descriptors
+        mov byte [ROffLDTFree + (16 / 8) + PSP], 11110b
 %endif
-        mov di, WinSize + 1000h + (OffLastInit - KernelBase) - 4  ;skip first page and
-        mov si, OffProtectedStart + (OffLastInit - KernelBase) + PSP - 4
+        ; skip first page and
+        mov di, WinSize + 1000h + (OffLastInit - KernelBase) - 4
+        mov si, OffProtectedStart + (OffLastInit - KernelBase) \
+                + PSP - 4
         std
         xor eax, eax
         mov cx, (OffLastInit - KernelBase) / 4
@@ -486,15 +500,19 @@ LSR equ -(OffProtectedStart) + 1000h + WinSize
         mov [cs:ROffSwitchTableCR3], eax
         mov di, OffPageDir + LSX
         call MovePageRef@167
-        mov [(OffPage2 + ((OffPage0 - KernelBase) >> 10)) + LSX], eax       ;mov Page0Ref[LSX], eax
+        ; mov Page0Ref[LSX], eax
+        mov [(OffPage2 + ((OffPage0 - KernelBase) >> 10)) \
+                + LSX], eax
         mov eax, [si + ((OffPage2 + LSX) / 1024) - 4]
-        call MovePageRef1@167    ;set reference to page 2 in the page directory
+        ; set reference to page 2 in the page directory
+        call MovePageRef1@167
 
         mov di, OffPage2 + LSX
         add si, WinSize / 1024
         mov cl, (OffLastInit - KernelBase + 0FFFh) / 1000h
         _do
-        call MovePageRef@167     ;set references to kernel in the page 2 table
+        ; set references to kernel in the page 2 table
+        call MovePageRef@167
         _enddo loop
         jmp SwitchToPM
         ;mov  esi, ROffSwitchTable
@@ -513,12 +531,15 @@ MovePageRef1@167:
 
 %ifdef CLIENTROLE
         LLabel DefaultFlatDescriptor
-        Descr 0, 0FFFFFh, 0CF93h               ;Flat data descriptor
+        ; Flat data descriptor
+        Descr 0, 0FFFFFh, 0CF93h
         LLabel ILoaderEntry0
         jc near RInitError
         LLabel ILoaderEntry
-        movzx esp, sp                   ;workaround for windows 3000:)
-        mov [ROffSavedPSP + LS], es          ;save psp to extender
+        ; workaround for windows 3000:)
+        movzx esp, sp
+        ; save psp to extender
+        mov [ROffSavedPSP + LS], es
         mov [ROfflSavedPSP + LS], es         ;save psp to loader
         mov edi, ROffDefaultFlatDescriptor + LS
         mov ax, cs
@@ -529,9 +550,11 @@ MovePageRef1@167:
         mov cx, 1
         push ds
         pop es
-        int 31h                         ;allocate selector for flat
+        ; allocate selector for flat
+        int 31h
         jc near PInitErrorSel
-        mov [ROffFlatSelector + LS], ax      ;save flat selector to extender
+        ; save flat selector to extender
+        mov [ROffFlatSelector + LS], ax
         xchg bx, ax
         mov ax, 0Ch
         int 31h                     ;set flat descriptor
@@ -540,18 +563,23 @@ MovePageRef1@167:
         mov dx, ExtenderSize / 4
         mov cx, ExtenderFullSize
         mov bp, ExtenderStart + LS
-        call AllocAndMove@167          ;allocate and move extender
+        ; allocate and move extender
+        call AllocAndMove@167
         mov [ROffExtenderSel + LS], bx
 %ifdef PEMAX
         mov [ROffExtenderSelB + LS], bx
         mov [ROffExtenderSelC + LS], bx
         mov [ROffExtenderSelD + LS], bx
         mov [ROffExtenderSelE + LS], bx
+        mov [ROffExtenderSelV + LS], bx
 %endif
-        mov bp, bx                 ;save code selector for extender
+        ; save code selector for extender
+        mov bp, bx
         mov ds, ax
-        push bx                     ;save code selector on the stack
-        push ax                     ;save data selector on the stack
+        ; save code selector on the stack
+        push bx
+        ; save data selector on the stack
+        push ax
         ;es, ds - selector of the extender
 ;assume es:EGroup
         mov [dword OffSelReference0 - 4], ax
@@ -582,11 +610,15 @@ MovePageRef1@167:
         int 31h        ;set vector XXX
         jc PInitErrorSetVect
         add si, ExtHandlerStep
-        cmp si, OffFirstExtHandler + NHookedInterrupts * ExtHandlerStep
+        cmp si, OffFirstExtHandler + NHookedInterrupts \
+                * ExtHandlerStep
         _enddo jb
-        mov [dword OffClientInt0Vector + 4], cx ;set default selector
-                                                 ;for client int0 handler
-;----------------- set interrupt vector for coprocessor ---------------------
+        ; set default selector
+        mov [dword OffClientInt0Vector + 4], cx
+                                                 ; for client
+                                                 ; int0 handler
+; ----------------- set interrupt vector for coprocessor
+; ---------------------
         mov ax, 400h
         int 31h
         mov bl, dl
@@ -601,11 +633,15 @@ MovePageRef1@167:
         mov ax, 205h
         int 31h
         jc PInitErrorSetVect
-;----------------------allocate a callback for mouse-------------------------
-        mov [dword OffMouseHookProc + 4], bp      ;setup selector for default mouse hook proc
+; ----------------------allocate a callback for
+; mouse-------------------------
+        ; setup selector for default mouse hook proc
+        mov [dword OffMouseHookProc + 4], bp
         mov esi, MouseCallbackHandler
-        mov di, OffMouseCallbackStruct   ;high part of edi already zero
-        mov ds, bp                       ;code selector of the extender
+        ; high part of edi already zero
+        mov di, OffMouseCallbackStruct
+        ; code selector of the extender
+        mov ds, bp
         mov ax, 303h
         int 31h
         mov si, ROffErrAllocCBackEM + LS
@@ -617,7 +653,8 @@ MovePageRef1@167:
         RRT
         mov [es:dword OffMouseCallbackPlace1], ecx
 %ifdef EDebug
-;---------------------------- init debugger --------------------------------
+; ---------------------------- init debugger
+; --------------------------------
         push ss
         pop ds
         push ss
@@ -632,7 +669,8 @@ MovePageRef1@167:
         call dword far [esp]
         add sp, 6
 %endif
-;----------------------------- setup loader ---------------------------------
+; ----------------------------- setup loader
+; ---------------------------------
         mov dx, LoaderSize / 4
         mov cx, LoaderFullSize
         mov bp, LoaderStart + LS
@@ -671,7 +709,8 @@ PInitError:
         mov ax, 4Cffh
         int 21h
 DispStrWithDPMI:
-        mov word [di + DC_DS], 0              ;put transfer segment here
+        ; put transfer segment here
+        mov word [di + DC_DS], 0
         LLabel PatchPoint8
         xor ecx, ecx
         mov [di + DC_EDX], si
@@ -739,7 +778,8 @@ AllocAndMove@167:
 %endif
         .8086
 ;RInitMemError:
-;---------------------------------- startup ----------------------------------
+; ---------------------------------- startup
+; ----------------------------------
 RSetup:
 ..start:
         mov ah, 30h
@@ -760,7 +800,8 @@ RSetup:
         pushf
         pop ax
         mov bh, 0F0h
-        sub ah, bh       ;check if all bits 12-15 in flags are set
+        ; check if all bits 12-15 in flags are set
+        sub ah, bh
         _ifnot jnc
           or ah, bh       ;try to set bits 12-15
           push ax
@@ -787,7 +828,8 @@ cpu 386
         shr eax, 19
         mov ah, 3
         jc EndCPUDetect@167
-        mov byte [ROffPatchPoint4 + PSP - 1], 77h      ;set PCD in int31(800h)
+        ; set PCD in int31(800h)
+        mov byte [ROffPatchPoint4 + PSP - 1], 77h
         mov ah, 4
         test al, 4
         jnz EndCPUDetect@167
@@ -810,7 +852,8 @@ EndCPUDetect@167:
         inc ax
         cmp [di], ax
         _ifnot jz
-;----------------------- real mode init error handler ------------------------
+; ----------------------- real mode init error handler
+; ------------------------
 RInitError:
         mov dx, ROffFirstError
         mov ah, 9
@@ -880,7 +923,8 @@ NoRole@170:
         pop dx
         _ifnot jnc
           mov ax, 3D20h           ;read only, deny write
-                                 ;the file may be opened by other instance
+                                 ; the file may be opened by
+                                 ; other instance
                                  ;with same open mode only
           int 21h
           jc RInitError
@@ -940,7 +984,8 @@ CfgDone:
 FrontDone@171:
 %endif
 %endif
-;------------ Setup linear disp for all references to 16Stub -----------------
+; ------------ Setup linear disp for all references to 16Stub
+; -----------------
         xor ebx, ebx
         push cs
         pop bx
@@ -953,10 +998,12 @@ FrontDone@171:
         inc si
         _enddo jnz
 %ifdef CLIENTROLE
-        mov ax, [ROffTransferBufferPSize + PSP]  ;patch transfer buffer size
+        ; patch transfer buffer size
+        mov ax, [ROffTransferBufferPSize + PSP]
         mov [ROffPatchPointTStSz - 2 + PSP], ax  ;in loader code
 %endif
-        shr byte [InitFlags + PSP], 1    ;DPMI/VCPI check sequence?
+        ; DPMI/VCPI check sequence?
+        shr byte [InitFlags + PSP], 1
         _ifnot jnc
           call TryVCPI@167
           call TryDPMI@167
@@ -1019,7 +1066,8 @@ SwArgs@167:
         int 21h
         mov [ROffSwapPSP + PSP], bx
         mov ax, [2Ch]              ;the real environment, before
-        mov [ROffSwapNameSeg + PSP], ax  ;the PM selector replaces it
+        ; the PM selector replaces it
+        mov [ROffSwapNameSeg + PSP], ax
         push es
         mov ah, 34h
         int 21h                  ;InDOS flag address
@@ -1042,20 +1090,26 @@ TryXMS@167:
         jc RInitError
 ;patch 2 points for working under RAW/XMS
         mov word [VCPIRICall + PSP], JmpShortCode + 1 * 100h
-        mov word [PatchPoint + PSP], JmpShortCode + (RawSwitcherToPM - PatchPoint - 2) * 100h
+        mov word [PatchPoint + PSP], JmpShortCode \
+                + (RawSwitcherToPM - PatchPoint - 2) * 100h
         call FindXMSServer
         jnz near TryRAW@167
         mov ah, 5
         call far [ROffXMC + PSP]         ;local enable A20
         or ax, ax
-        _ifnot jnz               ;extended memory not available if impossible to enable A20
-          dec byte [ROffXMSBlockNotAllocated + PSP]  ;disable XMS block allocation
+        ; extended memory not available if impossible to enable
+        ; A20
+        _ifnot jnz
+          ; disable XMS block allocation
+          dec byte [ROffXMSBlockNotAllocated + PSP]
           jmp InitRX
         _endif
-        mov byte [ROffA20State + PSP], 5 ;host owns one local enable
+        ; host owns one local enable
+        mov byte [ROffA20State + PSP], 5
 ;change gate descriptor for PM->RM mode switch in XMS/RAW
 InitRX:
-        mov dword [ROffVCPICallDesc + PSP], ROffL0234 + ((VCPISelector + 8) << 16)
+        mov dword [ROffVCPICallDesc + PSP], ROffL0234 \
+                + ((VCPISelector + 8) << 16)
         mov byte [ROffVCPICallDesc + PSP + 6], 0
         jmp InitRXV
 FindXMSServer:
@@ -1065,15 +1119,18 @@ FindXMSServer:
         cmp al, 80h                ;is XMS available ?
         _ifnot jne
           mov ax, 4310h
-          int 2Fh                  ;get XMS entry - always succefful
+          ; get XMS entry - always succefful
+          int 2Fh
           mov [ROffXMC + PSP], bx
           mov [ROffXMC + PSP + 2], es
-          inc byte [ROffXMSBlockNotAllocated + PSP]  ;enable XMS block allocation
+          ; enable XMS block allocation
+          inc byte [ROffXMSBlockNotAllocated + PSP]
           xor bx, bx        ;clear ZF
         _endif
         ret
 TryVCPI@167:
-;@@VTest:                    ;in V86 mode int 67h shall be supported anywhere
+; @@VTest:                    ;in V86 mode int 67h shall be
+; supported anywhere
         mov ax, 0DE00h     ;else V86 monitor is incorrect
         xor ebp, ebp
         mov fs, bp
@@ -1094,13 +1151,15 @@ VETest@167:
         _ifnot jz
           ret
         _endif
-;---------------------- init DPMI host under VCPI----------------------------
+; ---------------------- init DPMI host under
+; VCPI----------------------------
         inc byte [ROffVCPIMemAvailable + PSP]
         call FindXMSServer
         mov ax, 0DE03h
         int 67h
         mov [ROffTotalVCPIPages + PSP], edx
-;------------------- init DPMI host under VCPI/XMS/RAW -----------------------
+; ------------------- init DPMI host under VCPI/XMS/RAW
+; -----------------------
 InitRXV:
         push ds
         pop es
@@ -1114,7 +1173,8 @@ InitRXV:
         mov cx, (OffLastInit - OffSavedRealVectors) / 2
         rep stosw
 PatchPoint7:
-        jmp short PatchPoint7End  ;this code may by replaced with "mov eax,"
+        ; this code may by replaced with "mov eax,"
+        jmp short PatchPoint7End
         ;mov  eax, 0
         ;org  $-4
         dw int15handler, DGROUP16
@@ -1139,7 +1199,8 @@ PatchPoint7End:
         inc dl
         _enddo jnz
 
-;------------------------- set gate descriptor in GDT -----------------------
+; ------------------------- set gate descriptor in GDT
+; -----------------------
         movsw               ;low word of entry disp
         mov ax, Code1Selector
         stosw               ;selector
@@ -1150,302 +1211,23 @@ PatchPoint7End:
         stosw               ;high word of entry disp
         _enddo loop
         ; -- special set trap selector for int 31h --
-        mov word [ROffFirstTrap3 + PSP + (4 * 31h) + 5], DPMIEntryGateSelector
-        mov byte [dword ROffFirstTrap3 + OffPMSaveStateTrap3 + 7 + PSP], RetfCode
+        mov word [ROffFirstTrap3 + PSP + (4 * 31h) + 5], \
+                DPMIEntryGateSelector
+        mov byte [dword ROffFirstTrap3 + OffPMSaveStateTrap3 \
+                + 7 + PSP], RetfCode
 %ifdef VENDORON
 %ifndef VENDORPE
-        mov byte [dword ROffFirstTrap3 + OffVendorTrap3 + 7 + PSP], RetfCode
+        mov byte [dword ROffFirstTrap3 + OffVendorTrap3 + 7 \
+                + PSP], RetfCode
 %endif
 %endif
 
-;-------------------------- init some TSS fields ------------------------
+; -------------------------- init some TSS fields
+; ------------------------
         mov dword [ROffTSS + PSP + TSS_ESP0], OffKernelStack
         mov dword [ROffTSS + PSP + TSS_ESP1], OffKernelStack1End
         mov word [ROffTSS + PSP + TSS_SS0], Data0Selector
         mov word [ROffTSS + PSP + TSS_SS1], Data1Selector
         mov word [ROffTSS + PSP + TSS_IOBASE], 0FFFFh
 
-;----------------------------- Fill  client IDT ------------------------------
-        mov di, ROffClientIDT + PSP
-        mov dx, OffDefIntTrap3
-        _do
-        mov [di], dx
-        mov word [di + 4], Trap3Selector
-        mov [di + ROffIDT - ROffClientIDT + 0], dx
-        mov word [di + ROffIDT - ROffClientIDT + 2], Trap3Selector
-        mov dword [di + ROffIDT - ROffClientIDT + 4], (0E0h + SS_GATE_TRAP3) << 8
-        add di, 8
-        add dx, 4
-        dec cl
-        _enddo jnz
-;------------------------ fill default exceptions table ---------------------
-        mov cl, 16
-        mov eax, OffDefaultExcTrap3
-        mov di, ROffClientExc + PSP
-        _do
-        mov word [di + 4], Trap3Selector
-        mov [di], eax
-        add ax, 4
-        add di, 8
-        _enddo loop
-;------------------------ Init hardware interrupts ---------------------------
-        mov ax, 0DE0Ah
-        call VCPIRICall
-        mov bh, cl
-        ;mov HardwareIntMapR[PSP], bx
-        mov esi, OffHIntHandlers & 0FFFFh
-        ;mov dx, JmpShortCode + ((23*4) shl 8)
-        mov ax, 8
-        movzx di, bl
-        call Init8Handlers
-        mov al, 70h
-        movzx di, bh
-        call Init8Handlers
-        xor di, di
-        mov ax, di
-        call Init8HandlersAbs
-        call Init8HandlersAbs
-;--------------------- generate code for real mode hooks ----------------
-        mov di, OffFirstSwitchCode + PSP
-        mov ax, ROffRMS_RMHandler - ROffFirstSwitchCode - 3
-        mov cx, (MaxSystemSwitchCode + nMaxCallbacks * 4) / 4
-        _do
-        mov byte [di], NearCallCode
-        mov [di + 1], ax
-        add di, 4
-        sub ax, 4
-        _enddo loop
-;------- calculate top of dos memory area, may be used by dpmi host --------
-        mov ah, 48h
-        mov bx, -(1)
-        int 21h
-        mov ax, [ROffTransferBufferPSize + PSP]
-        add ax, [ROffMemReserve + PSP]
-;ax - total size to reserve
-        mov cx, [2]       ;top of task memory
-        cmp bx, ax
-        _ifnot jae
-          sub cx, ax         ;decrase top if no another memory for transfer buffer
-          _ifnot ja
-            xor cx, cx
-          _endif
-        _endif
-        push cx
-;--------------------- hook autopassup interrupts ---------------
-        mov di, ROffAutoPassupRJmps
-        xor si, si
-        mov cx, 100h
-        _do
-          bt word [ROffPassupIntMap + PSP], si
-          _ifnot jnc
-            shl si, 2
-            cli
-            mov eax, [fs:si]
-            mov byte [cs:di], JmpFarCode
-            mov [cs:di + 1], eax
-            mov [fs:si + 2], cs
-            mov [fs:si], di
-            add di, 5
-            sti
-            shr si, 2
-          _endif
-          inc si
-        _enddo loop
-;---------------------- install terminate handler --------------------------
-        db 66h, 0B8h
-        dw TerminateRHandler
-        dw DGROUP16
-        xchg [0Ah], eax
-        mov [ROffOldInt22 + PSP], eax
-        pop cx
-        jmp CriticalInitVCPI@167
-
-TryRAW@167:
-        mov ah, 88h
-        int 15h
-        movzx ebp, ax
-        or ax, ax
-        _ifnot jz, near
-        cli
-        call IsA20Enabled
-        _ifnot je
-PS2@167:
-        mov word [ROffXMC + PSP], ROffA20Port
-        mov [ROffXMC + 2 + PSP], cs
-        mov byte [ROffA20State + PSP], 5
-        mov cx, 5000
-        in al, 92h
-        test al, 2
-        jnz NotPS2@167
-        or al, 2
-        jmp $ + 2
-        jmp $ + 2
-        out 92h, al
-        _do
-        jmp $ + 2
-        jmp $ + 2
-        in al, 92h
-        test al, 2
-        _enddo loopz
-        ;jz   @@NotPS2
-        call IsA20Enabled
-        je A20OK@167
-NotPS2@167:
-        mov word [ROffXMC + PSP], ROffA20KBC
-        mov si, ROffA20EnableSq + PSP
-        _do jmp
-        movzx dx, al
-        jmp $ + 2
-        outsb
-        _while
-        xor cx, cx
-        _do
-        jmp $ + 2
-        jmp $ + 2
-        in al, 64h
-        test al, 2
-        _enddo loopnz
-        jnz A20Err@167
-        lodsb
-        or al, al
-        _enddo jnz
-        mov dx, [gs:46Ch]    ;timer counter
-        _do                   ;wait for A20 about 2 timer ticks
-          call IsA20Enabled
-          je A20OK@167
-          sti
-          mov ax, [gs:46Ch]
-          sub ax, dx
-          cli
-          cmp ax, 2
-        _enddo jb
-A20Err@167:
-        sti
-        xor ebp, ebp
-        jmp RawPatch@167
-        _endif
-A20OK@167:
-        sti
-        mov di, 1
-        mov edx, 100000h       ;default value for top of the extended memory
-        call CheckVDisk
-        _ifnot jnz
-          mov dx, [es:di + 2Eh - 1] ;vdisk top in k
-          shl edx, 10          ;convert to bytes
-        _endif
-        les di, [gs:di - 1 + (19h * 4)]
-        ;add  di, 12h
-        call CheckVDisk
-        _ifnot jnz
-          mov eax, [es:di + 2Ch]
-          and eax, 0FFFFFFh
-          cmp eax, edx
-          _ifnot jbe
-            xchg eax, edx
-          _endif
-        _endif
-        _endif
-;ebp - size of mem window, <= 0FFFFh
-;edx - top of mem window
-        mov eax, [ROffMaxXMSAllocate + PSP]
-        ;shr  eax, 10                        ;convert to kilobytes
-        cmp eax, ebp
-        _ifnot jb
-          mov eax, ebp                     ;now hi word of eax is undefined!
-        _endif
-        sub bp, ax                         ;bp = leaved_mem_size
-        xchg ax, bp                         ;move allocation size to ebp
-        mov [ROffPatchPoint_int15 + 1 + PSP], ax  ;set new extended size, returned by my int 15 handler
-        shl eax, 10
-        add edx, eax                       ;shift my memory base to bottom of the window
-RawPatch@167:
-        mov word [PatchPoint7 + PSP], 0B866h       ;mov eax, ??????
-        mov bx, ROffFreeXMSCount + PSP
-        call TranslateMemLimits
-        jmp InitRX
-CheckVDisk:
-        cmp dword [es:di + 12h], 'VDIS'
-        _ifnot jne
-          cmp byte [es:di + 12h + 4], 'K'
-        _endif
-        ret
-        LLabel A20EnableSq
-        db 64h, 0D1h, 60h, 0DFh, 64h, 0FFh, 0
-
-IsA20Enabled:
-        xor bx, bx
-        mov gs, bx
-        dec bx
-        mov es, bx
-        inc bx
-        mov al, [es:bx + 10h]
-        mov ah, al
-        inc al
-        xchg al, [gs:bx]
-        cmp ah, [es:bx + 10h]
-        mov [gs:bx], al
-        ret
-
-
-;al - unmapped real mode interrup number
-;di - mapped interrupt number
-Init8Handlers:
-        test di, 111b
-        jne near HIntMapError@169
-        push di
-        shr di, 3
-        mov byte [di + ROffPassupIntPMap + PSP], 0FFh
-        pop di
-        cmp di, 18h
-        _ifnot jae
-          cmp di, 8
-          jne HIntMapError@169
-          ret
-        _endif
-Init8HandlersAbs:
-        _do
-        mov byte [si + ROffHIntHandlers + PSP - (OffHIntHandlers & 0FFFFh)], PushBCode
-        mov [si + ROffHIntHandlers + PSP - (OffHIntHandlers & 0FFFFh) + 1], al
-
-        mov ecx, (OffInterruptH & 0FFFFh) - 7       ;only interrupt
-        cmp di, 10h
-        _ifnot jae
-          mov cx, (OffException0DHandler & 0FFFFh) - 7
-          cmp di, 0Dh
-          _toendif je
-          mov cx, (OffExceptionOrInterruptH & 0FFFFh) - 7
-          bt word [ROffPassupIntPMap + PSP], di
-          _ifnot jc
-            mov cx, (OffExceptionWithCodeH & 0FFFFh) - 7
-            cmp di, 8
-            _ifnot jae
-              cmp di, 2
-              je NotExc@169
-              mov cx, (OffExceptionWOCodeH & 0FFFFh) - 7
-            _endif
-          _endif
-        _endif
-        mov byte [si + ROffHIntHandlers + PSP - (OffHIntHandlers & 0FFFFh) + 2], JmpNearCode
-        sub ecx, esi
-        mov [si + ROffHIntHandlers + PSP - (OffHIntHandlers & 0FFFFh) + 3], ecx
-        shl di, 2
-        mov [di + ROffFirstTrap3 + PSP + 3], al   ;set new redirected real mode number
-        shl di, 1
-        mov [di + ROffIDT + PSP], si
-        mov word [di + ROffIDT + PSP + 2], Code0Selector
-        mov word [di + ROffIDT + PSP + 4], (0E0h + SS_GATE_INT3) << 8
-        mov word [di + ROffIDT + PSP + 6], (OffHIntHandlers >> 16)
-        add si, 7
-        shr di, 3
-NotExc@169:
-        inc di
-        inc ax
-        test di, 111b
-        _enddo jnz
-        ret
-HIntMapError@169:
-        mov si, ROffIntMapEM
-        jmp RInitError
-
-
-        ESEG IText16
+%include "realini2.asm"

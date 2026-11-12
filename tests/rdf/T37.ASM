@@ -1,4 +1,5 @@
-; clipboard API: calls without pointers (open/empty/compact/caps/close) do not crash
+; clipboard API: calls without pointers
+; (open/empty/compact/caps/close) do not crash
 %include "t.inc"
 bits 32
 global start

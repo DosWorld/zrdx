@@ -119,6 +119,9 @@ static int process(int handle, unsigned nl)
         rc = repack(image_len, nl, &need);
     else if (nl < need)
         rc = 2;
+    if (rc == 2)
+        fprintf(stderr, "aligner: %s needs %u bytes, limit %u\n",
+                "the stub", need, nl);
     if (rc == 0) {
         h->n = (nl + 511) / 512;
         h->r = nl % 512;

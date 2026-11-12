@@ -1,8 +1,16 @@
 @echo off
 if "%ZB%"=="" set ZB=..\..\bin
-for %%n in (T01 T02 T03 T04 T05 T06 T07 T09 T11 T12 T13 T14 T15 T16) do call one %%n
-for %%n in (T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T28 T29 T30 T31 T32 T33 T34 T35 T36 T37 T40 T50 T51 T52 T53 T54 T55 T56 T57 T58 T59) do call one %%n
-for %%n in (T03 T04 T05 T06 T07 T09 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T28 T29 T30 T31 T32 T33 T34 T35 T36 T37 T40 T50 T51 T52 T53 T54 T55 T56 T57 T58 T59) do call oner %%n
+for %%n in (T01 T02 T03 T04 T05 T06 T07 T09 T11) do call one %%n
+for %%n in (T12 T13 T14 T15 T16) do call one %%n
+for %%n in (T17 T18 T19 T20 T21 T22 T23 T24 T25) do call one %%n
+for %%n in (T26 T28 T29 T30 T31 T32 T33 T34 T35) do call one %%n
+for %%n in (T36 T37 T40 T50 T51 T52 T53 T54 T55) do call one %%n
+for %%n in (T56 T57 T58 T59) do call one %%n
+for %%n in (T03 T04 T05 T06 T07 T09 T11 T12 T13) do call oner %%n
+for %%n in (T14 T15 T16 T17 T18 T19 T20 T21 T22) do call oner %%n
+for %%n in (T23 T24 T25 T26 T28 T29 T30 T31 T32) do call oner %%n
+for %%n in (T33 T34 T35 T36 T37 T40 T50 T51 T52) do call oner %%n
+for %%n in (T53 T54 T55 T56 T57 T58 T59) do call oner %%n
 call onele T58
 call onen T10
 call nasm -f rdf -o T08B.RDO T08B.ASM

@@ -1,4 +1,5 @@
-; DPMI 0501h/0503h: zero size and sizes that overflow after rounding to pages must fail
+; DPMI 0501h/0503h: zero size and sizes that overflow after
+; rounding to pages must fail
 %include "t.inc"
 bits 32
 global start

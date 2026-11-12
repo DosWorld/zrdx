@@ -1,4 +1,5 @@
-; Real default exceptions and the separate software-interrupt vectors.
+; Real default exceptions and the separate software-interrupt
+; vectors.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -68,7 +69,8 @@ start:  cld
         mov eax, 1000h
         xor edx, edx
         xor ebx, ebx
-        div ebx                 ;#DE must reflect and resume with BX fixed
+        ; #DE must reflect and resume with BX fixed
+        div ebx
         cmp ebx, 1
         jne bad
         mov byte [which], 1
@@ -77,9 +79,11 @@ start:  cld
         or ah, 1
         push ax
         popf
-        nop                     ;#DB, real hook clears TF in its IRET frame
+        ; #DB, real hook clears TF in its IRET frame
+        nop
         mov byte [which], 2
-        int 2                   ;software NMI vector default, not physical NMI
+        ; software NMI vector default, not physical NMI
+        int 2
         mov byte [which], 3
         int3
         mov byte [which], 4
@@ -88,15 +92,18 @@ start:  cld
         into
         mov byte [which], 5
         mov eax, 2
-        bound eax, [bounds]     ;#BR real hook fixes EAX before retry
+        ; #BR real hook fixes EAX before retry
+        bound eax, [bounds]
         mov byte [which], 7
 %if ACTUALNM
         mov eax, cr0
         or al, 8
         mov cr0, eax
-        fnop                    ;actual #NM, protected callback clears TS
+        ; actual #NM, protected callback clears TS
+        fnop
 %endif
-        int 7                   ;also verify the separate software default
+        ; also verify the separate software default
+        int 7
         cmp byte [hits], 7 + ACTUALNM
         jne bad
         mov byte [step], 2
@@ -117,7 +124,8 @@ start:  cld
         int 31h
         jc bad
         mov byte [which], 3
-        int3                    ;client handler chains to its saved default
+        ; client handler chains to its saved default
+        int3
         cmp byte [hits], 8 + ACTUALNM
         jne bad
         call restore_exc
@@ -151,7 +159,8 @@ start:  cld
         mov eax, 205h
         int 31h
         jc bad
-        int 0                   ;CD 00 must use ClientIDT, not ClientExc
+        ; CD 00 must use ClientIDT, not ClientExc
+        int 0
         cmp byte [softseen], 1
         jne bad
         cmp byte [cpuseen], 0
@@ -171,7 +180,8 @@ start:  cld
         mov eax, 1000h
         xor edx, edx
         xor ebx, ebx
-        div ebx                 ;CPU default must follow hooked ClientIDT[0]
+        ; CPU default must follow hooked ClientIDT[0]
+        div ebx
         cmp ebx, 1
         jne bad
         cmp byte [softseen], 2
@@ -241,9 +251,11 @@ software_handler:
         cmp ax, [original]
         jne .wrong
         jmp .count
-.cpu:   mov ebx, 1               ;retry DIV even if a stack check fails
+; retry DIV even if a stack check fails
+.cpu:   mov ebx, 1
         cmp ax, [original]
-        je .wrong               ;CPU default must use the locked stack
+        ; CPU default must use the locked stack
+        je .wrong
 .count: inc byte [softseen]
 .wrong: pop ax
 %if CLIENT32

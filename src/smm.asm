@@ -37,7 +37,8 @@ PageSize equ 1000h
           _endif
           mov _pagesubdirindex, _pos
           shr _pagesubdirindex, 10
-          cmp dword [OffnEntriesInTable + (_pagesubdirindex * 4)], 0
+          cmp dword [OffnEntriesInTable + (_pagesubdirindex \
+                  * 4)], 0
           _ifnot jne
             ;allocate page for table
             lea _xdir, [OffPageDir + (_pagesubdirindex * 4)]
@@ -49,7 +50,8 @@ PageSize equ 1000h
             ;a fresh table must be empty: the pool pages are
             ;not zeroed and SwapEvict scans every entry
             mov _t, dword [OffPageDir + (_pagesubdirindex * 4)]
-            mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
+            mov dword [OffPage2 + ((OffPageTableWin \
+                    - KernelBase) >> 10)], _t
             InvalidateTLB
             mov _xdir, OffPageTableWin
             mov _xsize, 400h
@@ -60,7 +62,8 @@ PageSize equ 1000h
 %endif
           _endif
           mov _t, dword [OffPageDir + (_pagesubdirindex * 4)]
-          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _t
+          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) \
+                  >> 10)], _t
           mov _xdir, _pos
           and _xdir, 3FFh
           mov _xsize, 400h
@@ -85,9 +88,11 @@ Marked@32:
 NoMark@32:
 %endif
           _ifnot jnz
-            cmp dword [OffnEntriesInTable + (_pagesubdirindex * 4)], 0
+            cmp dword [OffnEntriesInTable + (_pagesubdirindex \
+                    * 4)], 0
             _ifnot jne
-              ;free previsionaly allocated subdirectory, if main allocation failed
+              ; free previsionaly allocated subdirectory, if main
+              ; allocation failed
               lea _xdir1, [OffPageDir + (_pagesubdirindex * 4)]
               xor _xsize, _xsize
               inc _xsize
@@ -100,7 +105,8 @@ Fail@32:
             stc
             jmp ret@32
           _endif
-          add dword [OffnEntriesInTable + (_pagesubdirindex * 4)], _xsize
+          add dword [OffnEntriesInTable + (_pagesubdirindex \
+                  * 4)], _xsize
           add _pos, _xsize
           sub _size, _xsize
         _enddo ja
@@ -117,7 +123,8 @@ XAllocPages:
         InvalidateTLB
         cmp dword [OffnFreePages], 0
         _ifnot je
-          mov _nfreepagesondir, dword [OffnEntriesInFplist] ; nFreePagesOnDir
+          ; nFreePagesOnDir
+          mov _nfreepagesondir, dword [OffnEntriesInFplist]
           or _nfreepagesondir, _nfreepagesondir
           _ifnot jz
             cmp _xsize, _nfreepagesondir
@@ -133,7 +140,8 @@ XAllocPages:
           _else jmp
             mov _t, dword [Offfplist + 0]
             lea _xsize, [ebp + 1]
-            xchg dword [OffPage2 + ((Offfplist - KernelBase) >> 10)], _t
+            xchg dword [OffPage2 + ((Offfplist - KernelBase) \
+                    >> 10)], _t
             mov [edi], _t
             mov _nfreepagesondir, 1023
             ;@@L0:
@@ -216,8 +224,10 @@ XAllocPages:
           mov _subdirindex, _firstpage
           shr _subdirindex, 10
           mov _xsize, dword [OffPageDir + (_subdirindex * 4)]
-          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], _xsize
-          InvalidateTLB             ;both physical frees and device unmaps use this window
+          mov dword [OffPage2 + ((OffPageTableWin - KernelBase) \
+                  >> 10)], _xsize
+          ; both physical frees and device unmaps use this window
+          InvalidateTLB
           mov _xsize, 400h
           mov _xdir, _firstpage
           and _xdir, 3FFh
@@ -242,14 +252,16 @@ UnmapDevices@32:
           push ecx
           mov edi, esi
           xor eax, eax
-          rep stosd               ;device memory is unmapped, never released
+          ; device memory is unmapped, never released
+          rep stosd
           pop ecx
           pop edi
           pop eax
 PagesRemoved@32:
           add _firstpage, _xsize
           sub _nd, _xsize
-          sub dword [OffnEntriesInTable + (_subdirindex * 4)], _xsize
+          sub dword [OffnEntriesInTable + (_subdirindex * 4)], \
+                  _xsize
           _ifnot jnz
             lea _xdir, [OffPageDir + (_subdirindex * 4)]
             mov _xsize, 1
@@ -264,8 +276,10 @@ PagesRemoved@32:
 ;destroy @@XDir, edi, eax
 XFreePages:
 %define _t edi
-        ;The caller has made any source window current; fplist changes
-        ;are flushed below before use. Other callers pass stack/PDE data.
+        ; The caller has made any source window current; fplist
+        ; changes
+        ; are flushed below before use. Other callers pass
+        ; stack/PDE data.
         mov _t, 1023
         sub _t, dword [OffnEntriesInFplist]
         _ifnot jz
@@ -289,10 +303,12 @@ XFreePages:
           pop ecx
           InvalidateTLB
         _else jmp
-          mov dword [OffnEntriesInFplist], _t    ; @@T already zero
+          ; @@T already zero
+          mov dword [OffnEntriesInFplist], _t
           lea _xsize, [edi + 1]
           xchg _t, [esi]
-          xchg dword [OffPage2 + ((Offfplist - KernelBase) >> 10)], _t
+          xchg dword [OffPage2 + ((Offfplist - KernelBase) \
+                  >> 10)], _t
           InvalidateTLB
           mov dword [Offfplist + 0], _t
         _endif
@@ -301,7 +317,8 @@ XFreePages:
 
         DPROC ReturnFreePool
         pushad
-        mov ecx, [OffPage2 + ((Offfplist - KernelBase) >> 10)]         ;FreePagesRef
+        ; FreePagesRef
+        mov ecx, [OffPage2 + ((Offfplist - KernelBase) >> 10)]
         cmp dword [OffnFreePages], 0
         _ifnot jz
         mov ecx, [OffnEntriesInFplist]  ;nFreePagesOnDir

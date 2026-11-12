@@ -156,7 +156,8 @@ PEProcLookup:
         ret
 
 ;es:eax forwarder text "MODULE.name" or "MODULE.#n", ecx = bytes
-;left, ss:edi buffer (NameMax). Writes MODULE.DLL (upper case) and
+;left, ss:edi buffer (NameMax). Writes MODULE.DLL (upper case)
+;and
 ;leaves eax and ecx after the dot. CF set if malformed.
 PEFwdModName:
         xor ebx, ebx
@@ -187,7 +188,8 @@ PEFwdModName:
 .bad:   stc
         ret
 
-;Resolve a forwarder: es:eax = text, ecx = bytes left (see above).
+;Resolve a forwarder: es:eax = text, ecx = bytes left (see
+;above).
 ;The target module must be loaded. Chains are limited to 8 steps.
 ;Out as PEProcLookup (3 bad text, 6 not found, 10 loop).
 PEFwd:

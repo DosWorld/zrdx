@@ -1,5 +1,7 @@
-; Real-mode upstream debugger state must survive complete host invocations.
-; Uses one enabled watchpoint at an unmapped address; no trap is expected.
+; Real-mode upstream debugger state must survive complete host
+; invocations.
+; Uses one enabled watchpoint at an unmapped address; no trap is
+; expected.
 bits 16
 org 100h
 %macro READ 1

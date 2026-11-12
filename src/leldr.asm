@@ -83,7 +83,8 @@ ObjTableS_size equ 24
         DFD ObjectsExtTable
         DFD LinAddress      ;DD Header
 ;DFD LinAddress1
-        DFD NextPageFixup   ;Pointer to fixup for next page - limit for current page
+        ; Pointer to fixup for next page - limit for current page
+        DFD NextPageFixup
         DFD PageIndex       ;absolute index of current page
         DFD MaxPageIndex    ;page index limit for current object
         DFD HeaderAddress
@@ -121,7 +122,8 @@ DPMICall:
           shl ebx, 16
           mov bx, cx
           shl esi, 16
-          or si, di   ;this instruction clear CF instead of "mov si, di"
+          ; this instruction clear CF instead of "mov si, di"
+          or si, di
           ;clc
         _endif
         pop edi
@@ -146,10 +148,12 @@ Loader:
       DefLDErr ErrNoDPMIMemory, 'out of DPMI memory$'
       DefLDErr ErrFile@129, "can't read EXE file$"
       DefLDErr ErrEXE@129, 'bad EXE format$'
-      DefLDErr ErrUnsupportedFixup@129, 'unsupported fixup record$'
+      DefLDErr ErrUnsupportedFixup@129, \
+              'unsupported fixup record$'
       DefLDErr ErrAllocSel, "can't allocate selector$"
       DefLDErr ErrLock, "can't lock extender$"
-      DefLDErr ErrTransferBuf@129, "can't allocate transfer buffer$"
+      DefLDErr ErrTransferBuf@129, \
+              "can't allocate transfer buffer$"
         SEGM IEData
         LLabel LoadErrMsg
         db 'ZRDX loader error: $'
@@ -260,9 +264,11 @@ LoaderDbgEntry:
         cmp word [ebp], 'LE'
         jne ErrEXE@129
         imul ebx, [ebp + LXObjN], ObjTableS_size
-        push ebx                      ;calculate size of internal object table
+        ; calculate size of internal object table
+        push ebx
         mov ax, 501h
-        call DPMICall            ;allocate space for object table;
+        ; allocate space for object table;
+        call DPMICall
         jc ErrNoDPMIMemory
         pop edx
         ;ca
@@ -277,7 +283,8 @@ LoaderDbgEntry:
         mov ecx, [ebp + LXObjN]
         xor edi, edi
         mov edx, edi
-;calculates the total memory size for the task and the uninitialized tail, which
+; calculates the total memory size for the task and the
+; uninitialized tail, which
 ;can be occupied
 ;edx - total length
 ;esi - uninitialized tail
@@ -285,8 +292,10 @@ LoaderDbgEntry:
           mov eax, [ebx + OTSize]
           add eax, 4095
           shr eax, 12                ;object length in pages
-          cmp dword [ebx + OTNPages], 0      ;the object has no initialized pages
-                                      ;and its memory can be occupied entirely ?
+          ; the object has no initialized pages
+          cmp dword [ebx + OTNPages], 0
+                                      ; and its memory can be
+                                      ; occupied entirely ?
           _ifnot je
             mov edi, [ebx + OTNPages]
             neg edi
@@ -295,15 +304,18 @@ LoaderDbgEntry:
           add edx, eax
           add ebx, ObjTableS_size
         _enddo loop
-        shl edx, 12                 ;convert size in pages to bytes
+        ; convert size in pages to bytes
+        shl edx, 12
         mov [ss:OffTaskSize], edx        ;save it for future use
 
         mov ebx, edx
         mov ax, 503h
 
-        call DPMICall             ;reallocate all memory for application
+        ; reallocate all memory for application
+        call DPMICall
         jc ErrNoDPMIMemory
-        mov [fs:OffImageBaseAddr], ebx ;save it linear address for future
+        ; save it linear address for future
+        mov [fs:OffImageBaseAddr], ebx
         push ebx
 
         ;--------------clear all memory------------------
@@ -324,7 +336,8 @@ LoaderDbgEntry:
         call DPMICall                 ;allocate memory for header
         jc ErrNoDPMIMemory
         mov [ss:OffLoaderMemHandle], esi  ;save handle for free
-        mov [ss:OffObjTablePtr], ebx      ;object table shall be first
+        ; object table shall be first
+        mov [ss:OffObjTablePtr], ebx
         push ds ;ss:lFlatSelector
         push ebx
         push dword [ebp + LXObjTblOff]
@@ -333,7 +346,8 @@ LoaderDbgEntry:
         add eax, ebx
         mov [ss:OffLocalTablePtr], eax
         sub ebx, [ebp + LXObjTblOff]
-        mov [ss:OffHeaderAddress], ebx  ;virtual address of header start in memory
+        ; virtual address of header start in memory
+        mov [ss:OffHeaderAddress], ebx
         call FileRead               ;read loader
 %define _relocreg esi
         pop _relocreg     ;fs:ImageBaseAddr
@@ -345,7 +359,8 @@ LoaderDbgEntry:
 %define _pageloadaddress edi
           mov edx, [ss:OffLocalTablePtr]
           mov dword [edx + eax*8 + LOTBase], _relocreg
-          mov word [edx + eax*8 + LOTSelector], 0  ;selector is undefined
+          ; selector is undefined
+          mov word [edx + eax*8 + LOTSelector], 0
           mov _pageloadaddress, _relocreg ;address to object load
           imul eax, ObjTableS_size
           add eax, [ebp + LXObjTblOff]
@@ -354,7 +369,8 @@ LoaderDbgEntry:
           add edx, 0FFFh           ;align it on page boundary
           and dx, 0F000h
           add _relocreg, edx
-          mov ecx, [eax + OTNPages] ;number of initialized pages in file
+          ; number of initialized pages in file
+          mov ecx, [eax + OTNPages]
           mov _pagetblreg, dword [eax + OTPage]
           dec _pagetblreg
           shl _pagetblreg, 2
@@ -415,12 +431,16 @@ LoaderDbgEntry:
         xor _objindexreg, _objindexreg
 ;Prepare to object loop
         _do
-          cmp _objindexreg, dword [ebp + LXObjN] ;all objects complete ?
-          _break jae, near                           ;break if yes
+          ; all objects complete ?
+          cmp _objindexreg, dword [ebp + LXObjN]
+          ; break if yes
+          _break jae, near
           ;mov  eax, [@@ObjIndexReg*8+@@BaseTableReg].LOTBase
-          ;mov  ss:SrcBase, eax               ;save linear address of current object
+          ; mov  ss:SrcBase, eax               ;save linear
+          ; address of current object
           push _objindexreg
-          push dword [ebx + (_objindexreg * 8) + LOTBase]    ;SrcBase
+          ; SrcBase
+          push dword [ebx + (_objindexreg * 8) + LOTBase]
 %assign F 0
           imul _objindexreg, ObjTableS_size
           add _objindexreg, dword [ss:OffObjTablePtr]
@@ -457,13 +477,17 @@ BeginFixup:
             mov _flagswreg, word [esi]
             test _flagshireg, 3             ;fixup type must be 0
             jne ErrUnsupportedFixup@129
-            test _flagsloreg, 20h           ;Source list not supported
+            ; Source list not supported
+            test _flagsloreg, 20h
             jne ErrUnsupportedFixup@129
-            movsx _srcoffreg, word [esi + 2] ;get offset of source
+            ; get offset of source
+            movsx _srcoffreg, word [esi + 2]
             add _srcoffreg, [esp + F] ;SrcBase
-                                          ;calc linear address of source
+                                          ; calc linear address
+                                          ; of source
             movzx _objindexreg, byte [esi + 4]
-            test _flagshireg, 40h     ;Object index is 16 bit or 8 ?
+            ; Object index is 16 bit or 8 ?
+            test _flagshireg, 40h
             _ifnot jz
               mov _objindexhireg, byte [esi + 5]
               inc _fixupptrreg
@@ -487,7 +511,8 @@ BeginFixup:
             pop eax            ;drop next_page_ptr
 %assign F F - 4
     ;To Next Page Increments
-            add dword [esp + F], 1000h  ;Update src_base for next page
+            ; Update src_base for next page
+            add dword [esp + F], 1000h
             ;add  ss:FixPageTablePtr, 4
             pop eax
             add eax, 4     ;FixPageTablePtr
@@ -564,30 +589,36 @@ FixJmpTable: dd Fix8 ;0
             times 7 dd ErrUnsupportedFixup@129 ;9-15
         ESEG IEData
 Fix8:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         mov byte [ecx], _srctagbreg
         jmp BeginFixup
 Fix16:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         mov word [ecx], _srctagwreg
         jmp BeginFixup
 Fix48:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         mov [ecx], _srctagreg
         add _srcoffreg, 4
         jmp FixSeg1
 Fix1616:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         mov [ecx], _srctagwreg
         inc _srcoffreg
         inc _srcoffreg
         jmp FixSeg1
 Fix32:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         mov dword [ecx], _srctagreg
         jmp BeginFixup
 Fix32SR:
-        add _srctagreg, dword [ebx + (_objindexreg * 8) + LOTBase]
+        add _srctagreg, dword [ebx + (_objindexreg * 8) \
+                + LOTBase]
         sub _srctagreg, _srcoffreg
         sub _srctagreg, 4
         mov dword [ecx], _srctagreg
@@ -595,7 +626,8 @@ Fix32SR:
 FixSeg:
         add _fixupptrreg, 5
 FixSeg1:
-        movzx _srctagreg, word [ebx + (_objindexreg * 8) + LOTSelector]
+        movzx _srctagreg, word [ebx + (_objindexreg * 8) \
+                + LOTSelector]
         or _srctagreg, _srctagreg
         _ifnot jnz
         mov eax, _objindexreg
@@ -722,7 +754,8 @@ ret@135:
 ;DGROUP group STACK
 
 ;create a selector for the object by the object index
-;if the object is 16-bit then base = object base, limit = object length
+; if the object is 16-bit then base = object base, limit = object
+; length
 ;otherwise base = 0, limit = 4G
 
 ;ebx-base, ecx-size, dx-attrs
@@ -810,8 +843,10 @@ AttrTranslateTable@139: db 0 ;0    all flags zero               ?
                  lea esi, [ss:ecx*2 + DefaultFlatSelectors]
                  movzx ebx, word [ss:esi]
                  or ebx, ebx
-                 _ifnot jnz           ;all flat segments with same attributes
-                   ;xor  ebx, ebx       ;may share one flat selector
+                 ; all flat segments with same attributes
+                 _ifnot jnz
+                   ; xor  ebx, ebx       ;may share one flat
+                   ; selector
                    mov ecx, 0FFFFF000h
                    call CreateSelector
                  _endif

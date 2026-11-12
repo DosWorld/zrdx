@@ -72,8 +72,7 @@ extern int WINAPI MultiByteToWideChar(UINT, DWORD, const char *,
 /* FILE of the Microsoft C runtime (32 bytes): the macros getc
    and
    putc of compiled programs use _ptr and _cnt directly */
-typedef struct FILE
-{
+typedef struct FILE {
     char *_ptr;
     int _cnt;
     char *_base;
@@ -109,6 +108,10 @@ extern int __cdecl ferror(FILE * f);
 extern FILE _iob[];
 extern DWORD WINAPI GetTickCount(void);
 extern void crt_flush_streams(void);
+/* bit 0: text mode, bit 1: a byte was read ahead */
+extern int crt_fdstate(int fd);
+extern char *crt_narrow_fmt(const WORD *);
+extern void crt_wide_free(void);
 extern int crt_vsscanf(const char *, const char *, va_list);
 extern int crt_vfscanf(FILE *, const char *, va_list);
 

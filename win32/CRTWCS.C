@@ -31,8 +31,7 @@ static int wmap(int c, int up)
         return 0x178;
     if (!up && c == 0x178)
         return 0xFF;
-    for (i = 0; i < sizeof(ranges) / sizeof(ranges[0]); i++)
-    {
+    for (i = 0; i < sizeof(ranges) / sizeof(ranges[0]); i++) {
         from = up ? ranges[i][0] : ranges[i][1];
         to = up ? ranges[i][1] : ranges[i][0];
         if (c >= from && c < from + ranges[i][2])
@@ -185,12 +184,10 @@ static int wcmp(const wchar * a, const wchar * b, DWORD n,
 {
     int x, y;
 
-    while (n--)
-    {
+    while (n--) {
         x = *a++;
         y = *b++;
-        if (fold)
-        {
+        if (fold) {
             x = towlower(x);
             y = towlower(y);
         }
@@ -224,8 +221,7 @@ int __cdecl _wcsnicmp(const wchar * a, const wchar * b, DWORD n)
 
 wchar *__cdecl wcschr(const wchar * s, wchar c)
 {
-    for (;; s++)
-    {
+    for (;; s++) {
         if (*s == c)
             return (wchar *) s;
         if (!*s)
@@ -237,8 +233,7 @@ wchar *__cdecl wcsrchr(const wchar * s, wchar c)
 {
     const wchar *r = 0;
 
-    for (;; s++)
-    {
+    for (;; s++) {
         if (*s == c)
             r = s;
         if (!*s)
@@ -331,8 +326,7 @@ wchar *__cdecl _wcsrev(wchar * s)
     DWORD i = 0, j = wcslen(s);
     wchar t;
 
-    while (i + 1 < j)
-    {
+    while (i + 1 < j) {
         t = s[i];
         s[i++] = s[--j];
         s[j] = t;
@@ -345,8 +339,7 @@ static DWORD narrow(const wchar * s, char *b, DWORD size)
 {
     DWORD i = 0;
 
-    while (i + 1 < size && s[i] && s[i] < 0x80)
-    {
+    while (i + 1 < size && s[i] && s[i] < 0x80) {
         b[i] = (char)s[i];
         i++;
     }

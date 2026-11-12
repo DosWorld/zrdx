@@ -21,15 +21,21 @@ ENV = runpy.run_path(str(ROOT / "tests/CHECK.PY"))
 def build(work, level):
     src = work / ("src" + str(level))
     shutil.copytree(ROOT / "src", src, dirs_exist_ok=True)
-    subprocess.run([shutil.which("nasm"), "-O9", "-f", "obj", "-DFAKELACK=" + str(level),
-                    "zrdxnp.asm", "-o", "zrdxnp.obj"], cwd=src, check=True,
+    subprocess.run([shutil.which("nasm"), "-O9", "-f", "obj",
+                    "-DFAKELACK=" + str(level),
+                    "zrdxnp.asm", "-o", "zrdxnp.obj"], cwd=src,
+                   check=True,
                    stderr=subprocess.DEVNULL)
     ENV["config"](work, "xms", False)
     ENV["dos"](work, "\n".join([
         "@echo off", "cd src" + str(level),
-        "wlink option quiet name fake.exe format dos file zrdxnp.obj > LINK.LOG",
-        "if errorlevel 1 goto bad", "cd ..", "echo OK > STATUS.LOG", "goto end",
-        ":bad", "cd R:" + chr(92), "echo FAILED > STATUS.LOG", ":end"]) + "\n", 300)
+        "wlink option quiet name fake.exe format dos file "
+        "zrdxnp.obj > LINK.LOG",
+        "if errorlevel 1 goto bad", "cd ..",
+                                "echo OK > STATUS.LOG",
+                                "goto end",
+        ":bad", "cd R:" + chr(92), "echo FAILED > STATUS.LOG",
+                                ":end"]) + "\n", 300)
     return src / "FAKE.EXE"
 
 
@@ -37,12 +43,17 @@ def run(args, work, level, case, want):
     image = build(work, level)
     out = work / ("Q" + str(level))
     shutil.rmtree(out, ignore_errors=True)
-    subprocess.run([sys.executable, str(ROOT / "tests/pe/QPE.PY"), "--qemu", str(args.qemu),
-                    "--fixtures", str(args.fixtures), "--host", str(image), "--work", str(out),
-                    "--profile", "xms", "--case", case], stdout=subprocess.DEVNULL)
+    subprocess.run([sys.executable,
+                    str(ROOT / "tests/pe/QPE.PY"), "--qemu",
+                    str(args.qemu),
+                    "--fixtures", str(args.fixtures), "--host",
+                    str(image), "--work", str(out),
+                    "--profile", "xms", "--case", case],
+                   stdout=subprocess.DEVNULL)
     text = (out / (case + ".LOG")).read_text(errors="replace")
     ok = want in text
-    print(("PASS" if ok else "FAIL"), "FAKELACK=" + str(level), case, text.strip().splitlines()[-1:])
+    print(("PASS" if ok else "FAIL"), "FAKELACK=" + str(level),
+          case, text.strip().splitlines()[-1:])
     return not ok
 
 
@@ -55,7 +66,8 @@ def main():
     ENV["CFG"]["check_scratch"](args.work.resolve())
     args.work.mkdir(parents=True, exist_ok=True)
     work = args.work.resolve()
-    bad = run(args, work, 1, "LOWMEM", "DPMI host lacks a function")
+    bad = run(args, work, 1, "LOWMEM",
+              "DPMI host lacks a function")
     bad |= run(args, work, 2, "LACK", "PE lack: ok")
     return bad
 

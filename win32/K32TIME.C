@@ -10,19 +10,16 @@
 
 #define TICKS_DAY 1573040UL
 
-typedef struct SysTime
-{
+typedef struct SysTime {
     WORD year, month, wday, day, hour, minute, second, msec;
 } SysTime;
 
-typedef struct FileTime
-{
+typedef struct FileTime {
     DWORD lo, hi;
 } FileTime;
 
 /* unsigned 64-bit number: four 16-bit limbs, lowest first */
-typedef struct U64
-{
+typedef struct U64 {
     DWORD l[4];
 } U64;
 
@@ -41,12 +38,10 @@ static void u_muladd(U64 *u, DWORD m, DWORD a)
 
     for (i = 0; i < 4; i++)
         r[i] = 0;
-    for (j = 0; j < 2; j++)
-    {
+    for (j = 0; j < 2; j++) {
         DWORD carry = 0, mj = j ? m1 : m0;
 
-        for (i = 0; i + j < 4; i++)
-        {
+        for (i = 0; i + j < 4; i++) {
             t = u->l[i] * mj + r[i + j] + carry;
             r[i + j] = t & 0xFFFF;
             carry = t >> 16;
@@ -69,8 +64,7 @@ static DWORD u_div(U64 *u, DWORD d)
     DWORD rem = 0, cur;
     int i;
 
-    for (i = 3; i >= 0; i--)
-    {
+    for (i = 3; i >= 0; i--) {
         cur = (rem << 16) | u->l[i];
         u->l[i] = cur / d;
         rem = cur % d;
@@ -116,8 +110,7 @@ BOOL WINAPI SystemTimeToFileTime(const SysTime *st, FileTime *ft)
             st->day > mdays(st->year, st->month) ||
             st->hour > 23 || st->minute > 59 ||
             st->second > 59 ||
-            st->msec > 999)
-    {
+            st->msec > 999) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -138,8 +131,7 @@ BOOL WINAPI FileTimeToSystemTime(const FileTime *ft, SysTime *st)
     DWORD days, y, m;
     W32T("FileTimeToSystemTime");
 
-    if (ft == NULL || st == NULL || ft->hi >= 0x7FFFFFFFUL)
-    {
+    if (ft == NULL || st == NULL || ft->hi >= 0x7FFFFFFFUL) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
@@ -173,8 +165,7 @@ void WINAPI GetLocalTime(SysTime *st)
     struct dregs d, t, d2;
     W32T("GetLocalTime");
 
-    do
-    {
+    do {
         w32_zero(&d, sizeof d);
         d.eax = 0x2A00;
         dos21(&d);
@@ -184,8 +175,7 @@ void WINAPI GetLocalTime(SysTime *st)
         w32_zero(&d2, sizeof d2);
         d2.eax = 0x2A00;
         dos21(&d2);
-    }
-    while ((d.edx & 0xFFFF) != (d2.edx & 0xFFFF));
+    } while ((d.edx & 0xFFFF) != (d2.edx & 0xFFFF));
     st->year = (WORD)(d.ecx & 0xFFFF);
     st->month = (WORD)((d.edx >> 8) & 0xFF);
     st->day = (WORD)(d.edx & 0xFF);
@@ -281,8 +271,7 @@ void WINAPI Sleep(DWORD ms)
     struct dregs r;
     W32T("Sleep");
 
-    while (GetTickCount() - start < ms)
-    {
+    while (GetTickCount() - start < ms) {
         w32_zero(&r, sizeof r);
         r.eax = 0x1680;
         int2f(&r);

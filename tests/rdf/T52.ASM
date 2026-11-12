@@ -1,4 +1,5 @@
-; DPMI exception handler: the handler must be entered with DF clear and may skip the faulting instruction
+; DPMI exception handler: the handler must be entered with DF
+; clear and may skip the faulting instruction
 %include "t.inc"
 bits 32
 global start

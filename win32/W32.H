@@ -39,8 +39,7 @@ typedef unsigned UINT;
 #define ERROR_NO_UNICODE_TRANSLATION 1113
 
 /* registers of one INT 21h or 31h call, cf is -1 on failure */
-struct dregs
-{
+struct dregs {
     DWORD eax, ebx, ecx, edx, esi, edi, cf;
 };
 
@@ -158,7 +157,22 @@ extern DWORD w32_lower(DWORD c);
 /* k32heap.c: heaps */
 extern void w32_heapfree(void);
 
-/* k32tls.c: TLS slots */
+/* k32teb.c: TEB and PEB, FS */
+extern DWORD *w32_tebp(void);
+extern void w32_tebtls(DWORD table);
+extern void WINAPI ExitProcess(UINT code);
+extern int WINAPI UnhandledExceptionFilter(void *info);
+extern DWORD WINAPI GetCurrentProcessId(void);
+extern HANDLE WINAPI GetProcessHeap(void);
+extern DWORD *w32_errp(void);
+extern DWORD w32_tebinit(DWORD image, DWORD pid, DWORD heap);
+extern void w32_tebfree(void);
+
+/* k32exc.c: exceptions */
+extern void w32_excinit(void);
+extern void w32_excfree(void);
+
+/* k32tls.c: TLS slots and the static TLS of the program */
 extern void w32_tlsfree(void);
 
 #endif

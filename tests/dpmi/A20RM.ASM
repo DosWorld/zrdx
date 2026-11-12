@@ -1,4 +1,5 @@
-; Native client verifies unflagged and flagged RAW calls with normal A20 off.
+; Native client verifies unflagged and flagged RAW calls with
+; normal A20 off.
 bits 16
 org 100h
 start:  cld

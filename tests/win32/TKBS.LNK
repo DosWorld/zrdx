@@ -1,0 +1,10 @@
+system nt
+name TKBS.EXE
+file TKBS.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import '_KbGetLastError@0' KERNELBASE.GetLastError
+import '_KbSetLastError@4' KERNELBASE.SetLastError
+import '_KbGetCurrentProcessId@0' KERNELBASE.GetCurrentProcessId
+import '_KbLstrlenA@4' KERNELBASE.lstrlenA
+import '_KbGetProcessHeap@0' KERNELBASE.GetProcessHeap

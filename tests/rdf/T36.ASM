@@ -1,4 +1,5 @@
-; clipboard API: bitmap header pointer is converted between protected and real mode
+; clipboard API: bitmap header pointer is converted between
+; protected and real mode
 %include "t.inc"
 bits 32
 global start

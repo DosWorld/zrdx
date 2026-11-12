@@ -1,0 +1,10 @@
+system nt_dll
+name SHELL32.DLL
+file SHELL32.OBJ
+option nodefaultlibs
+export CommandLineToArgvW='_CommandLineToArgvW@8'
+export SHGetFolderPathA='_SHGetFolderPathA@20'
+export SHGetFolderPathW='_SHGetFolderPathW@20'
+export SHGetSpecialFolderPathA='_SHGetSpecialFolderPathA@16'
+export ShellExecuteA='_ShellExecuteA@24'
+export ShellExecuteW='_ShellExecuteW@24'

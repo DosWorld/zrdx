@@ -1,4 +1,5 @@
-; Pentium/QEMU timing fixture, not part of the 386 host implementation.
+; Pentium/QEMU timing fixture, not part of the 386 host
+; implementation.
 bits 16
 org 100h
 start:  cld
@@ -29,8 +30,10 @@ start:  cld
         mov [pmds], ds
         push ds
         pop es
-        ; Same no-op handler: low INT exercises #GP decoding and preflight;
-        ; high INT is the existing gate path. Both use the application stack.
+        ; Same no-op handler: low INT exercises #GP decoding and
+        ; preflight;
+        ; high INT is the existing gate path. Both use the
+        ; application stack.
         xor ebx, ebx
         mov cx, cs
         mov edx, soft

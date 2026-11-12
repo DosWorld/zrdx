@@ -1,8 +1,10 @@
 # ZRDX OSE build file for Open Watcom wmake
 #
 # Tools (must be in PATH):
-#   NASM 0.98.39 (other versions may produce different OMF objects),
-#   Open Watcom 1.9 or later: wmake, wlink, wcl. Set WATCOM environment variable.
+#   NASM 0.98.39 (other versions may produce different OMF
+#   objects),
+#   Open Watcom 1.9 or later: wmake, wlink, wcl. Set the
+#   WATCOM environment variable.
 #   UPX (packs the stubs, zrdxconf.exe and zrdxbind.com).
 #
 # Usage:
@@ -13,31 +15,43 @@
 #                              stub-rdf.exe) in binder\
 #   Stubs are packed to 14 KB, stub-pmx to 18 KB; see
 #   docs/D09WORK.MD and docs/BUILD.MD.
-#   wmake install              copy everything from binder\ and zrdxconf.exe to ..\bin
-#   wmake clean                remove intermediate files and built programs
+#   wmake install              copy binder\ and zrdxconf.exe
+#                              to ..\bin
+#   wmake clean                remove intermediate files and
+#                              built programs
 #
-# zrdxbind.com reads the stubs (stub-le.exe, stub-pe.exe, stub-rdf.exe) from the directory
-# where zrdxbind.com itself lives, so they must be copied together.
+# zrdxbind.com reads the stubs (stub-le.exe, stub-pe.exe,
+# stub-rdf.exe) from the directory where zrdxbind.com itself
+# lives, so they must be copied together.
 #
-# Settings of a bound program (zrdxconf) are stored in the last 14 bytes of
-# the program (signature "ZRDX", written by zrdxbind), so the stub may be packed.
+# Settings of a bound program (zrdxconf) are stored in the last
+# 14 bytes of the program (signature "ZRDX", written by
+# zrdxbind), so the stub may be packed.
 
 NASMOPT = -O9
 NASM    = nasm $(NASMOPT) -f obj
 NASMBIN = nasm $(NASMOPT) -f bin
 WLINK   = wlink option quiet
 WCL     = wcl -zq -ox
-UPX     = upx -9 --8086
+UPX     = upx --8086 --ultra-brute --no-lzma --overlay=strip
 STUB    = zrdxu.exe
 PESTUB  = zrdxpu.exe
 PMXSTUB = zrdxpmu.exe
 RDFSTUB = zrdxru.exe
-# Binder requires whole 512-byte pages; round the old 29384 ceiling down.
+# Binder requires whole 512-byte pages; round the old 29384
+# ceiling down.
 STUBSZ  = 29184
-# User-approved 14 KB packed-file ceiling; runtime limits are unchanged.
+# User-approved 14 KB packed-file ceiling; runtime limits are
+# unchanged.
 PSTUBSZ = 14336
-# Approved 2026-11-05: stub-pmx (PE DLL service) only; 36 pages.
-PMXSZ   = 18432
+# Approved 2026-11-05: stub-pmx (PE DLL service) only, 36 pages;
+# 37 pages (18944) approved 2026-11-11 for TLS callbacks and
+# DLLs.
+PMXSZ   = 18944
+
+# A failed command must not make wmake ask "Should this file be
+# deleted [Yes/No]" (a batch hangs on it): erase the target.
+.ERASE
 
 all: binder\zrdxbind.com zrdxconf.exe zrdxdpmi.exe &
 	binder\stub-le.exe binder\stub-pe.exe binder\stub-pmx.exe &
@@ -106,7 +120,8 @@ zrdxru.exe: zrdxrdf0.exe aligner.exe makefile
 	$(UPX) -o zrdxru.exe zrdxrdf0.exe
 	aligner.exe zrdxru.exe $(PSTUBSZ)
 
-# Product: host + PE loader + DLL service in one image (NATPE.MD).
+# Product: host + PE loader + DLL service in one image
+# (NATPE.MD).
 zrdxdpmi.exe: zrdxnp.obj
 	$(WLINK) name zrdxdpmi.exe format dos file zrdxnp.obj
 
@@ -116,45 +131,67 @@ zrdxrdf0.exe: zrdxrdf.obj
 zrdx0.exe: zrdx.obj
 	$(WLINK) name zrdx0.exe format dos file zrdx.obj
 
-zrdx.obj: zrdx.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-	leldr.asm extender.asm smm.asm swapmm.asm segend.asm
+zrdx.obj: zrdx.asm prot.inc segdefs.asm layout.inc traps.inc &
+	autolbl.inc &
+	protdata.asm closerec.asm prothand.asm prothan2.asm &
+	realhand.asm gmacros.asm &
+	dpmifunc.asm dpmifun2.asm vcpiemu.asm mem.asm protinit.asm &
+	realinit.asm realini2.asm &
+	leldr.asm extender.asm extende2.asm smm.asm swapmm.asm &
+	segend.asm
 	$(NASM) zrdx.asm -o zrdx.obj
 
-zrdxpe.obj: zrdxpe.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-	peldr.asm peload.asm extender.asm smm.asm swapmm.asm segend.asm
+zrdxpe.obj: zrdxpe.asm prot.inc segdefs.asm layout.inc &
+	traps.inc autolbl.inc &
+	protdata.asm closerec.asm prothand.asm prothan2.asm &
+	realhand.asm gmacros.asm &
+	dpmifunc.asm dpmifun2.asm vcpiemu.asm mem.asm protinit.asm &
+	realinit.asm realini2.asm &
+	peldr.asm peload.asm extender.asm extende2.asm smm.asm &
+	swapmm.asm segend.asm
 	$(NASM) zrdxpe.asm -o zrdxpe.obj
 
-zrdxpm.obj: zrdxpm.asm zrdxpe.asm prot.inc segdefs.asm layout.inc &
+zrdxpm.obj: zrdxpm.asm zrdxpe.asm prot.inc segdefs.asm &
+	layout.inc &
 	traps.inc autolbl.inc protdata.asm closerec.asm prothand.asm &
-	realhand.asm gmacros.asm dpmifunc.asm vcpiemu.asm mem.asm &
-	protinit.asm realinit.asm peldr.asm peload.asm pereg.asm &
-	peexp.asm peimp.asm extender.asm &
+	prothan2.asm &
+	realhand.asm gmacros.asm dpmifunc.asm dpmifun2.asm &
+	vcpiemu.asm mem.asm &
+	protinit.asm realinit.asm realini2.asm peldr.asm peload.asm &
+	pereg.asm &
+	peexp.asm peimp.asm extender.asm extende2.asm &
 	smm.asm swapmm.asm segend.asm
 	$(NASM) zrdxpm.asm -o zrdxpm.obj
 
-zrdxnp.obj: zrdxnp.asm zrdxdpmi.asm prot.inc segdefs.asm layout.inc &
+zrdxnp.obj: zrdxnp.asm zrdxdpmi.asm prot.inc segdefs.asm &
+	layout.inc &
 	traps.inc autolbl.inc protdata.asm closerec.asm prothand.asm &
-	realhand.asm gmacros.asm dpmifunc.asm vcpiemu.asm mem.asm &
-	protinit.asm realinit.asm nathost.asm peldr.asm peload.asm &
-	pereg.asm peexp.asm peimp.asm extender.asm vendor.asm smm.asm &
+	prothan2.asm &
+	realhand.asm gmacros.asm dpmifunc.asm dpmifun2.asm &
+	vcpiemu.asm mem.asm &
+	protinit.asm realinit.asm realini2.asm nathost.asm &
+	nathost2.asm peldr.asm peload.asm &
+	pereg.asm peexp.asm peimp.asm extender.asm extende2.asm &
+	vendor.asm smm.asm &
 	swapmm.asm segend.asm
 	$(NASM) zrdxnp.asm -o zrdxnp.obj
 
 zrdxdpmi.obj: zrdxdpmi.asm prot.inc segdefs.asm layout.inc &
 	traps.inc autolbl.inc protdata.asm closerec.asm &
-	prothand.asm realhand.asm gmacros.asm dpmifunc.asm &
-	vcpiemu.asm mem.asm protinit.asm realinit.asm &
-	nathost.asm smm.asm swapmm.asm segend.asm
+	prothand.asm prothan2.asm realhand.asm gmacros.asm &
+	dpmifunc.asm dpmifun2.asm &
+	vcpiemu.asm mem.asm protinit.asm realinit.asm realini2.asm &
+	nathost.asm nathost2.asm smm.asm swapmm.asm segend.asm
 	$(NASM) zrdxdpmi.asm -o zrdxdpmi.obj
 
-zrdxrdf.obj: zrdxrdf.asm prot.inc segdefs.asm layout.inc traps.inc autolbl.inc &
-	protdata.asm closerec.asm prothand.asm realhand.asm gmacros.asm &
-	dpmifunc.asm vcpiemu.asm mem.asm protinit.asm realinit.asm &
-	rdfldr.asm extender.asm smm.asm swapmm.asm segend.asm
+zrdxrdf.obj: zrdxrdf.asm prot.inc segdefs.asm layout.inc &
+	traps.inc autolbl.inc &
+	protdata.asm closerec.asm prothand.asm prothan2.asm &
+	realhand.asm gmacros.asm &
+	dpmifunc.asm dpmifun2.asm vcpiemu.asm mem.asm protinit.asm &
+	realinit.asm realini2.asm &
+	rdfldr.asm extender.asm extende2.asm smm.asm swapmm.asm &
+	segend.asm
 	$(NASM) zrdxrdf.asm -o zrdxrdf.obj
 
 install: binder\zrdxbind.com zrdxconf.exe zrdxdpmi.exe &

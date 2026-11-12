@@ -1,4 +1,5 @@
-; Built-in descriptor contracts, including its public flat GDT selector.
+; Built-in descriptor contracts, including its public flat GDT
+; selector.
 %include "../rdf/T.INC"
 bits 32
 global start
@@ -38,11 +39,13 @@ start: BEGIN
        mov eax, 9
        int 31h
        jnc near bad
-       mov bx, 20h              ;kernel code is not a readable client GDT entry
+       ; kernel code is not a readable client GDT entry
+       mov bx, 20h
        mov eax, 6
        int 31h
        jnc near bad
-       mov bx, 3bh              ;a DPL-3 call gate is not a code/data descriptor
+       ; a DPL-3 call gate is not a code/data descriptor
+       mov bx, 3bh
        mov eax, 6
        int 31h
        jnc near bad

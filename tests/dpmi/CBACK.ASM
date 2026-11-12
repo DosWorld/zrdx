@@ -30,7 +30,8 @@ start: BEGIN
        mov [slots+eax*4+2],cx
        inc dword [count]
        jmp .alloc
-.full: cmp dword [count],19 ;the extender owns one of the 20 slots
+; the extender owns one of the 20 slots
+.full: cmp dword [count],19
        jne near bad
        mov dx,[slots]
        mov cx,[slots+2]

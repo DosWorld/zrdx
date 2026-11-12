@@ -1,4 +1,5 @@
-; Deterministic real-mode clipboard fixture, not a production driver.
+; Deterministic real-mode clipboard fixture, not a production
+; driver.
 bits 16
 org 100h
         jmp install

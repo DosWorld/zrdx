@@ -34,8 +34,7 @@ SigFn __cdecl signal(int sig, SigFn fn)
     int i = slot(sig);
     SigFn old;
 
-    if (i < 0 || fn == (SigFn) SIG_ERR)
-    {
+    if (i < 0 || fn == (SigFn) SIG_ERR) {
         crt_errno = CRT_EINVAL;
         return (SigFn) SIG_ERR;
     }
@@ -54,14 +53,12 @@ int __cdecl raise(int sig)
     fn = handler[i];
     if (fn == (SigFn) SIG_IGN)
         return 0;
-    if (fn != (SigFn) SIG_DFL)
-    {
+    if (fn != (SigFn) SIG_DFL) {
         handler[i] = (SigFn) SIG_DFL;
         fn(sig);
         return 0;
     }
-    if (sig == SIGABRT)
-    {
+    if (sig == SIGABRT) {
         crt_write_err("\r\nabnormal program termination\r\n");
         ExitProcess(3);
     }

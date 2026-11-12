@@ -77,8 +77,7 @@ static void t2(void)
 
 static int same(const char *a, const char *b)
 {
-    while (*a && *a == *b)
-    {
+    while (*a && *a == *b) {
         a++;
         b++;
     }

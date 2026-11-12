@@ -7,8 +7,7 @@
  */
 #include <stdarg.h>
 
-typedef struct OnExit
-{
+typedef struct OnExit {
     void (__cdecl ** first)(void);
     void (__cdecl ** last)(void);
     void (__cdecl ** end)(void);
@@ -179,8 +178,7 @@ void mainCRTStartup(void)
     print_tests();
     start_tests();
     exit_tests();
-    if (failed)
-    {
+    if (failed) {
         pfmt("UCRT: fail %d\r\n", failed);
         exit(1);
     }

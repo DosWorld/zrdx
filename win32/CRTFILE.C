@@ -27,8 +27,7 @@ static int ready;
 static FILE *extra;
 static DWORD tmpcount;
 
-typedef struct ExtraFile
-{
+typedef struct ExtraFile {
     FILE f;
     struct ExtraFile *next;
 } ExtraFile;
@@ -85,8 +84,7 @@ static void freefile(FILE * f)
     if (!own)
         return;
     for (pp = (ExtraFile **) & extra; *pp; pp = &(*pp)->next)
-        if (&(*pp)->f == f)
-        {
+        if (&(*pp)->f == f) {
             e = *pp;
             *pp = e->next;
             free(e);
@@ -97,14 +95,11 @@ static void freefile(FILE * f)
 static int getbuf(FILE * f)
 {
     f->_base = malloc(BUFSIZ);
-    if (f->_base == NULL)
-    {
+    if (f->_base == NULL) {
         f->_base = (char *)&f->_charbuf;
         f->_bufsiz = 1;
         f->_flag |= _IONBF;
-    }
-    else
-    {
+    } else {
         f->_bufsiz = BUFSIZ;
         f->_flag |= _IOMYBUF;
     }
@@ -121,8 +116,7 @@ static int drain(FILE * f)
     f->_ptr = f->_base;
     f->_cnt = 0;
     if (n > 0 && (f->_flag & WRACT) && _write(f->_file, f->_base,
-            (unsigned)n) != n)
-    {
+            (unsigned)n) != n) {
         f->_flag |= _IOERR;
         return EOF;
     }
@@ -134,30 +128,25 @@ int __cdecl _flsbuf(int ch, FILE * f)
     char c = (char)ch;
 
     stdio_init();
-    if (!(f->_flag & (_IOWRT | _IORW)))
-    {
+    if (!(f->_flag & (_IOWRT | _IORW))) {
         f->_flag |= _IOERR;
         crt_errno = CRT_EBADF;
         return EOF;
     }
-    if (f->_flag & RDACT)
-    {
+    if (f->_flag & RDACT) {
         f->_flag &= ~RDACT;
         f->_cnt = 0;
         f->_ptr = f->_base;
     }
-    if (f->_base == NULL && !(f->_flag & _IONBF))
-    {
+    if (f->_base == NULL && !(f->_flag & _IONBF)) {
         if (_isatty(f->_file))
             f->_flag |= _IONBF;
         else
             getbuf(f);
     }
-    if (f->_flag & _IONBF)
-    {
+    if (f->_flag & _IONBF) {
         f->_cnt = 0;
-        if (_write(f->_file, &c, 1) != 1)
-        {
+        if (_write(f->_file, &c, 1) != 1) {
             f->_flag |= _IOERR;
             return EOF;
         }
@@ -176,14 +165,12 @@ int __cdecl _filbuf(FILE * f)
     int n;
 
     stdio_init();
-    if (!(f->_flag & (_IOREAD | _IORW)))
-    {
+    if (!(f->_flag & (_IOREAD | _IORW))) {
         f->_flag |= _IOERR;
         crt_errno = CRT_EBADF;
         return EOF;
     }
-    if (f->_flag & WRACT)
-    {
+    if (f->_flag & WRACT) {
         drain(f);
         f->_flag &= ~WRACT;
     }
@@ -192,8 +179,7 @@ int __cdecl _filbuf(FILE * f)
     if (f == &_iob[0])
         fflush(&_iob[1]);
     n = _read(f->_file, f->_base, (unsigned)f->_bufsiz);
-    if (n <= 0)
-    {
+    if (n <= 0) {
         f->_flag |= n == 0 ? _IOEOF : _IOERR;
         f->_cnt = 0;
         return EOF;
@@ -210,8 +196,7 @@ int __cdecl fflush(FILE * f)
     ExtraFile *e;
 
     stdio_init();
-    if (f == NULL)
-    {
+    if (f == NULL) {
         for (i = 0; i < IOSLOTS; i++)
             if (_iob[i]._flag && fflush(&_iob[i]))
                 r = EOF;
@@ -276,15 +261,13 @@ int __cdecl ungetc(int c, FILE * f)
 {
     if (c == EOF || !(f->_flag & (_IOREAD | _IORW)))
         return EOF;
-    if (f->_flag & WRACT)
-    {
+    if (f->_flag & WRACT) {
         drain(f);
         f->_flag &= ~WRACT;
     }
     if (f->_base == NULL)
         getbuf(f);
-    if (f->_cnt <= 0)
-    {
+    if (f->_cnt <= 0) {
         f->_ptr = f->_base + 1;
         f->_cnt = 0;
     }
@@ -306,10 +289,8 @@ unsigned __cdecl fread(void *buf, unsigned size, unsigned count,
 
     if (size == 0 || count == 0)
         return 0;
-    while (got < want)
-    {
-        if (f->_cnt > 0 && !(f->_flag & WRACT))
-        {
+    while (got < want) {
+        if (f->_cnt > 0 && !(f->_flag & WRACT)) {
             k = want - got < (unsigned)f->_cnt ? want - got :
                 (unsigned)f->_cnt;
             crt_copy(p + got, f->_ptr, k);
@@ -335,11 +316,20 @@ unsigned __cdecl fwrite(const void *buf, unsigned size,
 
     if (size == 0 || count == 0)
         return 0;
-    while (put < want)
-    {
+    while (put < want) {
+        if ((f->_flag & _IONBF) && put > 0 &&
+                !(f->_flag & RDACT)) {
+            int n = _write(f->_file, p + put, want - put);
+
+            if (n <= 0) {
+                f->_flag |= _IOERR;
+                break;
+            }
+            put += (unsigned)n;
+            continue;
+        }
         if (f->_cnt > 0 && !(f->_flag & RDACT)
-            && (f->_flag & WRACT))
-        {
+                && (f->_flag & WRACT)) {
             k = want - put < (unsigned)f->_cnt ? want - put :
                 (unsigned)f->_cnt;
             crt_copy(f->_ptr, p + put, k);
@@ -378,8 +368,7 @@ char *__cdecl fgets(char *buf, int n, FILE * f)
 
     if (n <= 0)
         return NULL;
-    while (i < n - 1)
-    {
+    while (i < n - 1) {
         c = fgetc(f);
         if (c == EOF)
             break;
@@ -406,12 +395,39 @@ char *__cdecl gets(char *buf)
     return buf;
 }
 
+/*
+ * File bytes behind the unread part of a read buffer. A text
+ * stream was squeezed (CR LF -> LF): every LF counts as two.
+ */
+static long unread(const FILE * f)
+{
+    long n = f->_cnt;
+    int i, st = crt_fdstate(f->_file);
+
+    if (st & 1)
+        for (i = 0; i < f->_cnt; i++)
+            n += f->_ptr[i] == '\n';
+    return n + ((st & 2) != 0);
+}
+
+/* file bytes the write buffer will become (LF -> CR LF) */
+static long pending(const FILE * f)
+{
+    long n = f->_ptr - f->_base;
+    long i, len = n;
+
+    if (crt_fdstate(f->_file) & 1)
+        for (i = 0; i < len; i++)
+            n += f->_base[i] == '\n';
+    return n;
+}
+
 int __cdecl fseek(FILE * f, long off, int whence)
 {
     if (f->_flag & WRACT)
         drain(f);
     if ((f->_flag & RDACT) && whence == 1)
-        off -= f->_cnt;
+        off -= unread(f);
     f->_flag &= ~(WRACT | RDACT | _IOEOF);
     f->_ptr = f->_base;
     f->_cnt = 0;
@@ -425,9 +441,9 @@ long __cdecl ftell(FILE * f)
     if (p < 0)
         return -1L;
     if (f->_flag & WRACT)
-        p += f->_ptr - f->_base;
+        p += pending(f);
     else if (f->_flag & RDACT)
-        p -= f->_cnt;
+        p -= unread(f);
     return p;
 }
 
@@ -470,8 +486,7 @@ int __cdecl setvbuf(FILE * f, char *buf, int mode, unsigned size)
     f->_cnt = 0;
     if (mode == 4)
         f->_flag |= _IONBF;
-    else if (buf && size > 1)
-    {
+    else if (buf && size > 1) {
         f->_base = buf;
         f->_ptr = buf;
         f->_bufsiz = (int)size;
@@ -492,8 +507,7 @@ static int parse_mode(const char *m, int *oflag, int *sflag)
 {
     int plus = 0, bin = 0, i;
 
-    for (i = 1; m[i]; i++)
-    {
+    for (i = 1; m[i]; i++) {
         if (m[i] == '+')
             plus = 1;
         else if (m[i] == 'b')
@@ -501,8 +515,7 @@ static int parse_mode(const char *m, int *oflag, int *sflag)
         else if (m[i] != 't')
             return 0;
     }
-    switch (m[0])
-    {
+    switch (m[0]) {
     case 'r':
         *oflag = plus ? O_RDWR : 0;
         *sflag = plus ? _IORW : _IOREAD;
@@ -528,8 +541,7 @@ FILE *__cdecl fopen(const char *path, const char *mode)
     FILE *f;
 
     if (path == NULL || mode == NULL || !parse_mode(mode, &oflag,
-            &sflag))
-    {
+            &sflag)) {
         crt_errno = CRT_EINVAL;
         return NULL;
     }
@@ -537,8 +549,7 @@ FILE *__cdecl fopen(const char *path, const char *mode)
     if (f == NULL)
         return NULL;
     fd = _open(path, oflag, 0);
-    if (fd < 0)
-    {
+    if (fd < 0) {
         freefile(f);
         return NULL;
     }
@@ -576,13 +587,11 @@ int __cdecl fclose(FILE * f)
     if (f->_file > 2 && _close(f->_file))
         r = EOF;
     tmp = f->_tmpfname;
-    if (tmp)
-    {
+    if (tmp) {
         _unlink(tmp);
         free(tmp);
     }
-    if (f >= _iob && f < _iob + IOSLOTS && f < _iob + 3)
-    {
+    if (f >= _iob && f < _iob + IOSLOTS && f < _iob + 3) {
         f->_ptr = NULL;
         f->_base = NULL;
         f->_cnt = 0;

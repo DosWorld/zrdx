@@ -1,0 +1,16 @@
+system nt
+name TNTD.EXE
+file TNTD.OBJ
+option start=_mainCRTStartup
+option nodefaultlibs
+import '_NtGetLastError@0' NTDLL.RtlGetLastWin32Error
+import '_NtSetLastError@4' NTDLL.RtlSetLastWin32Error
+import '_NtFill@12' NTDLL.RtlFillMemory
+import '_NtZero@8' NTDLL.RtlZeroMemory
+import '_NtMove@12' NTDLL.RtlMoveMemory
+import '_NtAlloc@12' NTDLL.RtlAllocateHeap
+import '_NtFree@12' NTDLL.RtlFreeHeap
+import '_NtRealloc@16' NTDLL.RtlReAllocateHeap
+import '_NtGetVersion@4' NTDLL.RtlGetVersion
+import '_NtTerminate@8' NTDLL.NtTerminateProcess
+import '_NtUnwind@16' NTDLL.RtlUnwind

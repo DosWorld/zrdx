@@ -1,4 +1,5 @@
-; DPMI: allocate the whole free memory (the largest block reported by 0500h) as one block
+; DPMI: allocate the whole free memory (the largest block
+; reported by 0500h) as one block
 %include "t.inc"
 bits 32
 global start

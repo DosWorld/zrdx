@@ -1,9 +1,9 @@
-"""Writes K32CP.C: the upper halves of the single byte code pages.
+"""Writes K32CP.C: upper halves of the single byte code pages.
 
-Source: the character mappings published by the Unicode Consortium
-(vendors/micsft/ and iso8859/ files), as carried by the codec tables
-of the Python standard library. Bytes that the mapping leaves
-undefined map to the code point of the same value.
+Source: the character mappings published by the Unicode
+Consortium (vendors/micsft/ and iso8859/ files), as carried by
+the codec tables of the Python standard library. Bytes
+that the mapping leaves undefined map to the code point of the same value.
 Usage: python3 GENCP.PY > K32CP.C
 """
 import sys
@@ -33,11 +33,14 @@ def main():
         t = table(cp)
         w("static const WORD t%d[128] =\n{\n" % cp)
         for i in range(0, 128, 6):
-            w("    " + ", ".join("0x%04X" % v for v in t[i:i + 6]))
+            w("    "
+              + ", ".join("0x%04X" % v for v in t[i:i + 6]))
             w(",\n" if i + 6 < 128 else "\n")
         w("};\n\n")
-    w("/* upper half of a single byte code page, NULL = Latin-1 */\n")
-    w("const WORD *w32_cptab(DWORD cp)\n{\n    switch (cp)\n    {\n")
+    w("/* upper half of a single byte code page, NULL = "
+      "Latin-1 */\n")
+    w("const WORD *w32_cptab(DWORD cp)\n{\n    switch (cp)\n   "
+      " {\n")
     for cp in PAGES:
         w("    case %d:\n        return t%d;\n" % (cp, cp))
     w("    }\n    return NULL;\n}\n")

@@ -5,7 +5,7 @@ if errorlevel 1 goto end
 HOST.COM > HOST.LOG
 for %%n in (PROBE UNSUP CBACK PHYSMAP) do call ..\rdf\ONE %%n
 PROBE.EXE > PROBE.LOG
-if errorlevel 1 echo PROBE found conformance failures; read PROBE.LOG.
+if errorlevel 1 echo PROBE failed; read PROBE.LOG
 UNSUP.EXE > UNSUP.LOG
 if errorlevel 1 echo UNSUP failed; read UNSUP.LOG.
 :end

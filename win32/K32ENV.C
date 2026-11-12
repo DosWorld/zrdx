@@ -35,8 +35,7 @@ static char up(char c)
 /* name (nul ended) equals the name part of the entry at e */
 static int match(const char *e, const char *name)
 {
-    while (*name && *e != '=' && up(*e) == up(*name))
-    {
+    while (*name && *e != '=' && up(*e) == up(*name)) {
         e++;
         name++;
     }
@@ -59,8 +58,7 @@ static int einit(void)
         return 1;
     env = NULL;
     psp = w32_psp();
-    if (psp)
-    {
+    if (psp) {
         sel = *(WORD *)(psp + 0x2C);
         w32_zero(&r, sizeof r);
         r.eax = 0x0006;
@@ -106,14 +104,12 @@ DWORD WINAPI GetEnvironmentVariableA(const char *name, char *buf,
     DWORD n;
     W32T("GetEnvironmentVariableA");
 
-    if (name == NULL || !einit())
-    {
+    if (name == NULL || !einit()) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
     e = find(name);
-    if (e == NULL)
-    {
+    if (e == NULL) {
         w32_seterr(ERROR_ENVVAR_NOT_FOUND);
         return 0;
     }
@@ -132,44 +128,37 @@ BOOL WINAPI SetEnvironmentVariableA(const char *name,
     DWORD h, n, vl = 0;
     W32T("SetEnvironmentVariableA");
 
-    if (name == NULL || name[0] == 0 || !einit())
-    {
+    if (name == NULL || name[0] == 0 || !einit()) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
     for (n = 0; name[n]; n++)
-        if (name[n] == '=')
-        {
+        if (name[n] == '=') {
             w32_seterr(ERROR_INVALID_PARAMETER);
             return FALSE;
         }
     if (value)
         vl = slen(value);
-    if (value == NULL && find(name) == NULL)
-    {
+    if (value == NULL && find(name) == NULL) {
         w32_seterr(ERROR_ENVVAR_NOT_FOUND);
         return FALSE;
     }
-    if (elen + n + vl + 3 > ENVMAX * 2)
-    {
+    if (elen + n + vl + 3 > ENVMAX * 2) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return FALSE;
     }
     nb = newblock(elen + n + vl + 3, &h);
-    if (nb == NULL)
-    {
+    if (nb == NULL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return FALSE;
     }
     d = nb;
     for (e = eblk; *e; e += slen(e) + 1)
-        if (!match(e, name))
-        {
+        if (!match(e, name)) {
             w32_copy(d, e, slen(e) + 1);
             d += slen(e) + 1;
         }
-    if (value)
-    {
+    if (value) {
         w32_copy(d, name, n);
         d += n;
         *d++ = '=';
@@ -188,8 +177,7 @@ static BOOL narrow(const WORD *w, char *out, DWORD max)
 {
     DWORD i;
 
-    for (i = 0; i < max; i++)
-    {
+    for (i = 0; i < max; i++) {
         out[i] = (char)w[i];
         if (w[i] == 0)
             return TRUE;
@@ -204,8 +192,7 @@ DWORD WINAPI GetEnvironmentVariableW(const WORD *name, WORD *buf,
     DWORD len, i;
     W32T("GetEnvironmentVariableW");
 
-    if (name == NULL || !narrow(name, n, 40))
-    {
+    if (name == NULL || !narrow(name, n, 40)) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return 0;
     }
@@ -228,8 +215,7 @@ BOOL WINAPI SetEnvironmentVariableW(const WORD *name,
     W32T("SetEnvironmentVariableW");
 
     if (name == NULL || !narrow(name, n, 40) ||
-            (value && !narrow(value, v, sizeof v)))
-    {
+            (value && !narrow(value, v, sizeof v))) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }

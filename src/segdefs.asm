@@ -3,12 +3,18 @@
 ;                     (C) 2026, Viacheslav Komenda
 ;NASM version
 
-; Segment windows share the previous initialized-image total. The final
-; package trades ordinary EText padding (224) for Text16 (64)/Text (160),
-; and native init padding for Text16 (32), IData16 (16), Text (176). Selector,
-; callback and stack limits, BSS allowance and page-aligned kernel tables
-; do not grow. Task 100 transfers another 256 native init-padding bytes
-; to Text; the initialized-image total remains constant. Rationale: docs/D09SIZE.MD.
+; Segment windows share the previous initialized-image total. The
+; final
+; package trades ordinary EText padding (224) for Text16
+; (64)/Text (160),
+; and native init padding for Text16 (32), IData16 (16), Text
+; (176). Selector,
+; callback and stack limits, BSS allowance and page-aligned
+; kernel tables
+; do not grow. Task 100 transfers another 256 native init-padding
+; bytes
+; to Text; the initialized-image total remains constant.
+; Rationale: docs/D09SIZE.MD.
 ;segment definitions for
 ;real mode rezident switchers for ZRDX DPMI host under VCPI
 %assign KernelBase 4*1024*1024
@@ -147,10 +153,18 @@ segment Data16
          ;RM stack for IDMPI host
         VSegment BSS16, 1000, 1000
 segment RelocR0
+%ifdef SWAP
+        SetupSeg 98 , 98, RelocR0
+%else
         SetupSeg 88 , 98, RelocR0
+%endif
 segment IText16
 %ifdef NATIVEPE
+%ifdef SWAP
+        SetupRTSeg 2747, 3600, IText16, RelocR0
+%else
         SetupRTSeg 2640, 3600, IText16, RelocR0
+%endif
 %elifdef NativeHost
 %ifdef SWAP
         SetupRTSeg 1488, 1488, IText16, RelocR0
@@ -158,9 +172,13 @@ segment IText16
         SetupRTSeg 1370, 1370, IText16, RelocR0
 %endif
 %elifdef SWAP
+%ifdef PEMAX
+        SetupRTSeg 2409, 2450, IText16, RelocR0
+%else
         SetupRTSeg 2160, 2400, IText16, RelocR0
+%endif
 %elifdef PEMAX
-        SetupRTSeg 2350, 2400, IText16, RelocR0
+        SetupRTSeg 2354, 2400, IText16, RelocR0
 %else
         SetupRTSeg 2200, 2400, IText16, RelocR0
 %endif
@@ -179,7 +197,7 @@ ExtenderStart equ XCurSegBaseR
 %ifdef NATIVEONLY
         SetupSeg 0, 0, EText, IData16
 %elifdef PEMAX
-        SetupSeg 10144 + FLX, 10300, EText, IData16
+        SetupSeg 10988 + FLX, 11000, EText, IData16
 %else
         SetupSeg 3552, 3900, EText, IData16
 %endif
@@ -187,7 +205,7 @@ segment EData
 %ifdef NATIVEONLY
         SetupSeg 0, 0, EData, EText
 %elifdef PEMAX
-        SetupSeg 1648 + FLX, 1750, EData, EText
+        SetupSeg 1658 + FLX, 1750, EData, EText
 %else
         SetupSeg 1520, 1600, EData, EText
 %endif
@@ -205,6 +223,8 @@ LoaderStart equ XCurSegBaseR
 %assign XCurSegBase 0
 %ifdef NATIVEONLY
         SetupSeg 0, 0, IEText, EData
+%elifdef PEMAX
+        SetupSeg 1000, 1100, IEText, EData
 %elifdef PELDR
         SetupSeg 1745, 2600, IEText, EData
 %elifdef RDFLDR
@@ -227,8 +247,14 @@ segment IEData
 %assign ROffLoaderEnd XCurSegBaseR
 %assign WinSize (ROffLoaderEnd+0FFFh+200h) & ~0FFFh
 %assign LoaderSize XCurSegBase
+%ifdef PELDR
+; stack 1600 + PELoadCtx 1572 (HdrSize 600h) + 24 bytes of data
+LoaderFullSize equ LoaderSize+3512
+        VSegment IEBSS, 3520, 3520
+%else
 LoaderFullSize equ LoaderSize+3000
         VSegment IEBSS, 3008, 3008
+%endif
         ;IDPMI host rezident code
 segment Text
 %assign OffProtectedStart XCurSegBaseR
@@ -243,6 +269,8 @@ segment Text
         SetupRTSeg 15510, 15510, Text, IEData
 %elifdef VENDOR
         SetupRTSeg 7846, 9000, Text, IEData
+%elifdef PEMAX
+        SetupRTSeg 7923, 9000, Text, IEData
 %else
         SetupRTSeg 7840, 9000, Text, IEData
 %endif

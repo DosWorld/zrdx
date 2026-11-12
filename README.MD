@@ -14,11 +14,11 @@
 
 [![License: CC0](https://img.shields.io/badge/license-CC0%201.0-brightgreen?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-MS--DOS-blue?style=for-the-badge&logo=windowsterminal&logoColor=white)](#-quick-start)
-[![Release](https://img.shields.io/badge/release-fix39-orange?style=for-the-badge)](docs/HISTORY.MD)
+[![Release](https://img.shields.io/badge/release-fix43-orange?style=for-the-badge)](docs/HISTORY.MD)
 [![DPMI](https://img.shields.io/badge/DPMI-0.9%20%E2%80%94%2049%2F49-red?style=for-the-badge)](docs/D09COV.MD)
 [![Assembler](https://img.shields.io/badge/core-NASM%20assembly-purple?style=for-the-badge)](#-building-from-source)
 
-**⚡ stub 14 KB ⚡ DPMI 0.9: 49 of 49 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡ LE · PE · RDOFF2 ⚡**
+**⚡ stub 14 KB ⚡ DPMI 0.9: 49 of 49 ⚡ VCPI / XMS / RAW ⚡ up to 4 GB ⚡ LE · PE + DLL · RDOFF2 ⚡ Win32 console layer ⚡**
 
 *Original author: Sergey Belyakov (1998-1999)
 Open source edition: DosWorld (2026)*
@@ -35,18 +35,22 @@ the main module and hands it a flat 32-bit world — exactly what DOS/4G(W) does
 but small, free and hackable. No `DOS4GW.EXE` next to your program. 🎉
 
 It is also a **standalone DPMI 0.9 host** (`zrdxdpmi.exe`) for 16-bit and 32-bit clients.
+The same host runs **console Win32 programs** (PE32 with imports and DLLs): ZRDX ships
+clean-room `KERNEL32.DLL`, `MSVCRT.DLL`, `UCRTBASE.DLL` and friends, so a program built
+with Open Watcom (`-bt=nt`) runs in plain DOS.
 
 | | |
 |---|---|
 | 🎯 **Targets** | programs built for **DOS4G/W**, **PMODE/W**, **DOS32A**, **WDOSX** with Watcom C/C++, TMT Pascal, LadSoft C, … |
-| 📦 **Formats** | **LE** (DOS4G/W style), flat 32-bit **PE32** EXE (no imports, relocations supported), **RDOFF2** (`.rdf`, NASM + RLINK) |
+| 📦 **Formats** | **LE** (DOS4G/W style), **PE32** EXE and DLL (imports, forwarders, `LoadLibrary`, TLS, SEH, relocations), **RDOFF2** (`.rdf`, NASM + RLINK) |
 | 🧠 **Memory** | all physical memory (up to **4 GB**); in a test with 3000 MB RAM one `malloc` returned a 2995 MB block (DOS/4GW: 62 MB) |
-| 🔌 **DPMI** | **DPMI 0.9, all 49 specified INT 31h functions** — 42 full, 6 paging no-ops (memory is nonpageable), vendor lookup 0A00h without vendors. [Coverage report](docs/D09COV.MD) |
+| 🔌 **DPMI** | **DPMI 0.9, all 49 specified INT 31h functions** — 42 full, 6 paging no-ops (memory is nonpageable), vendor lookup 0A00h (only the `ZRDX` PE service of `stub-pmx.exe`). [Coverage report](docs/D09COV.MD) |
 | 🖥️ **Hosts** | runs under **DPMI**, **VCPI**, **XMS** and **RAW**; it picks what is available |
 | 🔁 **DOS calls** | translates everything PMODE/W translates (except identification) and almost all of DOS4G/W |
 | 📁 **Long names** | **LFN API** (int 21h, AX=71xxh) with buffer translation |
 | 📋 **Clipboard** | **Windows clipboard API** (int 2Fh, AX=17xxh), text and bitmaps translated both ways |
-| 📏 **Size** | every packed stub is **14 336 bytes** |
+| 📏 **Size** | every packed stub is **14 336 bytes**; `stub-pmx.exe` (PE with imports or DLLs) is **18 944 bytes** |
+| 🪟 **Win32** | console layer: `KERNEL32`, `KERNELBASE`, `USER32`, `NTDLL`, `ADVAPI32`, `SHELL32`, `MSVCRT`, `UCRTBASE` (also the `api-ms-win-crt-*` names). See [`docs/WIN32.MD`](docs/WIN32.MD) |
 | 🛠️ **Tools** | built with **NASM + Open Watcom + UPX** — no proprietary compilers |
 
 > 💡 The list of all translated DOS functions is in [`src/extender.asm`](src/extender.asm).
@@ -61,10 +65,12 @@ Everything you need is in [`bin/`](bin):
 |---|---|
 | `zrdxbind.com` | binds a ZRDX stub to your program (a 2 KB `.COM`) |
 | `stub-le.exe` | the stub for **LE** programs (DOS4G/W style) |
-| `stub-pe.exe` | the stub for **PE** programs |
+| `stub-pe.exe` | the stub for **PE** programs without imports |
+| `stub-pmx.exe` | the stub for **PE** programs with imports or DLLs (chosen by `zrdxbind`) |
 | `stub-rdf.exe` | the stub for **RDOFF2** (`.rdf`) programs |
 | `zrdxconf.exe` | changes the settings of a bound program |
 | `zrdxdpmi.exe` | standalone **DPMI 0.9 host** (RAW / XMS / VCPI) with the PE loader: `zrdxdpmi PROGRAM.COM`, `zrdxdpmi PROGRAM.EXE` (PE + DLLs) |
+| `*.DLL` | the Win32 layer (8 DLLs, see below); keep them next to the program or in the current directory. `KERNELBA.DLL` is the DLL `KERNELBASE.DLL`: it needs the long name, so LFN must be on the target |
 
 > ⚠️ `zrdxbind.com` takes the stubs **only from its own directory** (found via the DOS
 > environment block, DOS 3.0+) — keep `zrdxbind.com` and the `stub-*.exe` files together.
@@ -101,7 +107,7 @@ The first client fixes the bitness of the VM — do not mix 16-bit and 32-bit cl
 
 The stub is **bound to the start of the executable**. `zrdxbind` looks at the
 input file and picks the stub: `LE` → `stub-le.exe`, `PE` → `stub-pe.exe`,
-`RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`:
+`PE` with imports or a DLL → `stub-pmx.exe`, `RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`:
 
 | Command | What it does |
 |---|---|
@@ -120,7 +126,7 @@ zrdxbind -c doom.exe doomz.exe       :: doomz.exe = doom.exe + ZRDX
 | Format | What the loader does | Limits |
 |---|---|---|
 | **LE** | loads objects, applies fixups, creates selectors (16/32-bit, flat) | as in DOS4G/W |
-| **PE** | allocates the image at any free address, loads sections, applies **base relocations** when the address differs from `ImageBase`, gives flat 4 GB code/data selectors, starts at the entry point | PE32/i386 EXE only; **no imports, DLLs, delay imports or TLS** (clear diagnostic); a `.reloc` directory is required unless the image lands on its `ImageBase`; stack = `SizeOfStackReserve` (64 KB … 4 MB) |
+| **PE** | allocates the image at any free address, loads sections, applies **base relocations** when the address differs from `ImageBase`, resolves imports by name (also forwarders and `api-ms-win-crt-*`), runs `DllMain` and TLS callbacks, gives flat 4 GB code/data selectors, starts at the entry point | PE32/i386 only, up to 32 sections; **no delay imports**, no threads; a `.reloc` directory is required unless the image lands on its `ImageBase`; stack = `SizeOfStackReserve` (64 KB … 4 MB) |
 | **RDOFF2** | loads `code`/`data`/`bss`, applies relocations, starts at the exported symbol `start` (or at the code start); a return stub is on the stack, so `RET` ends the program | single module: no `import`, `library`, `segrelo`, `farimport`; `EAX`/`EBX` = linear address of the code, `EDX` = linear address of the PSP |
 
 ```bat
@@ -138,6 +144,26 @@ wlink ... option stub=zrdx.exe
 
 ---
 
+## 🪟 Win32 console programs
+
+`zrdxdpmi.exe` (or a program bound to `stub-pmx.exe`) loads a console PE32 program and the
+DLLs it imports. The DLLs are written from public API documentation only (clean room,
+[`docs/CLEANRM.MD`](docs/CLEANRM.MD)); every export has a test.
+
+| DLL | What it gives |
+|---|---|
+| `KERNEL32.DLL` (+ `KERNELBASE.DLL` forwarders) | files, console, memory and heap, environment, code pages, TEB/PEB behind `FS`, structured exceptions (`RtlUnwind` included), static and dynamic TLS, `LoadLibrary` |
+| `USER32.DLL`, `SHELL32.DLL`, `ADVAPI32.DLL`, `NTDLL.DLL` | the small subsets console programs use: `wsprintf`, `MessageBox` (text), keys, command line, registry stubs without keys, runtime helpers |
+| `MSVCRT.DLL`, `UCRTBASE.DLL` | the C runtime: stdio, strings, ctype, stdlib, time, math with x87 state, wide characters, `setjmp`, `signal`; the UCRT names `api-ms-win-crt-*` map to `UCRTBASE.DLL` |
+
+Build them in DOS with Open Watcom: `cd win32` and `BUILD.BAT`; then copy them to `bin/`.
+Programs for ZRDX itself can load plug-in DLLs through the `ZRDX` service
+([`docs/SDK.MD`](docs/SDK.MD), headers in [`sdk/`](sdk)). Details, limits and the plan:
+[`docs/WIN32.MD`](docs/WIN32.MD), [`docs/MSVCRT.MD`](docs/MSVCRT.MD), [`docs/PEABI.MD`](docs/PEABI.MD),
+[`docs/NATPE.MD`](docs/NATPE.MD).
+
+---
+
 ## 🔌 DPMI 0.9 coverage
 
 The built-in host was checked against the DPMI 0.9 specification (in [`docs/`](docs)):
@@ -146,7 +172,7 @@ The built-in host was checked against the DPMI 0.9 specification (in [`docs/`](d
 |---|---|---|
 | ✅ Full | **42** | descriptors, DOS memory, interrupts and exceptions, real-mode translation, callbacks, memory, physical mapping, virtual IF, **debug watchpoints 0B00h-0B03h** |
 | 🟡 No-op | **6** | 0600h-0603h, 0702h, 0703h: page lock / demand paging succeed, because memory is nonpageable |
-| 🔎 Lookup | **1** | 0A00h: optional vendor API lookup; no vendors, so every name returns CF=1 |
+| 🔎 Lookup | **1** | 0A00h: optional vendor API lookup; the only vendor is `ZRDX` (the PE service of the `stub-pmx.exe` kernel, 32-bit clients); the native host and foreign hosts answer CF=1 |
 
 **49 of 49** functions are in the dispatch table, for 16-bit and 32-bit clients. Current
 qualification: **55 native cases** and **17 bound API cases** on each of RAW, XMS and VCPI,
@@ -223,7 +249,8 @@ The settings are the **last 14 bytes of the bound program**:
 `zrdxbind` writes the default block; the stub reads it at start (it opens its own
 file anyway). Because it does not depend on the stub code, **the stub can be
 UPX-packed** and still be configured. Programs bound by an older `zrdxbind` have
-no such block — bind them again.
+no such block: `zrdxconf` appends a default one when it
+does not find it (also for any other file).
 
 ### 🧩 Why so few switches?
 
@@ -255,9 +282,9 @@ Only **free tools**. No Borland C, no TASM, no TLINK, no MS link.
 Set the `WATCOM` environment variable, put the tools in `PATH` and run, in `src/`:
 
 ```bat
-wmake                 :: zrdxbind.com, zrdxconf.exe and the stubs (stub-le/pe/rdf.exe) in binder\
+wmake                 :: zrdxbind.com, zrdxconf.exe, zrdxdpmi.exe and the stubs (stub-le/pe/pmx/rdf.exe) in binder\
 wmake STUB=zrdx.exe PESTUB=zrdxpe.exe RDFSTUB=zrdxrdf.exe   :: unpacked stubs
-wmake install         :: copy zrdxbind.com, zrdxconf.exe and the stubs to ..\bin
+wmake install         :: copy zrdxbind.com, zrdxconf.exe, zrdxdpmi.exe and the stubs to ..\bin
 wmake clean
 ```
 
@@ -267,6 +294,9 @@ reproducible build and check, which runs everything under DOSBox-X, is one comma
 ```sh
 python3 tests/CHECK.PY --work /tmp/ZRDXWORK
 ```
+
+The whole release matrix (CHECK.PY, the native host, RAW / XMS / VCPI on QEMU, native and
+bound) is one more command, `tests/dpmi/MATRIX.PY`; see [`docs/BUILD.MD`](docs/BUILD.MD).
 
 The runner needs `ZRDX_DOSCONF` (a dosbox-x config), `ZRDX_DRIVE_C` (DOS tools) and
 `ZRDX_DRIVE_D` (Open Watcom); the scratch root `ZRDX_SCRATCH` defaults to `/tmp`.
@@ -280,7 +310,9 @@ All variables, the native host, QEMU qualification, installation and reports:
 | `tests/CHECK.PY` | the full runner: builds in scratch, runs all suites, writes `RESULT.JSN` |
 | `tests/rdf/` | about 50 self-checking programs for the RDF and LE loaders (each prints `ok` or `FAIL`) |
 | `tests/dpmi/` | native DPMI host fixtures, 55 cases, RAW / XMS / VCPI, QEMU for CPU-fault checks |
-| `tests/pe/`, `tests/mz/`, `tests/bind/` | generated PE, MZ-aligner and binder inputs, valid and damaged |
+| `tests/pe/`, `tests/mz/`, `tests/bind/` | generated PE (with DLLs, TLS, forwarders), MZ-aligner and binder inputs, valid and damaged |
+| `tests/win32/` | the Win32 layer: console programs built by Open Watcom for KERNEL32, USER32, MSVCRT, UCRTBASE and the others |
+| `tests/swap/` | the SWAP build, RAW and XMS on QEMU (`SWAPRUN.PY`) |
 | `tests/clip/` | clipboard mock |
 | `tests/mem/` | `malloc` size comparison with DOS/4GW and CauseWay |
 
@@ -296,7 +328,8 @@ DOS file I/O larger than the transfer buffer, LFN and clipboard translation.
 
 The old dormant `vmm.asm` was removed (task 132). Paging to a file
 now lives in `src/swapmm.asm`, built only with `%assign SWAP 1`;
-see [`docs/SWAPDES.MD`](docs/SWAPDES.MD).
+see [`docs/SWAPDES.MD`](docs/SWAPDES.MD). `tests/swap/SWAPRUN.PY --regress`
+runs the whole regression on the SWAP build (RAW and XMS on QEMU).
 
 ---
 
@@ -304,7 +337,8 @@ see [`docs/SWAPDES.MD`](docs/SWAPDES.MD).
 
 ```
 bin/        prebuilt: zrdxbind.com, zrdxconf.exe, stub-le.exe, stub-pe.exe,
-            stub-rdf.exe, zrdxdpmi.exe (standalone DPMI host)
+            stub-pmx.exe, stub-rdf.exe, zrdxdpmi.exe (standalone DPMI
+            host with the PE loader) and the Win32 DLLs
 src/        the sources (NASM) and the makefile
   zrdx.asm      main file, includes everything (builds stub-le.exe)
   zrdxpe.asm    PE stub root     zrdxrdf.asm  RDOFF2 stub root
@@ -312,16 +346,22 @@ src/        the sources (NASM) and the makefile
   gmacros.asm   macros of virtual segments and labels
   segdefs.asm   segment layout and sizes
   extender.asm  DOS/BIOS call translation tables and handlers
-  dpmifunc.asm  DPMI functions (int 31h)
+  dpmifunc.asm  DPMI functions (int 31h; the second half is dpmifun2.asm)
   realinit.asm, protinit.asm  backend detection, entering PM
   prothand.asm, realhand.asm  interrupts and mode switches
   mem.asm, smm.asm            memory services (smm = active backend)
   leldr.asm / peldr.asm / rdfldr.asm   LE, PE32, RDOFF2 loaders
+  peload.asm, pereg.asm, peexp.asm, peimp.asm   PE images, modules,
+                exports, imports (DLL service); vendor.asm = ZRDX API
+  nathost.asm   native host (zrdxdpmi.exe)
   binder/       zrdxbind.com source (bnd.asm, a .COM program)
   aligner/      stub aligner
   zrdxconf.c    the settings utility
+win32/      the Win32 DLLs (C and NASM, built with BUILD.BAT) and their
+            generators
+sdk/        ZRDXAPI.H / ZRDXAPI.INC: the ZRDX service for PE programs
 tests/      CHECK.PY and the suites above
-docs/       BUILD.MD, D09COV.MD (DPMI coverage), backlog.txt, HISTORY.MD, plans
+docs/       BUILD.MD, D09COV.MD (DPMI coverage), BACKLOG.TXT, HISTORY.MD, plans
 history.txt changes by version
 LICENSE     CC0 1.0
 ```
@@ -334,9 +374,10 @@ Start with [`docs/README.MD`](docs/README.MD) — the project guide.
 
 Version **0.52OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
 to the end of the bound file, `zrdxconf` was rewritten, `zrdxbind` became a `.COM` that reads the
-stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix39**: DPMI 0.9
-hardening and the native `zrdxdpmi.exe` host, 14 336-byte packed stubs. See
-[`docs/HISTORY.MD`](docs/HISTORY.MD), the plans in [`docs/backlog.txt`](docs/backlog.txt) and
+stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix43**: DPMI 0.9
+hardening, the native `zrdxdpmi.exe` host with the PE loader and DLL service, PE DLLs, TEB/SEH/TLS,
+the Win32 console layer (KERNEL32 ... UCRTBASE), 14 336-byte packed stubs and the 18 944-byte `stub-pmx.exe`. See
+[`docs/HISTORY.MD`](docs/HISTORY.MD), the plans in [`docs/BACKLOG.TXT`](docs/BACKLOG.TXT) and
 [`history.txt`](history.txt).
 
 ---
@@ -344,17 +385,16 @@ hardening and the native `zrdxdpmi.exe` host, 14 336-byte packed stubs. See
 ## ⚠️ Notes and limitations
 
 - **Memory is not swapped to disk** in release builds. Swap-file paging exists only as an experimental build (`%assign SWAP 1`, tested on QEMU RAW/XMS, not on VCPI); see [`docs/SWAPDES.MD`](docs/SWAPDES.MD). DPMI 0600h/0601h count page locks there and are no-ops otherwise.
-- **DPMI:** 0.9 only; DPMI 1.0 is not implemented and not planned. There are no vendor extensions (0A00h answers `CF=1`).
-- **PE:** one EXE, no imports, DLLs, delay imports or TLS. DLL loading is a deferred plan ([`docs/PEPLAN.MD`](docs/PEPLAN.MD)).
-- **How it was verified:** the full campaign (55 native, 17 bound, 99 loader results) was recorded on the
-  reference machine on 2026-10-18 under DOSBox-X and QEMU. CPU-fault checks and the VCPI debug-watch checks
-  need QEMU with a FreeDOS image, which is not shipped. DOSBox-X alone cannot run them. On 2026-10-20 the PE
-  loader (including relocations, 24 cases) and a fresh rebuild of all six binaries were re-checked; the QEMU
-  campaign was not repeated.
+- **DPMI:** 0.9 only; DPMI 1.0 is not implemented and not planned. The only vendor extension is `ZRDX` (0A00h on `stub-pmx.exe`); everywhere else 0A00h answers `CF=1`.
+- **PE / Win32:** console programs only, PE32 i386, no delay imports, no threads, no GUI (`MessageBox` writes text). Only the functions listed in [`docs/WIN32.MD`](docs/WIN32.MD) and [`docs/MSVCRT.MD`](docs/MSVCRT.MD) exist; a missing DLL or import stops the load with a message ("can't open PE DLL", "unresolved PE import"). Design: [`docs/PEPLAN.MD`](docs/PEPLAN.MD).
+- **How it was verified:** the release matrix (55 native and 17 bound cases on each of RAW, XMS and VCPI,
+  99 loader results, the Win32 suites) passed on the reference machine on 2026-11-12 with DOSBox-X 2024.03.01
+  and QEMU 11.1.1 (`tests/dpmi/MATRIX.PY`). CPU-fault checks and the VCPI debug-watch checks need QEMU with a
+  FreeDOS image, which is not shipped. DOSBox-X alone cannot run them.
 - **Test setup is local:** the runners take DOSBox-X, the DOS tool tree, Open Watcom and the disk image from
   environment variables (see above); none of them is shipped.
-- **Recorded source fingerprint:** `docs/TOOLS.JSN` holds the source hash from 2026-10-18; sources changed
-  afterwards but a rebuild gives byte-identical binaries.
+- **Recorded source fingerprint:** `docs/TOOLS.JSN` holds the source hash and the file hashes of `bin/` from
+  2026-11-12; a rebuild gives byte-identical tools (the DLLs differ only in the link time stamp).
 - **Specifications in `docs/`** (`DPMI09.HTM`, `DPMI10.TXT`, `VCPI.TXT`) are third-party documents kept for
   reference. Their copyright stays with the original owners; the CC0 license applies to the ZRDX sources only.
 

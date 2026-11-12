@@ -1,4 +1,5 @@
-; Native raw switches and real/protected state procedures, both client ABIs.
+; Native raw switches and real/protected state procedures, both
+; client ABIs.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -30,7 +31,8 @@ start:  cld
         call far [entry]
         jc bad
         push ds
-        pop es                  ;0305h output buffer uses client ES, not PSP ES
+        ; 0305h output buffer uses client ES, not PSP ES
+        pop es
         mov [pmcs], cs
         mov [pmds], ds
         mov [pmss], ss

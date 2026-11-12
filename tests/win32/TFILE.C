@@ -6,8 +6,7 @@
  * "FILE: fail NN"; the stdout lines "puts-line" and "P" come
  * from the stream functions themselves.
  */
-typedef struct FILE
-{
+typedef struct FILE {
     char *_ptr;
     int _cnt;
     char *_base;
@@ -88,8 +87,7 @@ static void fail(void)
 
 static int same(const char *a, const char *b)
 {
-    while (*a && *a == *b)
-    {
+    while (*a && *a == *b) {
         a++;
         b++;
     }
@@ -202,8 +200,28 @@ static void buffer_tests(void)
     CHECK(remove("TF.FD") == 0);
 }
 
+/* ftell and fseek count CR LF of text streams */
+static void pos_tests(void)
+{
+    FILE *f = fopen("TF.POS", "w");
+    char buf[16];
+
+    CHECK(f != 0 && fputs("a\nb", f) == 0);
+    CHECK(ftell(f) == 4);
+    CHECK(fputs("\nc\n", f) == 0 && fclose(f) == 0);
+    f = fopen("TF.POS", "r");
+    CHECK(getc(f) == 'a' && ftell(f) == 1);
+    CHECK(getc(f) == '\n' && ftell(f) == 3);
+    CHECK(fseek(f, 0, 1) == 0 && getc(f) == 'b');
+    CHECK(fgets(buf, 16, f) == buf && same(buf, "\n"));
+    CHECK(ftell(f) == 6);
+    CHECK(fseek(f, 0, 2) == 0 && ftell(f) == 9);
+    CHECK(fclose(f) == 0 && remove("TF.POS") == 0);
+}
+
 void mainCRTStartup(void)
 {
+    pos_tests();
     text_tests();
     binary_tests();
     buffer_tests();

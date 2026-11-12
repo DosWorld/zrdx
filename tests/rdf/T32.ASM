@@ -1,4 +1,5 @@
-; flags and string ops, 32-bit operations in a loop (arithmetic sanity)
+; flags and string ops, 32-bit operations in a loop (arithmetic
+; sanity)
 %include "t.inc"
 bits 32
 global start

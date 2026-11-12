@@ -18,8 +18,7 @@
 #define C_HEX 0x80
 #define C_ALPHA 0x100
 
-typedef struct LConv
-{
+typedef struct LConv {
     char *decimal_point;
     char *thousands_sep;
     char *grouping;
@@ -53,8 +52,7 @@ void crt_ctype_init(void)
     int c;
     unsigned short f;
 
-    for (c = 0; c < 256; c++)
-    {
+    for (c = 0; c < 256; c++) {
         f = 0;
         if (c >= 'A' && c <= 'Z')
             f = C_UPPER | C_ALPHA;

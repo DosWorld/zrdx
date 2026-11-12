@@ -1,0 +1,15 @@
+system nt_dll
+name NTDLL.DLL
+file NTDLL.OBJ
+option nodefaultlibs
+export RtlUnwind='_NtUnwind@16'
+export RtlGetLastWin32Error='_RtlGetLastWin32Error@0'
+export RtlSetLastWin32Error='_RtlSetLastWin32Error@4'
+export RtlFillMemory='_RtlFillMemory@12'
+export RtlZeroMemory='_RtlZeroMemory@8'
+export RtlMoveMemory='_RtlMoveMemory@12'
+export RtlAllocateHeap='_RtlAllocateHeap@12'
+export RtlFreeHeap='_RtlFreeHeap@12'
+export RtlReAllocateHeap='_RtlReAllocateHeap@16'
+export RtlGetVersion='_RtlGetVersion@4'
+export NtTerminateProcess='_NtTerminateProcess@8'

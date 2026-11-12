@@ -18,24 +18,21 @@
 #define HEAP_ZERO 8UL
 #define REALLOC_IN_PLACE 0x10UL
 
-typedef struct Seg
-{
+typedef struct Seg {
     struct Seg *next;
     DWORD size;
     DWORD handle;
     DWORD pad;
 } Seg;
 
-typedef struct Heap
-{
+typedef struct Heap {
     struct Heap *next;
     Seg *segs;
     DWORD flags;
     DWORD pad;
 } Heap;
 
-typedef struct Block
-{
+typedef struct Block {
     DWORD size;
     DWORD magic;
     DWORD pad[2];
@@ -114,8 +111,7 @@ static void *take(Block *b, DWORD need, DWORD zero)
     char *u;
     DWORD i, n;
 
-    if (rest >= HDR + MIN_BLOCK)
-    {
+    if (rest >= HDR + MIN_BLOCK) {
         Block *r = (Block *)((char *)b + need);
 
         r->size = rest;
@@ -124,8 +120,7 @@ static void *take(Block *b, DWORD need, DWORD zero)
     }
     b->magic = MAGIC_USED;
     u = (char *)b + HDR;
-    if (zero)
-    {
+    if (zero) {
         n = b->size - HDR;
         for (i = 0; i < n; i++)
             u[i] = 0;
@@ -139,23 +134,19 @@ static void *halloc(Heap *h, DWORD size, DWORD zero)
     Block *b;
     DWORD need;
 
-    if (size > 0x7FFFF000UL)
-    {
+    if (size > 0x7FFFF000UL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
     need = ((size + 15) & ~15UL) + HDR;
     if (need < HDR + MIN_BLOCK)
         need = HDR + MIN_BLOCK;
-    for (s = h->segs; s; s = s->next)
-    {
+    for (s = h->segs; s; s = s->next) {
         b = first(s);
         if (s->next == NULL)
             b = (Block *)((char *)b + sizeof(Heap));
-        while ((char *)b < (char *)s + s->size)
-        {
-            if (b->magic == MAGIC_FREE)
-            {
+        while ((char *)b < (char *)s + s->size) {
+            if (b->magic == MAGIC_FREE) {
                 merge(s, b);
                 if (b->size >= need)
                     return take(b, need, zero);
@@ -164,8 +155,7 @@ static void *halloc(Heap *h, DWORD size, DWORD zero)
         }
     }
     s = newseg(h, need);
-    if (s == NULL)
-    {
+    if (s == NULL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
@@ -182,8 +172,7 @@ static Block *lookup(Heap *h, void *p)
     Block *b = (Block *)((char *)p - HDR);
 
     for (s = h->segs; s; s = s->next)
-        if (inseg(s, b))
-        {
+        if (inseg(s, b)) {
             if (((DWORD)b & 15) == 0 && b->magic == MAGIC_USED)
                 return b;
             break;
@@ -201,8 +190,7 @@ HANDLE WINAPI HeapCreate(DWORD flags, DWORD initial, DWORD max)
 
     tmp.segs = NULL;
     s = newseg(&tmp, initial);
-    if (s == NULL)
-    {
+    if (s == NULL) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
@@ -270,27 +258,27 @@ void *WINAPI HeapReAlloc(HANDLE heap, DWORD flags, void *p,
 
     if (h == NULL || p == NULL || (b = lookup(h, p)) == NULL)
         return NULL;
+    if (size > 0x7FFFF000UL) {
+        w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
+        return NULL;
+    }
     have = b->size - HDR;
     need = ((size + 15) & ~15UL) + HDR;
     if (need < HDR + MIN_BLOCK)
         need = HDR + MIN_BLOCK;
     for (s = h->segs; s && !inseg(s, b); s = s->next)
         ;
-    if (need > b->size && s)
-    {
+    if (need > b->size && s) {
         n = after(b);
         if ((char *)n < (char *)s + s->size &&
-                n->magic == MAGIC_FREE)
-        {
+                n->magic == MAGIC_FREE) {
             merge(s, n);
             if (b->size + n->size >= need)
                 b->size += n->size;
         }
     }
-    if (need <= b->size)
-    {
-        if (b->size - need >= HDR + MIN_BLOCK)
-        {
+    if (need <= b->size) {
+        if (b->size - need >= HDR + MIN_BLOCK) {
             n = (Block *)((char *)b + need);
             n->size = b->size - need;
             n->magic = MAGIC_FREE;
@@ -301,8 +289,7 @@ void *WINAPI HeapReAlloc(HANDLE heap, DWORD flags, void *p,
                 ((char *)p)[i] = 0;
         return p;
     }
-    if (flags & REALLOC_IN_PLACE)
-    {
+    if (flags & REALLOC_IN_PLACE) {
         w32_seterr(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
@@ -320,16 +307,14 @@ BOOL WINAPI HeapDestroy(HANDLE heap)
     Seg *s, *n;
     W32T("HeapDestroy");
 
-    if (h == NULL || h == process)
-    {
+    if (h == NULL || h == process) {
         w32_seterr(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
     for (pp = &heaps; *pp != h; pp = &(*pp)->next)
         ;
     *pp = h->next;
-    for (s = h->segs; s; s = n)
-    {
+    for (s = h->segs; s; s = n) {
         n = s->next;
         w32_freepages(s->handle);
     }
@@ -354,15 +339,12 @@ DWORD WINAPI HeapCompact(HANDLE heap, DWORD flags)
 
     if (h == NULL)
         return 0;
-    for (s = h->segs; s; s = s->next)
-    {
+    for (s = h->segs; s; s = s->next) {
         b = first(s);
         if (s->next == NULL)
             b = (Block *)((char *)b + sizeof(Heap));
-        while ((char *)b < (char *)s + s->size)
-        {
-            if (b->magic == MAGIC_FREE)
-            {
+        while ((char *)b < (char *)s + s->size) {
+            if (b->magic == MAGIC_FREE) {
                 merge(s, b);
                 if (b->size - HDR > best)
                     best = b->size - HDR;
@@ -392,11 +374,9 @@ void w32_heapfree(void)
     Heap *h, *n;
     Seg *s, *sn;
 
-    for (h = heaps; h; h = n)
-    {
+    for (h = heaps; h; h = n) {
         n = h->next;
-        for (s = h->segs; s; s = sn)
-        {
+        for (s = h->segs; s; s = sn) {
             sn = s->next;
             w32_freepages(s->handle);
         }

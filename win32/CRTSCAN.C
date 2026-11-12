@@ -14,8 +14,7 @@ extern int __cdecl fgetc(FILE * f);
 typedef int (*GetFn)(void *ctx);
 typedef void (*UngetFn)(int c, void *ctx);
 
-typedef struct In
-{
+typedef struct In {
     GetFn get;
     UngetFn unget;
     void *ctx;
@@ -36,8 +35,7 @@ static int next(In * in)
 
 static void back(In * in, int c)
 {
-    if (c != EOF)
-    {
+    if (c != EOF) {
         in->unget(c, in->ctx);
         in->count--;
     }
@@ -85,45 +83,37 @@ static int scan_int(In * in, int base, int width, int sgn,
         return 0;
     c = next(in);
     width--;
-    if ((c == '-' || c == '+') && width > 0)
-    {
+    if ((c == '-' || c == '+') && width > 0) {
         neg = c == '-';
         c = next(in);
         width--;
     }
-    if (c == '0' && (base == 0 || base == 16) && width > 0)
-    {
+    if (c == '0' && (base == 0 || base == 16) && width > 0) {
         int c2 = next(in), c3;
 
         width--;
         got = 1;
-        if ((c2 == 'x' || c2 == 'X') && width > 0)
-        {
+        if ((c2 == 'x' || c2 == 'X') && width > 0) {
             c3 = next(in);
-            if (dval(c3) < 16)
-            {
+            if (dval(c3) < 16) {
                 base = 16;
                 c = c3;
                 width--;
                 got = 0;
-            }
-            else
-            {
+            } else {
                 back(in, c3);
                 back(in, c2);
                 width++;
                 c = next(in);
             }
-        }
-        else
+        } else
             c = c2;
         if (base == 0)
             base = 8;
     }
     if (base == 0)
         base = 10;
-    for (;;)
-    {
+    for (;;) {
         d = dval(c);
         if (c == EOF || d >= base)
             break;
@@ -134,8 +124,7 @@ static int scan_int(In * in, int base, int width, int sgn,
         t3 = (*hi >> 16) * (DWORD)base + (t2 >> 16);
         *lo = (t0 & 0xFFFF) | ((t1 & 0xFFFF) << 16);
         *hi = (t2 & 0xFFFF) | ((t3 & 0xFFFF) << 16);
-        if (width <= 0)
-        {
+        if (width <= 0) {
             c = EOF;
             break;
         }
@@ -146,8 +135,7 @@ static int scan_int(In * in, int base, int width, int sgn,
         back(in, c);
     if (!got)
         return 0;
-    if (neg)
-    {
+    if (neg) {
         *lo = ~*lo + 1;
         *hi = ~*hi + (*lo == 0);
     }
@@ -163,19 +151,16 @@ static int scan_float(In * in, int width, char *buf)
     if (!skip_space(in))
         return 0;
     c = next(in);
-    if ((c == '-' || c == '+') && n < width)
-    {
+    if ((c == '-' || c == '+') && n < width) {
         buf[n++] = (char)c;
         c = next(in);
     }
-    for (; c != EOF && n < width && n < 380; c = next(in))
-    {
+    for (; c != EOF && n < width && n < 380; c = next(in)) {
         if (c >= '0' && c <= '9')
             digits = 1;
         else if (c == '.' && !seen_dot && !seen_e)
             seen_dot = 1;
-        else if ((c == 'e' || c == 'E') && digits && !seen_e)
-        {
+        else if ((c == 'e' || c == 'E') && digits && !seen_e) {
             seen_e = 1;
             buf[n++] = (char)c;
             c = next(in);
@@ -184,8 +169,7 @@ static int scan_float(In * in, int width, char *buf)
             else
                 back(in, c);
             continue;
-        }
-        else
+        } else
             break;
         buf[n++] = (char)c;
     }
@@ -194,8 +178,7 @@ static int scan_float(In * in, int width, char *buf)
     return digits;
 }
 
-typedef struct Set
-{
+typedef struct Set {
     const char *p;
     int len;
     int neg;
@@ -205,19 +188,25 @@ static int in_set(const Set * s, int c)
 {
     int i, hit = 0;
 
-    for (i = 0; i < s->len; i++)
-    {
-        if (i + 2 < s->len && s->p[i + 1] == '-')
-        {
+    for (i = 0; i < s->len; i++) {
+        if (i + 2 < s->len && s->p[i + 1] == '-') {
             if (c >= (unsigned char)s->p[i] &&
                     c <= (unsigned char)s->p[i + 2])
                 hit = 1;
             i += 2;
-        }
-        else if (c == (unsigned char)s->p[i])
+        } else if (c == (unsigned char)s->p[i])
             hit = 1;
     }
     return hit != s->neg;
+}
+
+/* store c at index i of a char or (wide) WORD target */
+static void put_ch(void *q, int i, int c, int wide)
+{
+    if (wide)
+        ((WORD *) q)[i] = (WORD) c;
+    else
+        ((char *)q)[i] = (char)c;
 }
 
 static int scan_engine(In * in, const char *fmt, va_list ap)
@@ -227,20 +216,16 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
     DWORD lo, hi;
     char buf[400];
 
-    for (; *fmt; fmt++)
-    {
-        if (is_space((unsigned char) * fmt))
-        {
+    for (; *fmt; fmt++) {
+        if (is_space((unsigned char) * fmt)) {
             skip_space(in);
             continue;
         }
-        if (*fmt != '%' || fmt[1] == '%')
-        {
+        if (*fmt != '%' || fmt[1] == '%') {
             if (*fmt == '%')
                 fmt++;
             c = next(in);
-            if (c != (unsigned char) * fmt)
-            {
+            if (c != (unsigned char) * fmt) {
                 back(in, c);
                 return assigned == 0 && c == EOF && first ? EOF :
                        assigned;
@@ -249,8 +234,7 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
         }
         fmt++;
         suppress = 0;
-        if (*fmt == '*')
-        {
+        if (*fmt == '*') {
             suppress = 1;
             fmt++;
         }
@@ -258,26 +242,21 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
         while (*fmt >= '0' && *fmt <= '9')
             width = width * 10 + (*fmt++ - '0');
         size = 0;
-        for (;; fmt++)
-        {
+        for (;; fmt++) {
             if (*fmt == 'h')
                 size = 1;
-            else if (*fmt == 'l' && fmt[1] == 'l')
-            {
+            else if (*fmt == 'l' && fmt[1] == 'l') {
                 size = 3;
                 fmt++;
-            }
-            else if (*fmt == 'l')
+            } else if (*fmt == 'l')
                 size = 2;
             else if (*fmt == 'L')
                 size = 2;
             else if (fmt[0] == 'I' && fmt[1] == '6'
-                     && fmt[2] == '4')
-            {
+                     && fmt[2] == '4') {
                 size = 3;
                 fmt += 2;
-            }
-            else
+            } else
                 break;
         }
         conv = *fmt;
@@ -286,8 +265,7 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
         if (width == 0)
             width = 0x7FFFFFFF;
         ok = 0;
-        switch (conv)
-        {
+        switch (conv) {
         case 'd':
         case 'i':
         case 'u':
@@ -300,22 +278,17 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
                           : 16,
                           width, conv == 'd' || conv == 'i', &lo,
                           &hi);
-            if (ok && !suppress)
-            {
-                if (size == 3)
-                {
+            if (ok && !suppress) {
+                if (size == 3) {
                     DWORD *q = va_arg(ap, DWORD *);
 
                     q[0] = lo;
                     q[1] = hi;
-                }
-                else if (size == 1)
-                {
-                    unsigned short *q = va_arg(ap, unsigned short *);
+                } else if (size == 1) {
+                    WORD *q = va_arg(ap, WORD *);
 
                     *q = (unsigned short)lo;
-                }
-                else
+                } else
                     *va_arg(ap, DWORD *) = lo;
                 assigned++;
             }
@@ -326,8 +299,7 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
         case 'g':
         case 'G':
             ok = scan_float(in, width, buf);
-            if (ok && !suppress)
-            {
+            if (ok && !suppress) {
                 double d = strtod(buf, NULL);
 
                 if (size >= 2)
@@ -337,53 +309,46 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
                 assigned++;
             }
             break;
-        case 'c':
-        {
-            char *q = suppress ? NULL : va_arg(ap, char *);
+        case 'c': {
+            void *q = suppress ? NULL : va_arg(ap, void *);
             int n = width == 0x7FFFFFFF ? 1 : width;
 
-            for (ok = 0; ok < n; ok++)
-            {
+            for (ok = 0; ok < n; ok++) {
                 c = next(in);
                 if (c == EOF)
                     break;
                 if (q)
-                    q[ok] = (char)c;
+                    put_ch(q, ok, c, size == 2);
             }
             ok = ok == n;
             if (ok && q)
                 assigned++;
         }
         break;
-        case 's':
-        {
-            char *q = suppress ? NULL : va_arg(ap, char *);
+        case 's': {
+            void *q = suppress ? NULL : va_arg(ap, void *);
             int n = 0;
 
-            if (skip_space(in))
-            {
-                while (n < width && (c = next(in)) != EOF)
-                {
-                    if (is_space(c))
-                    {
+            if (skip_space(in)) {
+                while (n < width && (c = next(in)) != EOF) {
+                    if (is_space(c)) {
                         back(in, c);
                         break;
                     }
                     if (q)
-                        q[n] = (char)c;
+                        put_ch(q, n, c, size == 2);
                     n++;
                 }
             }
             if (q && n)
-                q[n] = 0;
+                put_ch(q, n, 0, size == 2);
             ok = n > 0;
             if (ok && q)
                 assigned++;
         }
         break;
-        case '[':
-        {
-            char *q = suppress ? NULL : va_arg(ap, char *);
+        case '[': {
+            void *q = suppress ? NULL : va_arg(ap, void *);
             Set set;
             int n = 0;
 
@@ -397,19 +362,17 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
             while (*fmt && *fmt != ']')
                 fmt++;
             set.len = (int)(fmt - set.p);
-            while (n < width && (c = next(in)) != EOF)
-            {
-                if (!in_set(&set, c))
-                {
+            while (n < width && (c = next(in)) != EOF) {
+                if (!in_set(&set, c)) {
                     back(in, c);
                     break;
                 }
                 if (q)
-                    q[n] = (char)c;
+                    put_ch(q, n, c, size == 2);
                 n++;
             }
             if (q && n)
-                q[n] = 0;
+                put_ch(q, n, 0, size == 2);
             ok = n > 0;
             if (ok && q)
                 assigned++;
@@ -431,8 +394,7 @@ static int scan_engine(In * in, const char *fmt, va_list ap)
     return assigned;
 }
 
-typedef struct StrIn
-{
+typedef struct StrIn {
     const char *p;
 } StrIn;
 

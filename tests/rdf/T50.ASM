@@ -1,4 +1,5 @@
-; DPMI selectors: allocate until the LDT is full, set/get bases, free everything, allocate again
+; DPMI selectors: allocate until the LDT is full, set/get bases,
+; free everything, allocate again
 %include "t.inc"
 bits 32
 global start

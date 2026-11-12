@@ -1,4 +1,5 @@
-; Native 16/32-bit DPMI contract fixture. No intermediate execution.
+; Native 16/32-bit DPMI contract fixture. No intermediate
+; execution.
 bits 16
 org 100h
 %ifndef CLIENT32
@@ -58,12 +59,14 @@ start:  cld
         mov [regs+36], ax
         mov [regs+38], ax
         mov [regs+40], ax
-        mov word [regs+32], 201h ;CF supplied to real target, IF set
+        ; CF supplied to real target, IF set
+        mov word [regs+32], 201h
         mov word [regs+42], server
         mov [regs+44], ax
         cmp byte [mode], 0
         jne .target
-        mov dword [regs+42], 0BEEFDEADh ;0300h ignores packet CS:IP
+        ; 0300h ignores packet CS:IP
+        mov dword [regs+42], 0BEEFDEADh
 .target:mov dword [regs+46], 0
         cmp byte [mode], 1
         jne .default_stack
@@ -75,13 +78,16 @@ start:  cld
         mov edi, controls
         mov ecx, 2
         cld
-        rep movsd                ;all four control words must stay unchanged
+        ; all four control words must stay unchanged
+        rep movsd
         push word 1234h
         push word 5678h
         push word 9ABCh
         mov byte [step], 2
-        mov ebx, 12340160h        ;BH reset flag, BL interrupt vector
-        mov ecx, 23450003h        ;three words, preserving the high word
+        ; BH reset flag, BL interrupt vector
+        mov ebx, 12340160h
+        ; three words, preserving the high word
+        mov ecx, 23450003h
         mov edx, 3456789Ah
         mov esi, 456789ABh
         mov edi, regs

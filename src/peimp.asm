@@ -33,7 +33,12 @@ FUser equ FTarget + 4
 FRsv equ FUser + 264
 FFi equ FRsv + 4
 FDllSp equ FFi + 4
-FSize equ FDllSp + 4
+FMode equ FDllSp + 4
+FLo equ FMode + 4
+FSize equ FLo + 4
+; offset above the frame of the flat code selector of
+; the vendor caller (PELoadLib, PEFreeLib)
+CallerCs equ 4 + 4 + 32 + 4 + 4
 
 ;ss:edi = directory part of the program path (with the final
 ;separator), empty if unknown.
@@ -242,15 +247,26 @@ PELoadDll:
         lea esi, [ebp + FNames]
         call PERegFill
         jnc .ok
+        push eax                        ;not registered: free it
+        mov esi, [ebp + CtxHandle]
+        mov ax, 502h
+        call PEDpmi
+        pop eax
         cmp al, 9
-        mov eax, 5
-        je .bad
+        je .coll
+        cmp al, 10                      ;bad TLS directory
+        je .img
         mov eax, 6
+        jmp .bad
+.coll:  mov eax, 5
+        jmp .bad
+.img:   mov eax, 2
 .bad:   stc
 .ok:    ret
 
 ;[ebp + FRec] = record, [ebp + FFi] = next export index. Out: CF
-;clear and FNames = module of the next forwarder; CF set at the end.
+;clear and FNames = module of the next forwarder; CF set at the
+;end.
 PEFwdNext:
         mov esi, [ebp + FRec]
         mov edi, [es:esi + RecExpRVA]
@@ -290,7 +306,7 @@ PEFwdNext:
         add eax, ebx
         lea edi, [ebp + FNames]
         call PEFwdModName
-        jc .n
+        jc PEFwdNext
         clc
         ret
 .end:   stc
@@ -301,7 +317,7 @@ PELoadDeps:
         call PEImpInit
         jz .fw
 .d:     cmp dword [ebp + FCnt], 0
-        je .done
+        je .fw
         mov esi, [ebp + FDesc]
         mov eax, [es:esi + 12]
         or eax, eax
@@ -443,16 +459,11 @@ PEDllMain:
         cld
         ret
 
-;edx = record: initialize its imports first, then the module.
-;Modules being initialized or done are skipped (cycles).
-;Out: CF set and eax = 7 if a DllMain failed, 6 if too deep.
-PEAttach:
-        cmp dword [es:edx + RecState], 0
-        jne .skip
-        inc dword [ebp + FDepth]
-        cmp dword [ebp + FDepth], 200
-        ja .deep
-        mov dword [es:edx + RecState], 1
+;edx = record: visit (PEVisit) the DLLs it imports, then the
+;targets of its forwarders. FMode 0 (PEAttach) fails on an import
+;that is not registered, FMode 1 (PEMarkRec) skips it. Out: CF
+;clear and edx = record, or CF set and eax = the code.
+PEKids:
         push edx
         call PEImpInit
         jz .self
@@ -472,11 +483,17 @@ PEAttach:
         call PERegFind
         jc .bad
         mov edx, esi
-        call PEAttach
+        call PEVisit
         jc .fail
-        add dword [esp + 4], 20
+.next:  add dword [esp + 4], 20
         dec dword [esp]
         jmp .d
+.bad:   cmp dword [ebp + FMode], 0
+        jne .next
+        mov eax, 4
+.fail:  lea esp, [esp + 12]
+        stc
+        ret
 .done:  add esp, 8
 .self:  push dword 0
 .f:     mov eax, [esp]
@@ -491,11 +508,64 @@ PEAttach:
         call PERegFind
         jc .f
         mov edx, esi
-        call PEAttach
-        jc .ffail
-        jmp .f
+        call PEVisit
+        jnc .f
+        lea esp, [esp + 8]
+        stc
+        ret
 .fdone: add esp, 4
         pop edx
+        clc
+        ret
+
+PEVisit:
+        cmp dword [ebp + FMode], 0
+        je PEAttach
+        jmp PEMarkRec
+
+;edx = record, ecx = reason (1 attach, 0 detach): call the TLS
+;callbacks of its image (TLS directory, AddressOfCallBacks) with
+;(module handle, reason, reserved) like DllMain. Kept: edx.
+PETlsCall:
+        mov eax, [es:edx + RecTlsRVA]
+        or eax, eax
+        jz .ret
+        mov esi, [es:edx + RecBase]
+        add esi, eax
+        mov esi, [es:esi + 12]
+        or esi, esi
+        jz .ret
+.l:     mov ebx, [es:esi]
+        or ebx, ebx
+        jz .ret
+        push esi
+        push ecx
+        push edx
+        call PEDllMain.call
+        pop edx
+        pop ecx
+        pop esi
+        add esi, 4
+        jmp .l
+.ret:   ret
+
+;edx = record: initialize its imports first, then the module.
+;Modules being initialized or done are skipped (cycles).
+;Out: CF set and eax = 7 if a DllMain failed, 6 if too deep.
+PEAttach:
+        mov dword [ebp + FMode], 0
+        cmp dword [es:edx + RecState], 0
+        jne .skip
+        inc dword [ebp + FDepth]
+        cmp dword [ebp + FDepth], 200
+        ja .deep
+        mov dword [es:edx + RecState], 1
+        call PEKids
+        jc .fail
+        mov [ebp + FRec2], edx
+        mov ecx, 1
+        call PETlsCall
+        mov edx, [ebp + FRec2]
         mov ecx, 1
         cmp dword [es:edx + RecKind], 0
         je .mark
@@ -521,27 +591,25 @@ PEAttach:
         mov eax, 7
         stc
         ret
-.ffail: lea esp, [esp + 8]
-        dec dword [ebp + FDepth]
-        stc
-        ret
-.bad:   mov eax, 4
-.fail:  lea esp, [esp + 12]
-        dec dword [ebp + FDepth]
-        stc
-        ret
-.deep:  dec dword [ebp + FDepth]
-        mov eax, 6
+.deep:  mov eax, 6
+.fail:  dec dword [ebp + FDepth]
         stc
         ret
 
 ;Detach (DllMain reason 0) every initialized DLL, newest first.
 PEDetachAll:
+        mov dword [ebp + FMode], 0
+        mov eax, [ebp + FSeq0]
+        mov [ebp + FLo], eax
+;Newest first, sequence numbers FSeq - 1 down to FLo: DllMain
+;with reason 0. FMode 0: every initialized record, which is then
+;free (state 0); FMode 1: only the unmarked DLLs, state 3.
+PEDetachWalk:
         mov eax, [ebp + FSeq]
         mov [ebp + FCur], eax
 .s:     dec dword [ebp + FCur]
         mov eax, [ebp + FCur]
-        cmp eax, [ebp + FSeq0]
+        cmp eax, [ebp + FLo]
         jb .done
         mov dword [ebp + FIdx], 0
 .r:     mov ecx, [ebp + FIdx]
@@ -553,20 +621,31 @@ PEDetachAll:
         jne .r
         cmp dword [es:edx + RecState], 2
         jne .r
-        mov [ebp + FRec2], edx
+        cmp dword [ebp + FMode], 0
+        je .go
+        test dword [es:edx + RecFlags], RfMark
+        jnz .r
+        cmp dword [es:edx + RecKind], 0
+        je .r
+.go:    mov [ebp + FRec2], edx
+        xor ecx, ecx
+        call PETlsCall
+        mov edx, [ebp + FRec2]
         xor ecx, ecx
         cmp dword [es:edx + RecKind], 0
-        je .clr
+        je .st
         call PEDllMain
         mov edx, [ebp + FRec2]
-.clr:   mov dword [es:edx + RecState], 0
+.st:    mov eax, [ebp + FMode]
+        lea eax, [eax + eax * 2]
+        mov [es:edx + RecState], eax
         jmp .r
 .done:  ret
 
 ;Trampoline block for PEDllMain (CF set and eax = 6 on failure).
 PETrampOn:
 %ifdef FAKELACK
-        push fs                         ;test build only (task 169)
+        push fs                         ;test build (task 169)
         call PELoadFS
         inc dword [fs:OffPEFakeCnt]
         cmp dword [fs:OffPEFakeCnt], FAKELACK
@@ -601,7 +680,8 @@ PETrampOff:
 ;Shared by the program start and LoadLibrary. ebp = frame with
 ;FCs, FMark (registry mark), FStart (first new record), FTarget
 ;(record to initialize) and FUser set; es = ds = flat.
-;Out: CF clear, or CF set and eax = 1 open, 2 bad image, 3 unresolved,
+;Out: CF clear, or CF set and eax = 1 open, 2 bad image, 3
+;unresolved,
 ;4 bad table, 5 name conflict, 6 no memory, 7 DllMain refused.
 PEGraph:
         push fs
@@ -675,7 +755,8 @@ PEBusy:
 ;Far call from the loader: EAX = new ESP, EDX = application stack
 ;selector, ESI = flat code selector. Loads and binds the import
 ;graph, then runs the DllMain of every DLL (dependencies first).
-;Out: CF clear, or CF set and AL = the PEGraph code.
+;Out: CF clear and EDX = the FS of the program (vendor
+;function 8), or CF set and AL = the PEGraph code.
         DPROC PEBind
         push ds
         push es
@@ -722,7 +803,7 @@ PEBusy:
         mov dword [esp], 8              ;host lacks a function
         mov eax, 8
 .nl:
-        mov ecx, 0AEh                   ;codes 1 2 3 5 7 name a DLL
+        mov ecx, 0AEh                   ;codes 1 2 3 5 7: DLL
         bt ecx, eax
         jnc .noname
         lea esi, [ebp + FNames]
@@ -746,6 +827,11 @@ PEBusy:
         push ecx
         lss esp, [esp]
         mov [esp + 28], eax
+        push fs
+        call PELoadFS
+        mov edx, [fs:OffPEEntryFS]
+        pop fs
+        mov [esp + 20], edx             ;edx = entry FS
         popad
         pop fs
         pop es
@@ -754,7 +840,7 @@ PEBusy:
 
 ;LoadLibrary: edx = client path (ds). Out: CF clear and eax =
 ;handle, or CF set and eax = ABI error. The frame is on the stack
-;of the caller; [esp + 44] is its flat code selector.
+;of the caller; its flat code selector is at CallerCs.
 PELoadLib:
         push fs
         call PELoadFS
@@ -773,7 +859,7 @@ PELoadLib:
         call PEBusy
         sub esp, FSize
         mov ebp, esp
-        mov eax, [esp + FSize + 4 + 4 + 32 + 4 + 4]
+        mov eax, [esp + FSize + CallerCs]
         mov [ebp + FCs], eax
         mov dword [ebp + FRsv], 0
         xor ecx, ecx
@@ -865,65 +951,17 @@ PELoadLib:
 ;edx = record: mark it and everything it imports (RfMark).
 ;CF set if the import chain is too deep.
 PEMarkRec:
+        mov dword [ebp + FMode], 1
         test dword [es:edx + RecFlags], RfMark
         jnz .skip
         or dword [es:edx + RecFlags], RfMark
         inc dword [ebp + FDepth]
         cmp dword [ebp + FDepth], 200
         ja .deep
-        push edx
-        call PEImpInit
-        jz .self
-        push dword [ebp + FDesc]
-        push dword [ebp + FCnt]
-.d:     cmp dword [esp], 0
-        je .done
-        mov ecx, [esp + 4]
-        mov eax, [es:ecx + 12]
-        or eax, eax
-        jz .done
-        mov edx, [esp + 8]
-        mov [ebp + FRec], edx
-        call PEDescName
-        jc .next
-        lea edi, [ebp + FNames]
-        call PERegFind
-        jc .next
-        mov edx, esi
-        call PEMarkRec
-        jc .fail
-.next:  add dword [esp + 4], 20
-        dec dword [esp]
-        jmp .d
-.done:  add esp, 8
-.self:  push dword 0
-.f:     mov eax, [esp]
-        mov [ebp + FFi], eax
-        mov edx, [esp + 4]
-        mov [ebp + FRec], edx
-        call PEFwdNext
-        jc .fdone
-        mov eax, [ebp + FFi]
-        mov [esp], eax
-        lea edi, [ebp + FNames]
-        call PERegFind
-        jc .f
-        mov edx, esi
-        call PEMarkRec
-        jc .ffail
-        jmp .f
-.fdone: add esp, 4
-        pop edx
+        call PEKids
         dec dword [ebp + FDepth]
+        ret
 .skip:  clc
-        ret
-.ffail: lea esp, [esp + 8]
-        dec dword [ebp + FDepth]
-        stc
-        ret
-.fail:  lea esp, [esp + 12]
-        dec dword [ebp + FDepth]
-        stc
         ret
 .deep:  dec dword [ebp + FDepth]
         stc
@@ -931,6 +969,7 @@ PEMarkRec:
 
 ;edx = record: free its image and clear it.
 PEFreeRec:
+        call PETlsRelease
         mov esi, [es:edx + RecHandle]
         or esi, esi
         jz .z
@@ -979,33 +1018,28 @@ PERegTrim:
         jmp .again
 .ret:   ret
 
-;Detach (reason 0, reserved FRsv) every unmarked DLL, newest first,
-;then free their images. FSeq is the next sequence number.
+;Detach (reason 0, reserved FRsv) every unmarked DLL, newest
+;first, then free their images.
 PEUnloadUnmarked:
-        mov eax, [ebp + FSeq]
-        mov [ebp + FCur], eax
-.s:     dec dword [ebp + FCur]
-        jz .free
+        mov dword [ebp + FMode], 1
+        mov dword [ebp + FLo], 0FFFFFFFFh
         mov dword [ebp + FIdx], 0
-.r:     mov ecx, [ebp + FIdx]
+.p:     mov ecx, [ebp + FIdx]           ;lowest sequence to visit
         call PERegNth
-        jc .s
+        jc .go
         inc dword [ebp + FIdx]
-        mov eax, [ebp + FCur]
-        cmp [es:edx + RecSeq], eax
-        jne .r
         cmp dword [es:edx + RecState], 2
-        jne .r
+        jne .p
         test dword [es:edx + RecFlags], RfMark
-        jnz .r
+        jnz .p
         cmp dword [es:edx + RecKind], 0
-        je .r
-        mov [ebp + FRec2], edx
-        xor ecx, ecx
-        call PEDllMain
-        mov edx, [ebp + FRec2]
-        mov dword [es:edx + RecState], 3
-        jmp .r
+        je .p
+        mov eax, [es:edx + RecSeq]
+        cmp eax, [ebp + FLo]
+        jae .p
+        mov [ebp + FLo], eax
+        jmp .p
+.go:    call PEDetachWalk
 .free:  mov dword [ebp + FIdx], 0
 .f:     mov ecx, [ebp + FIdx]
         call PERegNth
@@ -1023,8 +1057,8 @@ PEUnloadUnmarked:
         ret
 
 ;Unload every DLL that cannot be reached from a root (the main
-;module and modules with explicit handles; with FRsv = 1, at exit,
-;there are no roots). Out: eax = 0, or CF set and eax = 6.
+;module and modules with explicit handles; with FRsv = 1, at
+;exit, there are no roots). Out: eax = 0, or CF set and eax = 6.
 PESweep:
         call PETrampOn
         jc .ret
@@ -1092,9 +1126,10 @@ PEFreeLib:
         call PEBusy
         sub esp, FSize
         mov ebp, esp
-        mov eax, [esp + FSize + 4 + 4 + 32 + 4 + 4]
+        mov eax, [esp + FSize + CallerCs]
         mov [ebp + FCs], eax
         mov dword [ebp + FRsv], 0
+        push esi
         call PESweep
         pushfd
         push eax
@@ -1102,7 +1137,11 @@ PEFreeLib:
         call PEBusy
         pop eax
         popfd
-        lea esp, [ebp + FSize]
+        pop esi
+        jnc .swept
+        inc dword [es:esi + RecRef]     ;nothing was unloaded
+        stc
+.swept: lea esp, [ebp + FSize]
         ret
 .bad:   mov eax, 5
         stc
@@ -1121,6 +1160,7 @@ PEExitSweep:
         mov ecx, 1
         call PEBusy
         call PESweep
+        call PETlsFreeAll
         lea esp, [ebp + FSize]
         ret
 

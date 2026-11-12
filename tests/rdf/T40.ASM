@@ -1,4 +1,5 @@
-; long file name API (INT 21h, AX=71xxh): volume info, mkdir, create, find, rename, attrs, truename, delete, rmdir
+; long file name API (INT 21h, AX=71xxh): volume info, mkdir,
+; create, find, rename, attrs, truename, delete, rmdir
 %include "t.inc"
 bits 32
 global start

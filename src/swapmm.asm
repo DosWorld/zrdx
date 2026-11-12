@@ -53,8 +53,10 @@ SwapFirstPage equ 0
         cmp dword [esi + 4], 0
         je .out
         mov eax, [esi + 4]
-        movzx eax, byte [eax]          ;InDOS at start: a host run by
-        mov [esi + 9], al              ;a DOS EXEC of a client starts at 1
+        ; InDOS at start: a host run by
+        movzx eax, byte [eax]
+        ; a DOS EXEC of a client starts at 1
+        mov [esi + 9], al
         movzx eax, byte [esi + 8]
         cmp al, 80h                    ;one bitmap page
         jbe .sz
@@ -116,12 +118,14 @@ SwapSlotAlloc:
 SwapCreate:
         push edi
         push ebp
-        mov ebx, 11h                   ;272 bytes: 260 path + name
+        ; 272 bytes: 260 path + name
+        mov ebx, 11h
         mov ah, 48h
         call Dos1Call
         jc .out
         mov ebp, edi
-        movzx ebx, word [ebp + 10]     ;environment (saved at init)
+        ; environment (saved at init)
+        movzx ebx, word [ebp + 10]
         mov [ebp + 10], ax             ;SwapNameSeg
         movzx esi, ax
         shl esi, 4                     ;esi = name linear
@@ -164,7 +168,8 @@ SwapCreate:
         inc ecx
         jmp short .tail
 .nodir: xor ecx, ecx
-.tail:  push ecx                       ;length of the directory part
+; length of the directory part
+.tail:  push ecx
         movzx eax, word [46Ch]         ;timer ticks
         movzx edx, word [ebp + 2]
         xor eax, edx
@@ -187,14 +192,16 @@ SwapCreate:
         shr esi, 4                     ;ES:DS = the name block
         mov ebx, 2                     ;read/write
         mov ecx, 2                     ;hidden
-        mov edx, 10h                   ;create new, fail if exists
+        ; create new, fail if exists
+        mov edx, 10h
         mov ax, 716Ch                  ;DS:SI = name (SI = 0)
         call Dos1Call
         pop ecx
         jnc .made
         mov ebx, esi
         shl ebx, 4
-        mov byte [ebx + ecx], 0        ;plain call: path + temp name
+        ; plain call: path + temp name
+        mov byte [ebx + ecx], 0
         xor edx, edx
         mov ecx, 2
         mov ah, 5Ah

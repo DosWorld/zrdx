@@ -54,7 +54,8 @@ DPMIFrame_SF equ 28 + DPMIExtra
 DPMIFrame_size equ 44 + DPMIExtra
         DPROC DPMIIntEntry
         cli
-        cld                     ;client DF is restored by its saved IRET frame
+        ; client DF is restored by its saved IRET frame
+        cld
 %ifdef NativeHost
         push edx
         push edi
@@ -80,8 +81,10 @@ DPMIFrame_size equ 44 + DPMIExtra
         movzx ebp, ah
         ja FnNumError@10
         cmp al, [ebp + OffDPMITable2N]
-        ; The first level indexes a compact word table; handlers are
-        ; offsets from KernelBase within the resident 64 KB Text window.
+        ; The first level indexes a compact word table; handlers
+        ; are
+        ; offsets from KernelBase within the resident 64 KB Text
+        ; window.
         movzx ebp, byte [ebp + OffDPMITable2]
         jae FnNumError@10
         movzx ebp, word [ebp + esi*2 + OffTable20]
@@ -94,11 +97,13 @@ DPMIIret:
         call NativeAfter31
 %endif
         lds esi, [esp + F + CFrESP] ;load client ss:esp
-        lea esi, [esi + 12]            ;instread of add to save CF
+        ; instread of add to save CF
+        lea esi, [esi + 12]
         push ds                      ;client ss
         push esi                     ;client new esp
 
-        mov ebp, [esi - 4]         ;load eflags from client iret frame
+        ; load eflags from client iret frame
+        mov ebp, [esi - 4]
         rcr ebp, 1                  ;copy CF to BIT0 of ebp
         rol ebp, 1
         push ebp                     ;eflags
@@ -145,7 +150,8 @@ DPMIError1: ;pop 1 dword ...
         LLabel InvalidFunction
 UnsupportedCall:
         mov al, 1
-        jmp DPMIError1       ;table dispatch pushed a return address
+        ; table dispatch pushed a return address
+        jmp DPMIError1
 FnNumError@10:
         mov al, 1
 DPMIError:
@@ -167,12 +173,15 @@ DPMIErrorN:
         mov si, bx
         xor si, [esp + DPMIFrame_SF + CFrSS]
         test si, ~3
-        jz DPMIError1InvSel       ;RPL does not distinguish the active stack
+        ; RPL does not distinguish the active stack
+        jz DPMIError1InvSel
         call CheckSelector
 FreeDescriptor1:
-        btr dword [OffLDTFree], esi ;clear alloc bit in flag vector
+        ; clear alloc bit in flag vector
+        btr dword [OffLDTFree], esi
         btr dword [OffLDTBlock], esi
-        mov byte [ebp + 5], 0      ;clear descriptor to prevent next use
+        ; clear descriptor to prevent next use
+        mov byte [ebp + 5], 0
         push edi
         lea edi, [esp + 4 + DPMIFrame_DS]
         lea ebp, [esi + 1]
@@ -180,8 +189,10 @@ FreeDescriptor1:
         pop edi
         FnRet
 
-; ESI..EBP is an LDT-index interval; EDI addresses saved DS/ES/FS/GS.
-; Share cache invalidation between ordinary and DOS-array descriptor frees.
+; ESI..EBP is an LDT-index interval; EDI addresses saved
+; DS/ES/FS/GS.
+; Share cache invalidation between ordinary and DOS-array
+; descriptor frees.
 ClearSelectorCacheRange:
         pushad
         push 4
@@ -290,9 +301,11 @@ CheckACC@10:
         test al, 70h
         jnz DPMIError2InvVal  ;this bits must be 1
         test ah, 20h
-        jnz DPMIError2InvVal     ;reserved extended-rights bit, even if P=0
+        ; reserved extended-rights bit, even if P=0
+        jnz DPMIError2InvVal
         test al, 80h
-        _ifnot jz               ;0.9 errata permit arbitrary absent types
+        ; 0.9 errata permit arbitrary absent types
+        _ifnot jz
           and al, 1110b
           cmp al, 1010b
           _ifnot je
@@ -351,7 +364,8 @@ CheckACC@10:
         DPMIFn 0, 0Dh
         movzx esi, bx
         test esi, 4
-        jz DPMIError1InvSel     ;must select the LDT; RPL is ignored
+        ; must select the LDT; RPL is ignored
+        jz DPMIError1InvSel
         shr esi, 3
         cmp esi, 16
         jae DPMIError1InvSel    ;only indices 0-15 are reserved
@@ -373,7 +387,8 @@ InitOneSelector:
         DPMIFn 1, 0
         test bx, bx
         jnz DOSAllocSize@10
-        dec bx                   ;query the maximum instead of a zero block
+        ; query the maximum instead of a zero block
+        dec bx
 DOSAllocSize@10:
         push 1
         call AllocSelectors
@@ -401,7 +416,8 @@ DOSAllocSize@10:
         shl eax, 4                 ;convert segment to LA
         mov [ebp + 2], eax           ;write base
         shl ebx, 4                 ;convert size to bytes
-        dec ebx                    ;if bx==0, DOS MUST return error
+        ; if bx==0, DOS MUST return error
+        dec ebx
         mov [ebp], bx
         shr ebx, 16
         and ebx, 0Fh
@@ -418,14 +434,16 @@ DOSAllocSize@10:
         call CheckSelectorInDX
         test bx, bx
         jnz DOSResizeSize@10
-        dec bx                   ;the failure path probes and rolls back
+        ; the failure path probes and rolls back
+        dec bx
 DOSResizeSize@10:
         push eax
         call GetSegment@10
         push ecx
         mov ecx, esi
         shl ecx, 4
-        movzx ecx, word [ecx - 13] ;DOS MCB's original paragraph count
+        ; DOS MCB's original paragraph count
+        movzx ecx, word [ecx - 13]
         push ecx
         mov ah, 4Ah
         call Dos1Call
@@ -434,7 +452,8 @@ DOSResizeSize@10:
         jne DOSResizeFailed@10
         push eax
         push ebx
-        mov bx, [esp + 8]         ;DOS can partially grow on error 8
+        ; DOS can partially grow on error 8
+        mov bx, [esp + 8]
         mov ah, 4Ah
         call Dos1Call
         pop ebx
@@ -446,7 +465,8 @@ DOSResizeFailed@10:
 DOSResized@10:
         add esp, 4
         pop ecx
-        mov ax, si                ;use the block segment, not AX=0102h
+        ; use the block segment, not AX=0102h
+        mov ax, si
         call SetupDOSSelector
         pop eax
         ret
@@ -460,7 +480,8 @@ DOSNoSelector@10:
         xor si, [esp + DPMIFrame_SF + CFrSS]
         test si, ~3
         jnz DOSFreeStackOK@10
-        mov ax, 9                 ;DOS invalid memory block, keep SS valid
+        ; DOS invalid memory block, keep SS valid
+        mov ax, 9
         jmp DPMIError1N
 DOSFreeStackOK@10:
         call CheckSelectorInDX
@@ -510,7 +531,8 @@ DosPCall:
         mov edi, [OffTSS + TSS_ESP1]
         push edi                 ;save Kernel1Stack
 %assign F F + 4
-        push dword [edi - 8]      ;client ESP    ;setup client stack
+        ; client ESP    ;setup client stack
+        push dword [edi - 8]
         pop dword [ebp + OffPMStack - OffRMStack]
         push dword [edi - 4]      ;elient SS
         pop dword [ebp + OffPMStack - OffRMStack + 4]
@@ -537,7 +559,8 @@ DosPCall:
         mov [edi + VMI_IP], eax
         db 0C7h, 47h, VMI_EndIP
         dw Dos1CallRetSwitchCode, DGROUP16
-        ;clc           ;not needed: add ebp, VMI_EAX always clear cf
+        ; clc           ;not needed: add ebp, VMI_EAX always
+        ; clear cf
         pushfd
         pop eax
         mov [edi + VMI_Flags], ax
@@ -558,7 +581,8 @@ DosPCall:
         RRT
         pop dword [OffTSS + TSS_ESP1]
         mov eax, [ebp + RMS_EAX]
-        bt word [ebp + RMS_Flags], 0  ;copy carry flag from DOS to CF
+        ; copy carry flag from DOS to CF
+        bt word [ebp + RMS_Flags], 0
         pop gs
         pop fs
         pop ebp
@@ -576,7 +600,8 @@ DosPCall:
         retf                   ;retf to pl1
 
 ;bx - selector
-;output: ebp -> pointer to descriptor or error handler call if selector incorrect
+; output: ebp -> pointer to descriptor or error handler call if
+; selector incorrect
 ;destoy: esi
 %ifndef NativeHost
 CheckSelectorInDX:
@@ -597,7 +622,8 @@ DOSInvalid@10:
         movzx esi, bx
 CheckSelector1:
         test esi, 4
-        jz DPMIError2InvSel       ;only LDT entries are writable by clients
+        ; only LDT entries are writable by clients
+        jz DPMIError2InvSel
         mov ebp, esi
         shr ebp, 3
         bt dword [OffLDTDOS], ebp
@@ -619,7 +645,8 @@ CheckSelectorRead1:
         add ebp, OffGDT
         movzx esi, byte [ebp + 5]
         and esi, 70h
-        cmp esi, 70h              ;only client-accessible code/data, not gates
+        ; only client-accessible code/data, not gates
+        cmp esi, 70h
         jne DPMIError2InvSel
         ret
 ReadLDT@10:
@@ -631,13 +658,15 @@ ReadLDT@10:
 
 
 ;stack - number of selectors to allocate
-;return: ax - first allocated selector, ebp - pointer to descriptor
+; return: ax - first allocated selector, ebp - pointer to
+; descriptor
 ;esi - index of descriptor
         DPROC AllocSelectors
 %define _t ebp
 %define _tw bp
 %define _t1 esi
-        cmp word [esp + 4], 1   ;Error if less then 1 selector requred
+        ; Error if less then 1 selector requred
+        cmp word [esp + 4], 1
         mov al, 21h
         jb near Err@10
         mov al, 11h
@@ -661,7 +690,8 @@ NextScan@10:
         _enddo jnz
 ;interval found
 SelectorsFound@10:
-        lea _t, [(_t1 * 8) - 1] ;inclusive end; 8192 entries end at FFFFh
+        ; inclusive end; 8192 entries end at FFFFh
+        lea _t, [(_t1 * 8) - 1]
         sub _tw, word [OffLDTLimit]
         _ifnot jbe
           push _t
@@ -691,7 +721,8 @@ SelectorsFound@10:
         _enddo jnz
         lea ebp, [(_t1 * 8) + 7]
         mov ax, bp
-        lea ebp, [ds:ebp + OffLDT - 7]   ;ebp - pointer to first descriptor
+        ; ebp - pointer to first descriptor
+        lea ebp, [ds:ebp + OffLDT - 7]
         clc
 ret@10:
         ret 4
@@ -742,7 +773,8 @@ Err@10:
 ;if it in AutoPassup:
 ;  check handler address for default, if client:
 ;    set CallMethodFlag
-;    replace RM passup code to call PM trap with apropriate switch code
+; replace RM passup code to call PM trap with apropriate switch
+; code
 ;  if default:
 ;    clear CallMethodFlag
 ;    replace RM passup code to far jmp to prevision RM handler
@@ -751,13 +783,16 @@ Err@10:
         movzx ebp, bl
         bt dword [OffPassupIntMap], ebp
         _ifnot jnc
-        movzx esi, byte [ebp*4 + OffFirstTrap3 + OffDefIntTrap3 + 3] ;load linked RM int number
+        ; load linked RM int number
+        movzx esi, byte [ebp*4 + OffFirstTrap3 + OffDefIntTrap3 \
+                + 3]
         bt dword [OffPassupIntMap], esi      ;
         _ifnot jnc
           push eax
           push edi
           xor eax, eax
-          mov edi, esi             ;calculate relative index of passup
+          ; calculate relative index of passup
+          mov edi, esi
           _do
             bt dword [OffPassupIntMap], edi
             adc eax, 0
@@ -774,23 +809,28 @@ Err@10:
 %endif
           cmp cx, Trap3Selector
           jne SetClientVect@10
-          cmp edx, 400h            ;edx points to Trap3 call gate ?
+          ; edx points to Trap3 call gate ?
+          cmp edx, 400h
           jb SetDefaultVect@10
 SetClientVect@10:
           mov byte [edi], PushWCode
           mov byte [edi + 3], JmpShortCode
-          lea eax, [eax + eax*4 + OffAutoPassupRJmps - OffRMS_RMHandler]
+          lea eax, [eax + eax*4 + OffAutoPassupRJmps \
+                  - OffRMS_RMHandler]
           neg eax
           mov [edi + 4], al
-          lea eax, [ds:ebp + FirstPassupSwitchCode + OffFirstSwitchCode + 3]
+          lea eax, [ds:ebp + FirstPassupSwitchCode \
+                  + OffFirstSwitchCode + 3]
           mov [edi + 1], ax
-          bts dword [OffRIntFlags], esi  ;set flag for routing to prevision RM vector
+          ; set flag for routing to prevision RM vector
+          bts dword [OffRIntFlags], esi
           _ifnot jmp
 SetDefaultVect@10:
           mov byte [edi], JmpFarCode
           mov eax, [esi*4 + OffSavedRealVectors]
           mov [edi + 1], eax
-          btr dword [OffRIntFlags], esi  ;clear flag for routing to current RM vector
+          ; clear flag for routing to current RM vector
+          btr dword [OffRIntFlags], esi
           _endif
           pop edi
           pop eax
@@ -803,7 +843,8 @@ SetDefaultVect@10:
         cmp ebp, 7 * 8   ;legacy fast FPU software interface
         je SetInt7@10
 %endif
-        test byte [ebp + OffIDT + 2], 10b  ;PL0/1 handler installed ?
+        ; PL0/1 handler installed ?
+        test byte [ebp + OffIDT + 2], 10b
         _ifnot jz                          ;else set in IDT
 SetInt7@10:
 %ifdef NativeHost
@@ -814,7 +855,8 @@ SetInt7@10:
 %endif
           mov [ebp + OffIDT + 2], cx
           mov [ebp + OffIDT], dx
-          shld esi, edx, 16               ;place high 16 bits of edx to si
+          ; place high 16 bits of edx to si
+          shld esi, edx, 16
           mov [ebp + OffIDT + 6], si
         _endif
         FnRet
@@ -823,10 +865,12 @@ SetInt7@10:
         DPMIFn 9, 1
         DPMIFn 9, 2
         lds esi, [esp + DPMIFrame_SF + CFrESP]
-        mov ebp, [esi + 8]       ;return the previous IF in all three forms
+        ; return the previous IF in all three forms
+        mov ebp, [esi + 8]
         cmp al, 2
         je VIFRead@10
-        shl al, 1               ;disable=0, enable=IF bit in the high byte
+        ; disable=0, enable=IF bit in the high byte
+        shl al, 1
         and byte [esi + 9], ~2
         or [esi + 9], al
 VIFRead@10:
@@ -838,12 +882,58 @@ VIFRead@10:
         DPMIFn B, 1
         DPMIFn B, 2
         DPMIFn B, 3
-        VCPITrap              ;debug operations share the existing ring-0 gate
+        ; debug operations share the existing ring-0 gate
+        VCPITrap
         jc DPMIError1
         FnRet
 
+%ifdef VENDORREG
+;private: the loader registers the vendor entry, CX:EDX
+        DPMIFn A, 1
+        mov [OffVendorEntry], edx
+        mov [OffVendorEntrySel], cx
+        FnRet
+
+;vendor lookup (task 152): DS:ESI = "ZRDX", 32-bit clients only;
+;ES:EDI = the entry of the PE service (as INT 2Fh 168Ah gives)
+        DPMIFn A, 0
+        push ecx
+        push edx
+        movzx ecx, word [esp + 8 + DPMIFrame_SF + CFrCS]
+        lar eax, ecx
+        jnz .bad
+        test eax, 400000h               ;D bit: a 32-bit client
+        jz .bad
+        cmp word [OffVendorEntrySel], 0
+        je .bad
+        movzx edx, word [esp + 8 + DPMIFrame_DS]
+        lsl ecx, edx
+        jnz .bad
+        mov eax, [esp + 8 + DPMIFrame_ESI]
+        add eax, 4
+        jc .bad
+        cmp eax, ecx
+        ja .bad
+        push ds
+        mov ds, edx
+        cmp dword [eax - 4], 'ZRDX'
+        jne .no
+        cmp byte [eax], 0
+.no:    pop ds
+        jne .bad
+        mov ax, [OffVendorEntrySel]
+        mov [esp + 8 + DPMIFrame_ES], ax
+        mov edi, [OffVendorEntry]
+        pop edx
+        pop ecx
+        FnRet
+.bad:   pop edx
+        pop ecx
+        jmp UnsupportedCall
+%else
         DPMIFn A, 0
         jmp UnsupportedCall ;no vendor extensions are implemented
+%endif
 
         DPMIFn 6, 4
         xor bx, bx
@@ -907,7 +997,8 @@ SwapLockCom:
         add edx, [OffnFreePages] ;add free pages in my pool
         add edx, [OffFreeXMSCount]
         RRT
-        ; Metadata occupies the permanently mapped kernel directory.
+        ; Metadata occupies the permanently mapped kernel
+        ; directory.
         ; Only a new MCB page consumes another physical page.
         cmp dword [OffFMemRover], 0
         jne .budget
@@ -974,7 +1065,8 @@ SwapLockCom:
 
 ;get version
         DPMIFn 4, 0
-        mov ax, 005Ah          ;minor 0.90, decimal 90 (DPMI 1.0 Appendix C)
+        ; minor 0.90, decimal 90 (DPMI 1.0 Appendix C)
+        mov ax, 005Ah
         mov bx, 1              ;32-bit clients supported
 %ifdef SWAP
         cmp dword [OffSwapIdx], 0
@@ -983,7 +1075,8 @@ SwapLockCom:
         _endif
 %endif
         cmp word [OffVCPICallDesc + 2], VCPISelector + 8
-        jne .v86                 ;VCPI remains active even when out of free pages
+        ; VCPI remains active even when out of free pages
+        jne .v86
         or bl, 2               ;host uses real mode outside VCPI
 .v86:   mov cl, [OffCPUType]
         mov dx, 870h
@@ -1029,20 +1122,25 @@ L045@10:
 ;Save all PM registers on client stack
         mov [esi + RMIE_EDX], edx
         mov [esi + RMIE_EAX], eax
-        mov edx, [esp + DPMIFrame_EBP] ;ebp, saved on current stack
+        ; ebp, saved on current stack
+        mov edx, [esp + DPMIFrame_EBP]
         mov [esi + RMIE_EBX], ebx
         mov [esi + RMIE_EBP], edx
         mov [esi + RMIE_ECX], ecx
-        mov edx, [esp + DPMIFrame_ESI] ;esi, saved on current stack
+        ; esi, saved on current stack
+        mov edx, [esp + DPMIFrame_ESI]
         push eax
 %assign F 4
         mov [esi + RMIE_ESI], edx
-        mov [esi + RMIE_EDI], edi            ;@@CS[26] - pointer to client DC_Struct
+        ; @@CS[26] - pointer to client DC_Struct
+        mov [esi + RMIE_EDI], edi
 %ifdef NativeHost
         mov edx, [esp + F + DPMIFrame_OrigDI]
-        mov [esi + RMIE_OriginalDI], edx ;keep high bits separate from a 16-bit pointer
+        ; keep high bits separate from a 16-bit pointer
+        mov [esi + RMIE_OriginalDI], edx
 %endif
-        mov edx, [esp + F + DPMIFrame_DS]  ;@@CS[20] - saved client DS:ESI
+        ; @@CS[20] - saved client DS:ESI
+        mov edx, [esp + F + DPMIFrame_DS]
         movzx ecx, cx
         mov [esi + RMIE_DS], dx
         mov ebp, [ebp]              ;RMStack->ebp
@@ -1052,7 +1150,8 @@ L045@10:
         mov [esi + RMIE_RealStack], ebp
         mov dl, [ss:OffA20Reset]
         RRT
-        mov [esi + RMIE_CS + 2], dl ;unused high CS byte: nested RM A20 policy
+        ; unused high CS byte: nested RM A20 policy
+        mov [esi + RMIE_CS + 2], dl
         shr al, 1
         sbb edx, edx
 ;calculate iret frame additional length(only for iret forms)
@@ -1064,7 +1163,8 @@ L045@10:
                       ;edx == 2 if al==(0|2)
 ;calculate RM stack frame lenght
         or esi, esi
-        lea eax, [ecx*2 + edx + VMIStruct_size - 2 - 1] ;full stack frame length-1  -> ax
+        ; full stack frame length-1  -> ax
+        lea eax, [ecx*2 + edx + VMIStruct_size - 2 - 1]
 ;replace kernel stack on client's if it is nonzero
         _ifnot jz
           mov ebp, esi
@@ -1082,265 +1182,4 @@ L045@10:
         add esi, VMI_EAX
         mov [ebp + VMI_ESP], esi  ;RM ESP
 
-;copy parameters
-        _ifnot jcxz
-          mov esi, [esp + F + DPMIFrame_SF + CFrESP]   ;reload client esp to esi
-          push edi
-          push es
-          add esi, 12                            ;interrupt frame length
-%ifdef NativeHost
-          call NativeRMParameters
-%endif
-          lea edi, [ebp + edx + VMIStruct_size - 2]
-          push ss
-          pop es
-          cld
-          rep movsw
-          pop es
-          pop edi
-          ;add  ebp, edx
-          ;$do
-          ;  mov  ax, ds:[esi+ecx*2-2+12]    ;get parameter from client stack
-          ;  mov  ss:[ebp+ecx*2-2+size VMIStruct-2], ax ;put it on the RM stack
-          ;$enddo loop
-          ;sub  ebp, edx
-        _endif
-;set flags value for RM iret, if requered
-        or edx, edx          ;interrupt stack frame mode ?
-        push es
-        pop ds
-        mov dx, [edi + DC_Flags]
-        _ifnot jz
-          mov [ebp + VMI_EndFlags], dx ;put flags to RM stack iret frame
-          and dh, ~(3)       ;clear TF and IF for initial flags
-        _endif
-        pop eax               ;saved client eax
-        mov [ebp + VMI_Flags], dx    ;set initial flags
-
-        or al, al            ;Fn number == 0  ?
-        mov edx, [edi + DC_IP]
-        _ifnot jnz
-          movzx edx, bl
-          mov edx, [ss:edx*4]  ;call CS:IP from current interrupt vector for function 0 only
-        _endif
-        db 0C7h, 45h, VMI_EndIP
-        dw RMIERetSwitchCode, DGROUP16
-
-;ss:ebp - RM switch stack, ds:edi - dos call struct, edx - start address
-        test bh, 1
-        jz SwitchToVMWithTransfer
-        mov byte [ss:OffA20Reset], 1 ;nested calls retain the outer RM policy
-        RRT 1
-SwitchToVMWithTransfer:
-        movzx eax, word [edi + DC_GS]
-        mov [ebp + VMI_IP], edx
-;prepare VCPI stack frame
-        movzx ecx, word [edi + DC_FS]
-        mov [ebp + VMI_GS], eax
-        movzx edx, word [edi + DC_ES]
-        mov [ebp + VMI_FS], ecx
-        movzx eax, word [edi + DC_DS]
-        mov [ebp + VMI_ES], edx
-        mov [ebp + VMI_DS], eax
-
-;load all other registers from DPMI table
-        mov edx, [edi + DC_EAX]
-        mov eax, ebp
-        mov [ebp + VMI_EAX], edx
-
-        mov ebx, [edi + DC_EBX]
-        mov ecx, [edi + DC_ECX]
-        mov edx, [edi + DC_EDX]
-        mov esi, [edi + DC_ESI]
-        mov ebp, [edi + DC_EBP]
-        mov edi, [edi + DC_EDI]
-        VCPICallTrap
-        ;jmp  SwitcherToVM
-RStackOverflow@10:
-        pop eax
-        mov esi, [esp + DPMIFrame_SF + CFrESP]  ;@@CSR
-        mov edx, [esi + 12 - RMIEStruct_size + RMIE_EDX]
-        mov ecx, [esi + 12 - RMIEStruct_size + RMIE_ECX]
-        jmp DPMIError1
-;allocate RM callback
-        DPMIFn 3, 3
-        mov esi, (nMaxCallbacks * CBTStruct_size) / 3
-        _do
-          sub esi, 4 ; (size CBTStruct)/3
-          jb DPMIError1                    ;free callback not found
-          cmp word [esi + esi*2 + OffCallbacksTable + CBT_CS], 0
-        _enddo jne
-        mov ebp, [esp + DPMIFrame_DS]
-        or ebp, ebp
-        je DPMIError1
-        lea dx, [si + OffFirstSwitchCode + MaxSystemSwitchCode]
-        lea esi, [esi + esi*2 + OffCallbacksTable]
-        mov [esi + CBT_CS], bp
-        mov ebp, [esp + DPMIFrame_ESI]
-        mov [esi + CBT_EIP], ebp
-        mov [esi + CBT_SPtrOff], edi
-        mov [esi + CBT_SPtrSeg], es
-        mov cx, DGROUP16
-        FnRet
-;Free RM callback
-        DPMIFn 3, 4
-        cmp cx, DGROUP16
-        jne DPMIError1
-        movzx esi, dx
-        lea esi, [esi + esi*2 - ((OffFirstSwitchCode + MaxSystemSwitchCode) * 3)]
-        test esi, 3         ;address must be dword aligned
-        jne DPMIError1
-        cmp esi, nMaxCallbacks * CBTStruct_size
-        jae DPMIError1
-        cmp word [esi + OffCallbacksTable + CBT_CS], 0
-        je DPMIError1       ;unused or already freed callback
-        mov word [esi + OffCallbacksTable + CBT_CS], 0
-        FnRet
-
-
-        DPROC PhMap
-%define _mapregionstart eax
-%define _mapregionstartb al
-%define _mapregionend ebp
-%define _lastdi edx
-%define _firstdi eax
-%define _tmappedpage esi
-%define _t edx
-
-        DPMIFn 8, 0
-        pushad
-        push ds
-        pop es
-        shl ebx, 16
-        mov esi, [esp + (8 * 4) + DPMIFrame_ESI]
-        shl esi, 16
-        mov bx, cx
-        mov si, di
-        mov _mapregionstart, ebx
-        and _mapregionstart, ~(0FFFh)
-        test esi, esi
-        jz near MapRangeError@12
-        cmp ebx, 100000h
-        jb near MapRangeError@12
-        mov _mapregionend, ebx
-        add _mapregionend, esi
-        jnc MapRound@12
-        test _mapregionend, _mapregionend
-        jnz near MapRangeError@12
-MapRound@12: ;zero denotes an exclusive physical end of 4 GB
-        add _mapregionend, 0FFFh
-        xor ebx, _mapregionstart
-        and _mapregionend, ~(0FFFh)
-        push _mapregionstart
-        push _mapregionend
-        sub _firstdi, _mapregionend
-        mov _lastdi, dword [OffRootMCB + MCB_StartOffset]
-        add _firstdi, _lastdi
-        jnc near Err@12
-        mov ecx, [OffRootMCB + MCB_Prev]
-        cmp _firstdi, dword [ecx + MCB_EndOffset]
-        jb near Err@12
-        push _firstdi
-        ;uses @@FirstDI, @@LastDI, ecx, esi, edi, ebp
-        shr _firstdi, 22
-        shr _lastdi, 22
-        cmp _firstdi, _lastdi
-        jae MapTables@12
-        test byte [OffPageDir + _firstdi*4], 1
-        jz MapTables@12
-        inc _firstdi                ;share the normal block's boundary table
-MapTables@12:
-        push _firstdi               ;first newly owned directory for rollback
-        _do jmp
-          lea edi, [OffPageDir + (_firstdi * 4)]
-          mov ecx, _lastdi
-          sub ecx, _firstdi
-          call XAllocPages
-          jz Recover@12
-          add _firstdi, ecx
-        _while
-        cmp _lastdi, _firstdi
-        _enddo jne
-        add esp, 4
-        pop _tmappedpage
-        pop _mapregionend
-        pop _mapregionstart
-        add ebx, _tmappedpage
-        mov [esp + PA_ECX], bx
-        shr ebx, 16
-        mov [esp + PA_EBX], bx
-        mov dword [OffRootMCB + MCB_StartOffset], _tmappedpage
-        mov _mapregionstartb, 67h
-        LLabel PatchPoint4
-        movzx _t, _mapregionstartb
-        or _mapregionend, _t ;compare matching PTE attributes, including PCD
-        shr _tmappedpage, 12
-MapDirectory@12:
-        mov _t, _tmappedpage
-        shr _t, 10
-        cli
-        mov edi, [OffPageDir + _t*4]
-        mov [OffPage2 + ((OffPageTableWin - KernelBase) >> 10)], edi
-        lea edi, [OffnEntriesInTable + _t*4]
-        InvalidateTLB
-        movzx edx, si
-        and dh, 3
-MapEntries@12:
-        inc dword [edi]
-        mov [OffPageTableWin + _t*4], _mapregionstart
-        add _mapregionstart, 1000h
-        inc _tmappedpage
-        inc _t
-        cmp _mapregionend, _mapregionstart
-        je MapComplete@12
-        test dh, 4               ;1024 entries: reload the window once per PDE
-        jz MapEntries@12
-        sti                      ;IRQs may reuse the window between directories
-        jmp MapDirectory@12
-MapComplete@12:
-        sti
-        popad
-        ret
-MapRangeError@12:
-        popad
-        mov al, 21h
-        jmp DPMIError1
-Recover@12:
-        mov edx, eax
-        pop ebx
-        call FreeNewMapTables
-        pop eax                    ;original mapping start
-Err@12:
-        pop eax
-        pop eax
-        popad
-        jmp DPMIError1
-
-
-;ebx - first page
-;edx(@@LastDI) - last page
-FreeHMPages:
-        mov eax, ebx
-        shr eax, 12
-        shl edx, 10
-        push 2                     ;shared page walker, no physical release/IRQ
-        call FreePagesN
-        ret
-
-; New mapping tables have no installed entries yet; rollback frees only
-; directories allocated by this call, excluding an existing boundary.
-FreeNewMapTables:
-.loop:  cmp ebx, edx
-        jae .done
-        push ebx
-        push edx
-        lea esi, [OffPageDir + ebx*4]
-        mov ecx, 1
-        call XFreePages
-        pop edx
-        pop ebx
-        inc ebx
-        jmp .loop
-.done:  ret
-
-        ESEG Text
+%include "dpmifun2.asm"

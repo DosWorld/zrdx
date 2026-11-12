@@ -1,4 +1,5 @@
-; DPMI memory: random allocate / verify / reallocate / free with data patterns
+; DPMI memory: random allocate / verify / reallocate / free with
+; data patterns
 %include "t.inc"
 bits 32
 global start

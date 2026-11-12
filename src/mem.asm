@@ -66,7 +66,8 @@ free:
 %ifdef NativeHost
         cmp dword [OffNativeCurrent], 0
         jne .active
-        push 0                   ;no exited client is available for IRQ delivery
+        ; no exited client is available for IRQ delivery
+        push 0
         jmp short .release
 .active:
 %endif
@@ -145,12 +146,14 @@ _err equ MemErrHandle
           ;alloc 2 new pages;
           push _newmcb
           push _curmcb
-          ;must preserve @@CurMCB, @@NewMCB, @@NewSize (esi, ebx, eax)
+          ; must preserve @@CurMCB, @@NewMCB, @@NewSize (esi,
+          ; ebx, eax)
           push eax
           push eax        ;reserve space for @@GCount
           lea edx, [esp - 8]
           _do
-            push edi             ;allocate space for phisical address
+            ; allocate space for phisical address
+            push edi
             mov edi, esp        ;set pointer to it
             xor ecx, ecx
             inc ecx             ;mov 1 to ecx
@@ -164,7 +167,8 @@ _err equ MemErrHandle
 %define _t ebp
 %define _t1 ecx
           mov _msize, dword [esi + MCB_EndOffset]
-          sub _msize, dword [esi + MCB_StartOffset] ;calculate size of the current block
+          ; calculate size of the current block
+          sub _msize, dword [esi + MCB_StartOffset]
           mov _t, _newsize
           sub _t, _msize
           _ifnot jb
@@ -177,7 +181,8 @@ _err equ MemErrHandle
             _toendif jnc
             jmp short FreeAndErr@18
 NoTempPage@18:
-            pop esi              ;discard the unwritten physical-page slot
+            ; discard the unwritten physical-page slot
+            pop esi
 FreeAndErr@18:
             add edx, 8
             _do jmp
@@ -189,11 +194,13 @@ FreeAndErr@18:
             _while
             cmp esp, edx
             _enddo jne
-            pop eax              ;two workspace dwords, then old/new MCB
+            ; two workspace dwords, then old/new MCB
+            pop eax
             pop eax
             pop esi
             pop eax
-            jmp MemFreeNoMem      ;unlink the uncommitted replacement block
+            ; unlink the uncommitted replacement block
+            jmp MemFreeNoMem
           _else ; jmp
             neg _t
             mov _t1, dword [esi + MCB_EndOffset]
@@ -204,7 +211,8 @@ FreeAndErr@18:
             call FreePages
             mov _msize, _newsize
           _endif
-          add edx, 8          ;restore pointer to @@GCount and stack base
+          ; restore pointer to @@GCount and stack base
+          add edx, 8
           ;all OK, move pages now
 %define _paddr0 ebp
 %define _paddr1 ebx
@@ -243,15 +251,19 @@ FreeAndErr@18:
           _ifnot jnz
             pop dword [eax]
           _endif
-          add dword [eax + OffnEntriesInTable - OffPageDir], _lcount
+          add dword [eax + OffnEntriesInTable - OffPageDir], \
+                  _lcount
           mov eax, [eax]
-          mov [OffPage2 + ((OffSDir1Win - KernelBase) >> 10)], eax
+          mov [OffPage2 + ((OffSDir1Win - KernelBase) >> 10)], \
+                  eax
           mov _dirindex, _paddr0
           shr _dirindex, 10
           lea _dirindex, [OffPageDir + (_dirindex * 4)]
           push dword [eax]
-          pop dword [OffPage2 + ((OffSDir0Win - KernelBase) >> 10)]
-          sub dword [eax + OffnEntriesInTable - OffPageDir], _lcount
+          pop dword [OffPage2 + ((OffSDir0Win - KernelBase) \
+                  >> 10)]
+          sub dword [eax + OffnEntriesInTable - OffPageDir], \
+                  _lcount
           _ifnot jnz
             push dword [eax]
             and dword [eax], 0
@@ -290,7 +302,8 @@ ReturnMalloc@18:
           jmp ReturnMalloc
         _else
           mov _msize, dword [esi + MCB_EndOffset]
-          sub _msize, dword [esi + MCB_StartOffset] ;calculate size of the current block
+          ; calculate size of the current block
+          sub _msize, dword [esi + MCB_StartOffset]
           sub _msize, _newsize
           _ifnot jae
             neg _msize
@@ -323,7 +336,8 @@ FindLinWindow:
 %define _c eax
 %define _t_size esi
         mov _optmcb, dword [OffRootMCB + MCB_Prev]
-        mov _optsize, dword [OffRootMCB + MCB_StartOffset] ; 0; 0FFF00000h ;LastMappedPage   !!!!!!!
+        ; 0; 0FFF00000h ;LastMappedPage   !!!!!!!
+        mov _optsize, dword [OffRootMCB + MCB_StartOffset]
         sub _optsize, dword [ecx + MCB_EndOffset]
         cmp _optsize, _newsize
         _ifnot jae
@@ -406,7 +420,8 @@ L0@22:
           jnz L0@22
         _enddo
 Exit1@22:
-        mov _nextmcb, dword [eax + MCB_Next]  ;delete MCB from free list
+        ; delete MCB from free list
+        mov _nextmcb, dword [eax + MCB_Next]
         mov _prevmcb, dword [eax + MCB_Prev]
         mov dword [edi + MCB_Prev], _prevmcb
         mov dword [edx + MCB_Next], _nextmcb
@@ -460,7 +475,8 @@ FreeMCB:
 %define _next edi
 %define _size edi
         dec dword [Offnmemblocks]
-        mov _nextmcb, dword [eax + MCB_Next]     ;exclude from allocated list
+        ; exclude from allocated list
+        mov _nextmcb, dword [eax + MCB_Next]
         mov _prevmcb, dword [eax + MCB_Prev]
         mov dword [edx + MCB_Prev], _prevmcb
         mov dword [edi + MCB_Next], _nextmcb
@@ -636,21 +652,43 @@ Exit2@30: ; ;mov word ptr ds:[0B8000h+160*6+50], 1F32h
 
         SEGM Text
         LByte DPMITable2N
+%ifdef VENDORREG
+        db 0Eh, 3, 6, 7, 1, 4, 5, 4, 1, 3, 2, 4
+%else
         db 0Eh, 3, 6, 7, 1, 4, 5, 4, 1, 3, 1, 4
+%endif
         align 4
-        DPMIRow 0, DPMIFn_0_0, DPMIFn_0_1, DPMIFn_0_2, DPMIFn_0_3, InvalidFunction, InvalidFunction, DPMIFn_0_6, DPMIFn_0_7, DPMIFn_0_8, DPMIFn_0_9, DPMIFn_0_10, DPMIFn_0_11, DPMIFn_0_12, DPMIFn_0_13
+        DPMIRow 0, DPMIFn_0_0, DPMIFn_0_1, DPMIFn_0_2, \
+                DPMIFn_0_3, InvalidFunction, InvalidFunction, \
+                DPMIFn_0_6, DPMIFn_0_7, DPMIFn_0_8, DPMIFn_0_9, \
+                DPMIFn_0_10, DPMIFn_0_11, DPMIFn_0_12, \
+                DPMIFn_0_13
         DPMIRow 1, DPMIFn_1_0, DPMIFn_1_1, DPMIFn_1_2
-        DPMIRow 2, DPMIFn_2_0, DPMIFn_2_1, DPMIFn_2_2, DPMIFn_2_3, DPMIFn_2_4, DPMIFn_2_5
-        DPMIRow 3, DPMIFn_3_0, DPMIFn_3_1, DPMIFn_3_2, DPMIFn_3_3, DPMIFn_3_4, DPMIFn_3_5, DPMIFn_3_6
+        DPMIRow 2, DPMIFn_2_0, DPMIFn_2_1, DPMIFn_2_2, \
+                DPMIFn_2_3, DPMIFn_2_4, DPMIFn_2_5
+        DPMIRow 3, DPMIFn_3_0, DPMIFn_3_1, DPMIFn_3_2, \
+                DPMIFn_3_3, DPMIFn_3_4, DPMIFn_3_5, DPMIFn_3_6
         DPMIRow 4, DPMIFn_4_0
         DPMIRow 5, DPMIFn_5_0, DPMIFn_5_1, DPMIFn_5_2, DPMIFn_5_3
-        DPMIRow 6, DPMIFn_6_0, DPMIFn_6_1, DPMIFn_6_2, DPMIFn_6_3, DPMIFn_6_4
-        DPMIRow 7, InvalidFunction, InvalidFunction, DPMIFn_7_2, DPMIFn_7_3
+        DPMIRow 6, DPMIFn_6_0, DPMIFn_6_1, DPMIFn_6_2, \
+                DPMIFn_6_3, DPMIFn_6_4
+        DPMIRow 7, InvalidFunction, InvalidFunction, \
+                DPMIFn_7_2, DPMIFn_7_3
         DPMIRow 8, DPMIFn_8_0
         DPMIRow 9, DPMIFn_9_0, DPMIFn_9_1, DPMIFn_9_2
+%ifdef VENDORREG
+        DPMIRow A, DPMIFn_A_0, DPMIFn_A_1
+%else
         DPMIRow A, DPMIFn_A_0
+%endif
         DPMIRow B, DPMIFn_B_0, DPMIFn_B_1, DPMIFn_B_2, DPMIFn_B_3
         LDWord DPMITable2
-        db OffTable20 - OffTable20, OffTable21 - OffTable20, OffTable22 - OffTable20, OffTable23 - OffTable20, OffTable24 - OffTable20, OffTable25 - OffTable20
-        db OffTable26 - OffTable20, OffTable27 - OffTable20, OffTable28 - OffTable20, OffTable29 - OffTable20, OffTable2A - OffTable20, OffTable2B - OffTable20
+        db OffTable20 - OffTable20, OffTable21 - OffTable20, \
+                OffTable22 - OffTable20, OffTable23 \
+                - OffTable20, OffTable24 - OffTable20, \
+                OffTable25 - OffTable20
+        db OffTable26 - OffTable20, OffTable27 - OffTable20, \
+                OffTable28 - OffTable20, OffTable29 \
+                - OffTable20, OffTable2A - OffTable20, \
+                OffTable2B - OffTable20
         ESEG Text

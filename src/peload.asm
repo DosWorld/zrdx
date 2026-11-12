@@ -72,7 +72,7 @@ PEHdrPos:
         push ebp
         mov [ebp + CtxHdrPos], edx
         push edx
-        push 400h
+        push HdrSize
         call FileRead
         movzx eax, ax
         cmp eax, PEOptHdr + 96
@@ -159,7 +159,10 @@ PEComOK:
         jb PETlsOK
         mov eax, [ebp + PEDirTLS]
         or eax, [ebp + PEDirTLSSize]
-        jne PEFailTls
+        jz PETlsOK
+%ifndef PEMAX
+        jmp PEFailTls                    ;checked by PETlsSetup
+%endif
 PETlsOK:
         mov ebx, [ebp + PEImageSize]
         cmp ebx, [ebp + PEHeadersSize]
@@ -305,7 +308,8 @@ SkipReloc:
         jmp short PERelocsOK
 PEBadReloc:
         jmp PEFailReloc
-;no relocation records: fine unless the file says they were stripped
+;no relocation records: fine unless the file says they were
+;stripped
 PENoRelocs:
         test byte [ebp + PEFlags], 1
         jnz PEBadReloc
@@ -386,30 +390,15 @@ FileRead:
          shr ecx, 16
          mov ebx, [ebp + CtxFile]
          mov ax, 4200h
-         ;call XX
          DOSINT 42
          jc PEReadError
-         ;int  21h
-         ;call EnableTrace
          push ds
          lds edx, [esp + 12 + 12 + 4]
          mov ecx, [esp + 12 + 4 + 4]
          mov ah, 3Fh
          DOSINT
          jc PEReadError
-         ;push eax       ;write dump
-         ;mov ebx, DumpHandle
-         ;mov ah, 40h
-         ;DOSINT
-         ;pop eax
          pop ds
-         ;call DisableTrace
-        ;push ecx
-        ;push 8
-        ;call PrintN
-        ;push eax
-        ;push 8
-        ;call PrintN
          pop edx
          pop ecx
          pop ebx

@@ -1,4 +1,5 @@
-; A sequential client may enter only the VM's first successful bitness.
+; A sequential client may enter only the VM's first successful
+; bitness.
 bits 16
 org 100h
 %ifndef CLIENT32

@@ -1,4 +1,5 @@
-; AX=0/1 for physical A20 off/on. Restore both bytes and all flags.
+; AX=0/1 for physical A20 off/on. Restore both bytes and all
+; flags.
 a20query:
         pushf
         cli
