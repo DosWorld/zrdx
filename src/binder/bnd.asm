@@ -209,7 +209,7 @@ start:
         mov ah, 9
 section .data
 IntroMsg: db 'Zurenava DOS extender bind utility ', \
-    'ver.0.52OSE. ', \
+    'ver.0.53OSE. ', \
     '(C) 1998-1999, Sergey Belyakov', 13, 10, \
     '(C) 2026, Viacheslav Komenda', 13, 10, '$'
 CfgTrailer: db 'ZRDX'

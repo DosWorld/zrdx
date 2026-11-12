@@ -5,7 +5,7 @@
 ;real mode init routines
         SEGM IData16
         LByte IntroMsg
-        db 'Zurenava DOS extender, version 0.52OSE. ', \
+        db 'Zurenava DOS extender, version 0.53OSE. ', \
         'Copyright(C) 1998-1999, Sergey Belyakov', 13, 10, \
         'Copyright(C) 2026, Viacheslav Komenda', 13, 10, '$'
         LByte FirstError

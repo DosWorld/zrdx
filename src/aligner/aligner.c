@@ -70,7 +70,7 @@ static int repack(unsigned long image_len, unsigned nl,
     memmove(buffer + off, buffer + h->hSize * 16, data);
     memmove(buffer + 0x40, buffer + h->RelocOff, h->nRelocs * 4);
     memset(buffer + 0x1C, 0, 0x40 - 0x1C);
-    strcpy(buffer + 0x1C, "Zurenava DOS extender v0.52OSE");
+    strcpy(buffer + 0x1C, "Zurenava DOS extender v0.53OSE");
     memset(buffer + off + data, 0, BUFSIZE - off - data);
     h->RelocOff = 0x40;
     buffer[0x3C] = (char)nl;
