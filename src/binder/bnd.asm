@@ -6,6 +6,8 @@
 %assign sf_c 8
 %assign sf_y 16
 %assign sf_n 32
+%assign sf_pe 64
+%assign sf_pmx 128
 %assign header_size 200h
 ;             This file is part of the ZRDX OSE project
 ;                     (C) 1998, Sergey Belyakov
@@ -46,6 +48,9 @@ DelErrMsg: db 'Can', "'", 't delete file "', 1, '"', 0
 ReadErrMsg: db 'Can', "'", 't read file "', 1, '"', 0
 BadStubMsg: db 'Invalid stub file "', 1, '"', 0
 BadHeadErrMsg: db 'Bad or unsupported header in "', 1, '"', 0
+StubFmtMsg: db 'The stub does not match the format of "', 1, \
+        '"', 0
+NeedPmxMsg: db '"', 1, '" needs stub-pmx.exe', 0
 DiskFullMsg: db ', disk full ?'
 EmptyMsg: db 0
 HelpMsg: db "Usage:", 13, 10
@@ -59,7 +64,13 @@ db "     -y option: assume yes on all questions", \
 db "  zrdxbind [-c] [-y] <old file> <new file>", 13, 10
 db "     copy <old file> with new stub to <new file>", 13, 10
 db "  zrdxbind -w [-y] [target file]", 13, 10
-db "     write zrdx stub to the target file(zrdx.exe is default)"
+db "     write zrdx stub to the target file", \
+    "(zrdx.exe is default)", 13, 10
+db "  PE only, with -r or -c:", 13, 10
+db "     -pe option: bind stub-pe.exe", 13, 10
+db "     -pmx option: bind stub-pmx.exe (DLL loading)", 13, 10
+db "     default: stub-pmx.exe for imports or a DLL", \
+    ", else stub-pe.exe"
 CrLfMsg: db 13, 10, 0
 YesMsg: db 'Yes', 13, 10, 0
 section .text
@@ -281,6 +292,20 @@ do_switch:
         call charclass
         je ParamErr
 do_switch1:
+        cmp al, 'p'
+        jne sw_table
+        lodsb
+        mov ah, sf_pe
+        cmp al, 'e'
+        je sw_set
+        cmp al, 'm'
+        jne ParamErr
+        lodsb
+        cmp al, 'x'
+        jne ParamErr
+        mov ah, sf_pmx
+        jmp short sw_set
+sw_table:
         mov cx, 5
 section .data
 SwitchTable: db 'wrcyn'
@@ -293,6 +318,7 @@ section .text
           cmp al, [bx]
         _enddo loopnz
         jne ParamErr
+sw_set:
         test SwitchFlags, ah    ;check for double switch
         jnz ParamErr           ;error if this
         or SwitchFlags, ah    ;set switch flag
@@ -301,14 +327,25 @@ section .text
         jle L0@8
         jb do_switch1
         jmp L0@8
+; the help is longer than disp_buffer: write it directly
 ParamErr:
 TooManyParms:
-        mov si, HelpMsg
-        jmp ErrorF1
+        mov dx, HelpMsg
+        mov cx, CrLfMsg + 2 - HelpMsg
+        mov bx, 1
+        mov ah, 40h
+        int 21h
+        mov ax, 4C01h
+        int 21h
 end_param:
+        mov byte [MSwitchFlags], SwitchFlags
+        mov al, SwitchFlags
+        and al, sf_pe | sf_pmx
+        cmp al, sf_pe | sf_pmx
+        je ParamErr
         test SwitchFlags, sf_w
         _ifnot je
-        test SwitchFlags, sf_c | sf_r | sf_n
+        test SwitchFlags, sf_c | sf_r | sf_n | sf_pe | sf_pmx
         jne ParamErr
         or param_count, param_count
         xchg ax, dx
@@ -331,10 +368,7 @@ section .text
           mov si, ExeExtTpl
           call set_default_ext
         _endif
-        test ah, sf_n
-        _ifnot jnz
-          call CheckForOverwrite
-        _endif
+        call CheckForOverwrite
         mov si, CreatErrMsg
         call DosCreat
         xchg bx, ax
@@ -344,7 +378,6 @@ section .text
         _endif
         or param_count, param_count
         jz ParamErr
-        mov byte [MSwitchFlags], SwitchFlags
         mov di, SrcName
         mov si, ExeExtTpl
         call set_default_ext
@@ -774,30 +807,48 @@ lwrite:
           cmp bp, di
         _enddo jne
         ret
-write_le_stub:
-        mov dx, StubLeName
-        jmp short write_stub_file
-; buffer = PE header. stub-pmx.exe when the DLL flag is set or
-; the import directory is non-empty, else stub-pe.exe.
+; buffer = PE header. -pmx: stub-pmx.exe. Else stub-pmx.exe
+; when the DLL flag is set or the import directory is non-empty
+; (-pe is then an error), else stub-pe.exe.
 write_pe_stub:
-        mov dx, StubPeName
+        mov dx, StubPmxName
+        test byte [MSwitchFlags], sf_pmx
+        jnz write_stub_file
         cmp word [header_count], 136
-        jb write_stub_file
+        jb wps_pe
         test byte [buffer + 23], 20h
-        jnz .pmx
+        jnz wps_pmx
         cmp word [buffer + 118], 0
-        jne .dirs
+        jne wps_dirs
         cmp word [buffer + 116], 2
-        jb write_stub_file
-.dirs:  mov ax, [buffer + 128]
+        jb wps_pe
+wps_dirs:
+        mov ax, [buffer + 128]
         or ax, [buffer + 130]
         or ax, [buffer + 132]
         or ax, [buffer + 134]
+        jz wps_pe
+wps_pmx:
+        test byte [MSwitchFlags], sf_pe
         jz write_stub_file
-.pmx:   mov dx, StubPmxName
+        mov si, NeedPmxMsg
+        jmp short wps_err
+wps_pe:
+        mov dx, StubPeName
         jmp short write_stub_file
+write_le_stub:
+        mov dx, StubLeName
+        jmp short wps_other
 write_rdf_stub:
         mov dx, StubRdfName
+; -pe and -pmx are for PE images only
+wps_other:
+        test byte [MSwitchFlags], sf_pe | sf_pmx
+        jz write_stub_file
+        mov si, StubFmtMsg
+wps_err:
+        mov dx, SrcName
+        jmp ErrorF2
 write_stub_file:
         push si
         push di

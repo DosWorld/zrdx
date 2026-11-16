@@ -14,7 +14,7 @@
 
 [![License: CC0](https://img.shields.io/badge/license-CC0%201.0-brightgreen?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-MS--DOS-blue?style=for-the-badge&logo=windowsterminal&logoColor=white)](#-quick-start)
-[![Release](https://img.shields.io/badge/release-fix43-orange?style=for-the-badge)](docs/HISTORY.MD)
+[![Release](https://img.shields.io/badge/release-0.53OSE-orange?style=for-the-badge)](docs/HISTORY.MD)
 [![DPMI](https://img.shields.io/badge/DPMI-0.9%20%E2%80%94%2049%2F49-red?style=for-the-badge)](docs/D09COV.MD)
 [![Assembler](https://img.shields.io/badge/core-NASM%20assembly-purple?style=for-the-badge)](#-building-from-source)
 
@@ -66,7 +66,7 @@ Everything you need is in [`bin/`](bin):
 | `zrdxbind.com` | binds a ZRDX stub to your program (a 2 KB `.COM`) |
 | `stub-le.exe` | the stub for **LE** programs (DOS4G/W style) |
 | `stub-pe.exe` | the stub for **PE** programs without imports |
-| `stub-pmx.exe` | the stub for **PE** programs with imports or DLLs (chosen by `zrdxbind`) |
+| `stub-pmx.exe` | the stub for **PE** programs with imports or DLLs (chosen by `zrdxbind`, or forced with `-pmx`) |
 | `stub-rdf.exe` | the stub for **RDOFF2** (`.rdf`) programs |
 | `zrdxconf.exe` | changes the settings of a bound program |
 | `zrdxdpmi.exe` | standalone **DPMI 0.9 host** (RAW / XMS / VCPI) with the PE loader: `zrdxdpmi PROGRAM.COM`, `zrdxdpmi PROGRAM.EXE` (PE + DLLs) |
@@ -88,7 +88,7 @@ hellz.exe
 ```
 
 ```
-Zurenava DOS extender, version 0.52OSE. Copyright(C) 1998-1999, Sergey Belyakov
+Zurenava DOS extender, version 0.53OSE. Copyright(C) 1998-1999, Sergey Belyakov
 Copyright(C) 2026, Viacheslav Komenda
 hello from 32-bit
 ```
@@ -107,7 +107,8 @@ The first client fixes the bitness of the VM — do not mix 16-bit and 32-bit cl
 
 The stub is **bound to the start of the executable**. `zrdxbind` looks at the
 input file and picks the stub: `LE` → `stub-le.exe`, `PE` → `stub-pe.exe`,
-`PE` with imports or a DLL → `stub-pmx.exe`, `RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`:
+`PE` with imports or a DLL → `stub-pmx.exe`, `RDOFF2` → `stub-rdf.exe`. To put it on an already linked program use `-r` or `-c`.
+For a PE the stub can be forced with `-pe` or `-pmx`:
 
 | Command | What it does |
 |---|---|
@@ -115,6 +116,13 @@ input file and picks the stub: `LE` → `stub-le.exe`, `PE` → `stub-pe.exe`,
 | `zrdxbind -r -n prog.exe` | the same, **n**o backup copy |
 | `zrdxbind -c prog.exe out.exe` | **c**opies the program to a new file and binds ZRDX to it; the original stays untouched |
 | `zrdxbind -w zrdx.exe` | **w**rites the **LE** stub itself to a file (a copy of `stub-le.exe`) |
+| `zrdxbind -c -pmx host.exe hostz.exe` | binds `stub-pmx.exe` to a PE **without imports** that loads DLLs at run time (`LoadLibrary`, see [`docs/SDK.MD`](docs/SDK.MD)) |
+| `zrdxbind -c -pe prog.exe progz.exe` | binds `stub-pe.exe` (the default for a plain PE) |
+| `-y` | assume **y**es: never ask before an overwrite |
+
+A wrong switch is an error (exit code 1, nothing is written):
+`-pe`/`-pmx` on an `LE` or `RDOFF2` program, `-pe` on a PE with
+imports or a DLL, both switches together, or a switch with `-w`.
 
 ```bat
 zrdxbind -r -n doom.exe              :: bind to doom.exe, no backup
@@ -372,11 +380,12 @@ Start with [`docs/README.MD`](docs/README.MD) — the project guide.
 
 ## 📜 History
 
-Version **0.52OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
+Version **0.51OSE**: the project moved to NASM + Open Watcom + UPX, the settings were moved
 to the end of the bound file, `zrdxconf` was rewritten, `zrdxbind` became a `.COM` that reads the
-stubs from its directory, PE and RDOFF2 loaders were added. Current release **fix43**: DPMI 0.9
+stubs from its directory, PE and RDOFF2 loaders were added. Current release **0.53OSE**: DPMI 0.9
 hardening, the native `zrdxdpmi.exe` host with the PE loader and DLL service, PE DLLs, TEB/SEH/TLS,
-the Win32 console layer (KERNEL32 ... UCRTBASE), 14 336-byte packed stubs and the 18 944-byte `stub-pmx.exe`. See
+the Win32 console layer (KERNEL32 ... UCRTBASE), 14 336-byte packed stubs, the 18 944-byte `stub-pmx.exe`
+and the `zrdxbind` stub switches `-pe` / `-pmx`. See
 [`docs/HISTORY.MD`](docs/HISTORY.MD), the plans in [`docs/BACKLOG.TXT`](docs/BACKLOG.TXT) and
 [`history.txt`](history.txt).
 
@@ -388,13 +397,13 @@ the Win32 console layer (KERNEL32 ... UCRTBASE), 14 336-byte packed stubs and th
 - **DPMI:** 0.9 only; DPMI 1.0 is not implemented and not planned. The only vendor extension is `ZRDX` (0A00h on `stub-pmx.exe`); everywhere else 0A00h answers `CF=1`.
 - **PE / Win32:** console programs only, PE32 i386, no delay imports, no threads, no GUI (`MessageBox` writes text). Only the functions listed in [`docs/WIN32.MD`](docs/WIN32.MD) and [`docs/MSVCRT.MD`](docs/MSVCRT.MD) exist; a missing DLL or import stops the load with a message ("can't open PE DLL", "unresolved PE import"). Design: [`docs/PEPLAN.MD`](docs/PEPLAN.MD).
 - **How it was verified:** the release matrix (55 native and 17 bound cases on each of RAW, XMS and VCPI,
-  99 loader results, the Win32 suites) passed on the reference machine on 2026-11-12 with DOSBox-X 2024.03.01
+  99 loader results, the Win32 suites) passed on the reference machine on 2026-11-16 with DOSBox-X 2024.03.01
   and QEMU 11.1.1 (`tests/dpmi/MATRIX.PY`). CPU-fault checks and the VCPI debug-watch checks need QEMU with a
   FreeDOS image, which is not shipped. DOSBox-X alone cannot run them.
 - **Test setup is local:** the runners take DOSBox-X, the DOS tool tree, Open Watcom and the disk image from
   environment variables (see above); none of them is shipped.
 - **Recorded source fingerprint:** `docs/TOOLS.JSN` holds the source hash and the file hashes of `bin/` from
-  2026-11-12; a rebuild gives byte-identical tools (the DLLs differ only in the link time stamp).
+  2026-11-16; a rebuild gives byte-identical tools (the DLLs differ only in the link time stamp).
 - **Specifications in `docs/`** (`DPMI09.HTM`, `DPMI10.TXT`, `VCPI.TXT`) are third-party documents kept for
   reference. Their copyright stays with the original owners; the CC0 license applies to the ZRDX sources only.
 

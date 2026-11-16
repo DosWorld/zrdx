@@ -1,7 +1,8 @@
 # ZRDX PE SDK
 
 Programs that run on stub-pmx.exe (a PE with imports or DLLs,
-chosen by zrdxbind) may load DLLs at run time. The API is the
+chosen by zrdxbind) may load DLLs at run time. A program
+without imports must be bound with `zrdxbind -pmx`. The API is the
 vendor entry "ZRDX" (INT 2Fh AX=168Ah); sdk/ZRDXAPI.INC wraps it.
 
 ## Use from NASM

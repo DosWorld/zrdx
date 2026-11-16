@@ -186,6 +186,26 @@ extende2.asm, prothan2.asm, realini2.asm and dpmifun2.asm at
 their end (task 150). Docs name the first part; the objects are
 byte-identical to the unsplit ones.
 
+## Release number
+
+The owner sets the release number in the root README.MD (the
+release badge, "Current release" in the History section and the
+sample banner). That file is the only source; never choose or
+change the number yourself. When it changes, copy it to these
+places only, and never add the number anywhere else (other
+documents point to the root README.MD):
+
+- src/realinit.asm (stub banner, all four stubs),
+- src/zrdxconf.c (zrdxconf banner),
+- src/aligner/aligner.c (aligned MZ header text),
+- src/binder/bnd.asm (zrdxbind banner),
+- file_id.diz.
+
+Then rebuild, run CHECK.PY and MATRIX.PY and install the tools
+whose bytes changed (see "Installation and use"). Check that no
+other place has it: grep -rn "OSE" --exclude-dir=EVID . (the
+older 0.51OSE in history.txt and README.MD is history).
+
 ## Installation and use
 
 wmake install copies seven matching files into ../bin: zrdxbind.com,
@@ -216,9 +236,20 @@ HELLZ.EXE
 R:\BIN\zrdxconf HELLZ.EXE
 ```
 
--c creates a bound copy; -r replaces a stub in-place; -n suppresses the
-backup. Existing PE support remains single-module PE32 without DLLs,
-imports, TLS or delay imports. Proposed DLL APIs in PEPLAN.MD do not exist.
+-c creates a bound copy; -r replaces a stub in-place; -n
+suppresses the backup; -y never asks before an overwrite.
+For a PE the binder picks stub-pmx.exe for imports or a DLL,
+else stub-pe.exe. -pe or -pmx forces the stub: a PE without
+imports that calls LoadLibrary needs -pmx. A switch on an LE or
+RDF image, -pe on a PE with imports, both switches, or a switch
+with -w is an error (exit code 1, no output file):
+
+```bat
+R:\BIN\zrdxbind -c -pmx HOST.EXE HOSTZ.EXE
+```
+
+PE support (stub-pmx.exe): DLLs, imports, TLS and SEH; delay
+imports are rejected (PEABI.MD, SDK.MD).
 
 ## Test input, converter and output relationships
 
@@ -235,7 +266,9 @@ imports, TLS or delay imports. Proposed DLL APIs in PEPLAN.MD do not exist.
   -> zrdxbind -> EXE -> RESULT.LOG.
 - tests/mz/GEN.PY -> six EXE inputs and RUN.BAT -> aligner -> RESULT.LOG;
   verify() checks exact payload preservation and unchanged rejected files.
-- tests/bind/GEN.PY -> four BAD inputs and RUN.BAT -> binder -> RESULT.LOG.
+- tests/bind/GEN.PY -> six BAD inputs (MZ, LE, RDF headers), two
+  PE copies from tests/pe and RUN.BAT -> binder -> RESULT.LOG;
+  verify() checks the stub of each output (stub switches).
 - tests/CHECK.PY orchestrates these steps, verifies outputs and generates
   RESULT.JSN with provider identification and all five tool SHA256 values.
 - tests/mem/MEM.C -> BUILD.BAT with Watcom -> MEMD/MEMC/MEMZ.EXE ->
